@@ -1,0 +1,188 @@
+{
+  "$comment": "Hand-written source for atum-work/brand.json. Regenerate with `node scripts/atum-work/brand-map.mjs` after a pin bump and review the count diff. Paths are relative to apps/web. Provider-facing identity (CodexChatGptAuth.ts, CodexProvider.ts) is deliberately absent.",
+  "scan": [
+    "index.html",
+    "vite.config.ts",
+    "gt.config.json",
+    "public/manifest.webmanifest",
+    "src",
+    "../../packages/shared/src",
+    "../../packages/client-runtime/src"
+  ],
+  "exclude": [
+    "\\.test\\.",
+    "\\.bench\\.",
+    "/__tests__/",
+    "test-fixtures",
+    "testUtils",
+    "/src/i18n/translations/",
+    "routeTree\\.gen\\.ts$"
+  ],
+  "extensions": [".ts", ".tsx", ".html", ".json", ".webmanifest"],
+  "files": [
+    {
+      "file": "gt.config.json",
+      "from": "\"locales\": [\"de\", \"es\", \"fr\", \"ja\", \"ko\", \"pt-BR\", \"ru\", \"sv\", \"zh\"]",
+      "to": "\"locales\": []",
+      "why": "Atum ships English now and Vietnamese with Q5. Rebranded English source no longer matches the upstream catalogs' hashes."
+    },
+    {
+      "file": "index.html",
+      "from": "<title>T3 Code</title>",
+      "to": "<title>Atum Work</title>"
+    },
+    {
+      "file": "index.html",
+      "from": "alt=\"T3 Code\"",
+      "to": "alt=\"Atum\""
+    },
+    {
+      "file": "vite.config.ts",
+      "from": "baseName: \"T3 Code\"",
+      "to": "baseName: \"Atum Work\""
+    },
+    {
+      "file": "public/manifest.webmanifest",
+      "from": "\"name\": \"T3 Code\"",
+      "to": "\"name\": \"Atum Work\""
+    },
+    {
+      "file": "public/manifest.webmanifest",
+      "from": "\"short_name\": \"T3 Code\"",
+      "to": "\"short_name\": \"Work\""
+    },
+    {
+      "file": "src/branding.ts",
+      "from": "?? \"T3 Code\"",
+      "to": "?? \"Atum Work\""
+    },
+    {
+      "file": "src/branding.logic.ts",
+      "from": "(input.development ? \"Dev\" : \"Beta\")",
+      "to": "(input.development ? \"Dev\" : \"Latest\")",
+      "why": "The served client is not a hosted channel build (that mode never connects to its own server). A release build names itself plainly, without (Beta)."
+    },
+    {
+      "file": "src/components/sidebar/SidebarChrome.tsx",
+      "from": "<T3Wordmark aria-label=\"T3\" className=\"h-[1cap] w-auto shrink-0\" />",
+      "to": "<T3Wordmark aria-label=\"Atum\" className=\"size-4 shrink-0 self-center\" />",
+      "why": "The eclipse is square and needs more than cap height to read."
+    },
+    {
+      "file": "src/components/sidebar/SidebarChrome.tsx",
+      "from": "{\"Code\"}",
+      "to": "{\"Work\"}"
+    },
+    {
+      "file": "src/components/ui/standalone-page.tsx",
+      "from": "font-medium tracking-tight\">Code</span>",
+      "to": "font-medium tracking-tight\">Work</span>"
+    },
+    {
+      "file": "../../packages/shared/src/themePalettes.ts",
+      "from": "label: \"T3 Chat\"",
+      "to": "label: \"Classic\""
+    },
+    {
+      "file": "../../packages/contracts/src/browserImport.ts",
+      "from": "Give T3 Code Full Disk Access",
+      "to": "Give Atum Full Disk Access"
+    },
+    {
+      "file": "../../packages/contracts/src/device.ts",
+      "from": "not on the T3 server's PATH. Install npm (it comes with Node.js from nodejs.org), restart T3 Code,",
+      "to": "not on the Atum server's PATH. Install npm (it comes with Node.js from nodejs.org), restart Atum,"
+    },
+    {
+      "file": "../../packages/contracts/src/managedPolicy.ts",
+      "from": "manages T3 Code updates.",
+      "to": "manages Atum updates."
+    },
+    {
+      "file": "../../packages/contracts/src/pullRequest.ts",
+      "from": "in T3 Code",
+      "to": "in Atum"
+    },
+    {
+      "file": "src/components/clerk/T3ConnectUserProfilePage.tsx",
+      "from": "available through T3\n",
+      "to": "available through\n",
+      "why": "JSX copy wraps between T3 and Connect."
+    },
+    {
+      "file": "src/components/chat/ChatHeader.tsx",
+      "from": "From <Var>{activeThreadLinkOrigin}</Var>",
+      "to": "Started by <Var>{activeThreadLinkOrigin}</Var>",
+      "why": "Plan 9.4: a delegated thread reads \"Started by Luna\". Main names each agent's peer link from the account's agent record."
+    },
+    {
+      "file": "src/components/chat/ChatHeader.tsx",
+      "from": "Started by an agent on <Var>{activeThreadLinkOrigin}</Var> through a linked\n                  environment.",
+      "to": "<Var>{activeThreadLinkOrigin}</Var> started this. You can type here or stop it."
+    },
+    {
+      "file": "src/components/ui/standalone-page.tsx",
+      "from": "<T3Wordmark className=\"h-3 w-auto shrink-0 text-foreground\" aria-hidden />",
+      "to": "<T3Wordmark className=\"size-5 shrink-0 self-center\" aria-hidden />"
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "name=T3%20Code",
+      "to": "name=Atum%20Work",
+      "why": "Names the connector the person adds in Poke."
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "connectorName=T3%20Code",
+      "to": "connectorName=Atum%20Work",
+      "why": "Names the connector the person adds in Claude."
+    }
+  ],
+  "tokens": [
+    {
+      "from": "T3 Code",
+      "to": "Atum"
+    },
+    {
+      "from": "T3 Connect",
+      "to": "Connect"
+    },
+    {
+      "from": "T3 Chat",
+      "to": "Chat"
+    },
+    {
+      "from": "T3 Server",
+      "to": "Atum server"
+    },
+    {
+      "from": "T3 thread",
+      "to": "thread"
+    },
+    {
+      "from": "T3 desktop",
+      "to": "the desktop app"
+    },
+    {
+      "from": "T3 ",
+      "to": "Atum ",
+      "skip": ["../../packages/client-runtime/src/errors/transport.ts"],
+      "why": "Last: catches the remaining prose (T3 server, T3 home, T3 process, T3 could not ...). The transport regex matches legacy server text and must stay."
+    }
+  ],
+  "assets": [
+    {
+      "file": "src/components/T3Wordmark.tsx",
+      "source": "assets/T3Wordmark.tsx",
+      "why": "The Atum eclipse mark under the upstream component name, so no call site changes."
+    }
+  ],
+  "icons": {
+    "favicon.ico": "assets/icons/favicon.ico",
+    "favicon-16x16.png": "assets/icons/favicon-16x16.png",
+    "favicon-32x32.png": "assets/icons/favicon-32x32.png",
+    "apple-touch-icon.png": "assets/icons/apple-touch-icon.png",
+    "icon-192x192.png": "assets/icons/icon-192x192.png",
+    "icon-512x512.png": "assets/icons/icon-512x512.png"
+  }
+}

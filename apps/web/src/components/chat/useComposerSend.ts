@@ -133,6 +133,7 @@ import {
   prepareTurnAttachments,
   restoreComposerDraft,
 } from "./chatViewSend";
+import { checkWorkSubmitAccess } from "./workSubmitAccess";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -1048,6 +1049,24 @@ export function useComposerSend(input: ComposerSendInput) {
     };
     sendInFlightRef.current = true;
     const sendGeneration = ++composerSendGenerationRef.current;
+    const accessCheck =
+      approvalFeedbackTarget === undefined
+        ? checkWorkSubmitAccess(
+            multipleModelSelections === null
+              ? [ctxSelectedModelSelection.instanceId]
+              : multipleTargets.map(({ selection }) => selection.instanceId),
+          )
+        : undefined;
+    if (accessCheck) {
+      const refusal = await accessCheck;
+      if (composerSendGenerationRef.current !== sendGeneration) return;
+      const routeChanged = currentRouteThreadKeyRef.current !== routeThreadKey;
+      if (refusal !== null || routeChanged) {
+        sendInFlightRef.current = false;
+        if (refusal !== null && !routeChanged) setThreadError(threadIdForSend, refusal);
+        return;
+      }
+    }
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();
     if (attachmentCapabilitiesBeforeUpload.fileBlockReason !== null) {
       sendInFlightRef.current = false;

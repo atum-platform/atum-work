@@ -1,0 +1,79 @@
+name: Atum Work verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [atum/main, atum/v0.1.11]
+    paths:
+      - ".github/workflows/atum-work.yml"
+      - "apps/server/**"
+      - "apps/web/**"
+      - "atum-work/**"
+      - "native/resource-monitor/**"
+      - "scripts/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atum-work-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # As upstream ci.yml: skip .repos/ (reference trees). Its gitlinks have no .gitmodules, so
+          # persist-credentials: false (whose auth removal runs `git submodule foreach`) fails the
+          # checkout; the job token is already read-only (permissions: contents: read).
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+        with:
+          node-version-file: package.json
+          cache: false
+          run-install: false
+      - name: Install scoped workspace dependencies
+        run: vp install --frozen-lockfile --filter=@t3tools/web... --filter=t3... --filter=@t3tools/scripts... --filter=@t3tools/oxlint-plugin-t3code...
+      - name: Check the stable-tag replay
+        run: |
+          node --test scripts/atum-work/brand.test.mjs
+          node scripts/atum-work/brand-map.mjs
+          git diff --exit-code atum-work/brand.json
+          node scripts/atum-work/brand.mjs --check atum-work/brand.json
+          git fetch --no-tags https://github.com/pingdotgg/t3code refs/tags/v0.1.10:refs/tags/v0.1.10 refs/tags/v0.1.11:refs/tags/v0.1.11
+          scripts/atum-work/replay.sh
+      - name: Typecheck and lint
+        run: |
+          vp run --filter t3 --filter @t3tools/web --filter @t3tools/scripts typecheck
+          vp lint --report-unused-disable-directives apps/server/src/telemetry/AnalyticsService.ts apps/web/src/components/chat/useComposerSend.ts apps/web/src/components/chat/workSubmitAccess* apps/web/src/routes/__root.tsx apps/web/vite.config.ts scripts/build-cli-archive.ts scripts/atum-work
+      - name: Test composer and server defaults
+        run: |
+          node apps/web/node_modules/playwright/cli.js install --only-shell chromium
+          (cd apps/web && vp test run --project unit src/components/chat/workSubmitAccess.test.ts src/components/chat/composerSubmission.test.ts)
+          (cd apps/web && vp test run --project browser src/components/chat/workSubmitAccess.browser.test.tsx)
+          (cd apps/server && vp test run src/cloud/publicConfig.test.ts src/telemetry/AnalyticsService.test.ts src/serverSettings.test.ts src/mcp/McpHttpServer.test.ts)
+      - name: Build and smoke the standalone archive
+        if: ${{ github.event.pull_request.draft != true && hashFiles('atum-work/brand.json') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_version=$(node -p 'process.version')
+          node_tar="node-$node_version-darwin-arm64.tar.gz"
+          node_dist="https://nodejs.org/dist/$node_version"
+          curl -fsSL "$node_dist/$node_tar" -o "$RUNNER_TEMP/$node_tar"
+          curl -fsSL "$node_dist/SHASUMS256.txt" -o "$RUNNER_TEMP/SHASUMS256.txt"
+          (cd "$RUNNER_TEMP" && grep "  $node_tar$" SHASUMS256.txt | shasum -a 256 -c)
+          tar -xzf "$RUNNER_TEMP/$node_tar" -C "$RUNNER_TEMP" "node-$node_version-darwin-arm64/LICENSE"
+          node scripts/atum-work/build.mjs v0.1.11 atum-work/brand.json "$RUNNER_TEMP/node-$node_version-darwin-arm64/LICENSE" "$RUNNER_TEMP/work"
+          node scripts/atum-work/smoke.mjs "$RUNNER_TEMP/work/atum-work-0.1.11-darwin-arm64.tar.gz" "Atum Work"

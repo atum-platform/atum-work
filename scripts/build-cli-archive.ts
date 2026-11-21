@@ -32,6 +32,7 @@ import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-package
 import { signWithJsign } from "./lib/windows-jsign.ts";
 import { windowsSystemTar } from "./lib/windows-tar.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+import { writeRuntimeNotices } from "./atum-work/runtimeNotices.ts";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64"]);
@@ -590,6 +591,7 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   readonly version: string;
   readonly outputDir: string;
   readonly resourceMonitorDir: Option.Option<string>;
+  readonly noticeDir: Option.Option<string>;
   readonly notarySubmissionFile: Option.Option<string>;
 }) {
   const fs = yield* FileSystem.FileSystem;
@@ -643,6 +645,13 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     arch: input.arch,
     version: input.version,
   });
+
+  if (Option.isSome(input.noticeDir)) {
+    const target = path.join(contentDir, "licenses");
+    yield* fs.copy(input.noticeDir.value, target);
+    yield* fs.copyFile(path.join(repoRoot, "LICENSE"), path.join(contentDir, "LICENSE"));
+    yield* Effect.promise(() => writeRuntimeNotices(contentDir, repoRoot));
+  }
 
   const executablePath = path.join(contentDir, executableName);
   if (input.platform === "linux") {
@@ -723,6 +732,10 @@ const command = Command.make(
       Flag.withDescription(
         "Directory laid out like dist/resource-monitor (defaults to apps/server/dist/resource-monitor).",
       ),
+      Flag.optional,
+    ),
+    noticeDir: Flag.String("notice-dir").pipe(
+      Flag.withDescription("Copy standalone runtime notices beside the executable."),
       Flag.optional,
     ),
     notarySubmissionFile: Flag.String("notary-submission-file").pipe(
