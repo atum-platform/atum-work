@@ -36,8 +36,8 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
 
 // Use the upstream fixture's ready provider. The unit suite verifies the production instance filter.
 vi.mock(import("./workSubmitAccess"), async (original) => {
-  const { checkWorkSubmitAccess } = await original();
-  return { checkWorkSubmitAccess: () => checkWorkSubmitAccess(["atum-managed"]) };
+  const actual = await original();
+  return { ...actual, checkWorkSubmitAccess: () => actual.checkWorkSubmitAccess(["atum-managed"]) };
 });
 
 it("keeps a refused managed draft and dispatches it once after a successful retry", async () => {
@@ -68,6 +68,8 @@ it("keeps a refused managed draft and dispatches it once after a successful retr
       .element(page.getByText("You're out of Protons. Add Protons to start Work."))
       .toBeVisible();
     await expect.element(editor).toHaveTextContent("send after refill");
+    // This bridge has no openProtons, so the line stands alone.
+    expect(page.getByRole("button", { name: "Add Protons" }).elements()).toHaveLength(0);
     expect(dispatchedCommands().filter((command) => command.type === "message.dispatch")).toEqual(
       [],
     );
@@ -79,6 +81,39 @@ it("keeps a refused managed draft and dispatches it once after a successful retr
     await vi.waitFor(() => expect(sends()).toHaveLength(1));
     expect(sends()[0]).toMatchObject({ text: "send after refill" });
     expect(readModelAccess).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("opens the Protons top-up page from the out-of-Protons line", async () => {
+  const thread = threadWithHistory("work-protons", 3);
+  using _environment = installFakeEnvironment([thread], { acceptCommands: true });
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const openProtons = vi.fn(async () => true);
+  vi.stubGlobal("atumWork", { readModelAccess: async () => "empty", openProtons });
+  try {
+    const router = getRouter(
+      createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${thread.id}`] }),
+    );
+    await router.load();
+    await using _app = await render(<AppRoot router={router} />, { router: false });
+    await expect.element(page.getByText(`Answer 2 for ${thread.id}.`)).toBeVisible();
+    const editor = page.getByTestId("composer-editor");
+    await userEvent.click(editor);
+    await userEvent.type(editor, "needs protons");
+    await userEvent.keyboard("{Enter}");
+    await expect
+      .element(page.getByText("You're out of Protons. Add Protons to start Work."))
+      .toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Add Protons" }));
+    expect(openProtons).toHaveBeenCalledOnce();
+    expect(dispatchedCommands().filter((command) => command.type === "message.dispatch")).toEqual(
+      [],
+    );
   } finally {
     vi.unstubAllGlobals();
   }
