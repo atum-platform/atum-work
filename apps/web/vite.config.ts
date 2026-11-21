@@ -328,7 +328,14 @@ export default defineConfig(({ command }) => {
             packageManifests: [
               { bundle: "web", path: new URL("./package.json", import.meta.url) },
               { bundle: "server", path: new URL("../server/package.json", import.meta.url) },
-              { bundle: "desktop", path: new URL("../desktop/package.json", import.meta.url) },
+              ...(process.env.VITE_ATUM_WORK_BUILD === "1"
+                ? []
+                : [
+                    {
+                      bundle: "desktop",
+                      path: new URL("../desktop/package.json", import.meta.url),
+                    },
+                  ]),
             ],
           }),
       tanstackRouter({ autoCodeSplitting: true }),
