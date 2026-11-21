@@ -47,7 +47,8 @@ const env = Object.fromEntries(
 Object.assign(env, {
   APP_VERSION: version,
   VITE_ATUM_WORK_BUILD: "1",
-  VITE_HOSTED_APP_CHANNEL: "latest",
+  // No VITE_HOSTED_APP_CHANNEL: it makes the client a hosted static app that never connects
+  // to the server serving it, so Work would open on "No computer connected".
   VITE_RELEASE_CHANNEL: "stable",
   T3CODE_TELEMETRY_CHANNEL: "dev",
 });
