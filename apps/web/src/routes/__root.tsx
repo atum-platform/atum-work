@@ -227,7 +227,7 @@ function RootRouteBranch() {
         </>
       ) : (
         <FirstRunGate
-          enabled={primaryEnvironmentAuthenticated}
+          enabled={import.meta.env.VITE_ATUM_WORK_BUILD !== "1" && primaryEnvironmentAuthenticated}
           hostedStatic={authGateState.status === "hosted-static"}
         >
           {appHosts}
