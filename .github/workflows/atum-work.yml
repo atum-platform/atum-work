@@ -29,10 +29,10 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
-          persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          # Same exclusion as upstream ci.yml: .repos/ holds reference trees with gitlinks and no
-          # .gitmodules, which breaks checkout's submodule cleanup.
+          # As upstream ci.yml: skip .repos/ (reference trees). Its gitlinks have no .gitmodules, so
+          # persist-credentials: false (whose auth removal runs `git submodule foreach`) fails the
+          # checkout; the job token is already read-only (permissions: contents: read).
           sparse-checkout: |
             /*
             !/.repos/
