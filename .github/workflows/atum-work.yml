@@ -41,6 +41,9 @@ jobs:
       - name: Check the stable-tag replay
         run: |
           node --test scripts/atum-work/brand.test.mjs
+          node scripts/atum-work/brand-map.mjs
+          git diff --exit-code atum-work/brand.json
+          node scripts/atum-work/brand.mjs --check atum-work/brand.json
           git fetch --no-tags https://github.com/pingdotgg/t3code refs/tags/v0.1.10:refs/tags/v0.1.10 refs/tags/v0.1.11:refs/tags/v0.1.11
           scripts/atum-work/replay.sh
       - name: Typecheck and lint

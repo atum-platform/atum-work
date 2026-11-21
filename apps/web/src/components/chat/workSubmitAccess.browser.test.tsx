@@ -65,7 +65,7 @@ it("keeps a refused managed draft and dispatches it once after a successful retr
     await userEvent.keyboard("{Enter}");
     await vi.waitFor(() => expect(readModelAccess).toHaveBeenCalledOnce());
     await expect
-      .element(page.getByText("There is no balance available for this turn."))
+      .element(page.getByText("You're out of Protons. Add Protons to start Work."))
       .toBeVisible();
     await expect.element(editor).toHaveTextContent("send after refill");
     expect(dispatchedCommands().filter((command) => command.type === "message.dispatch")).toEqual(

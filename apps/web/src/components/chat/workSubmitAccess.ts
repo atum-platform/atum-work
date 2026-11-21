@@ -14,8 +14,10 @@ declare global {
 }
 
 // Lane-specific UI copy lives at this boundary so the send path only sees a refusal or null.
-const empty = "There is no balance available for this turn.";
-const unavailable = "Work couldn't check your balance. Try again.";
+// One plain line each, no balance figure (plan section 9.3). Vietnamese waits for the Q5 locale:
+// "Bạn đã hết Proton. Nạp thêm Proton để bắt đầu Work." / "Chưa bắt đầu được Work. Hãy thử lại."
+const empty = "You're out of Protons. Add Protons to start Work.";
+const unavailable = "Work couldn't start just now. Try again.";
 
 export function checkWorkSubmitAccess(
   instanceIds: ReadonlyArray<string>,

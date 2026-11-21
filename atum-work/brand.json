@@ -1,0 +1,1585 @@
+{
+  "strings": [
+    {
+      "file": "gt.config.json",
+      "from": "\"locales\": [\"de\", \"es\", \"fr\", \"ja\", \"ko\", \"pt-BR\", \"ru\", \"sv\", \"zh\"]",
+      "to": "\"locales\": []",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "<title>T3 Code</title>",
+      "to": "<title>Atum Work</title>",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "alt=\"T3 Code\"",
+      "to": "alt=\"Atum\"",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "public/manifest.webmanifest",
+      "from": "\"name\": \"T3 Code\"",
+      "to": "\"name\": \"Atum Work\"",
+      "count": 1
+    },
+    {
+      "file": "public/manifest.webmanifest",
+      "from": "\"short_name\": \"T3 Code\"",
+      "to": "\"short_name\": \"Work\"",
+      "count": 1
+    },
+    {
+      "file": "src/branding.logic.ts",
+      "from": "(input.development ? \"Dev\" : \"Beta\")",
+      "to": "(input.development ? \"Dev\" : \"Latest\")",
+      "count": 1
+    },
+    {
+      "file": "src/branding.ts",
+      "from": "?? \"T3 Code\"",
+      "to": "?? \"Atum Work\"",
+      "count": 1
+    },
+    {
+      "file": "src/cloud/cloudLinkState.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/cloud/linkEnvironment.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 2
+    },
+    {
+      "file": "src/cloud/linkEnvironment.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 4
+    },
+    {
+      "file": "src/cloud/managedRelayState.ts",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 3
+    },
+    {
+      "file": "src/cloud/relayFailureReason.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/cloud/relayFailureReason.ts",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 4
+    },
+    {
+      "file": "src/cloud/t3ConnectState.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/cloud/useCloudLinkController.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 8
+    },
+    {
+      "file": "src/cloud/useT3ConnectTurnOn.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/BranchToolbarBranchSelector.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/ChatView.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/CommandPalette.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/ConnectDeviceApprovalCoordinator.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/DiffPanel.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/EnvironmentContextChip.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/GitHubStarPrompt.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/HostedEmptyState.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/RightPanelTabs.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/ServerUpdateAction.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/T3AppIcon.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/auth/ApproveAgentSurface.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 5
+    },
+    {
+      "file": "src/components/auth/ApproveAgentSurface.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/auth/ConnectAgentSurface.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/chat/ChatHeader.tsx",
+      "from": "From <Var>{activeThreadLinkOrigin}</Var>",
+      "to": "Started by <Var>{activeThreadLinkOrigin}</Var>",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/ChatHeader.tsx",
+      "from": "Started by an agent on <Var>{activeThreadLinkOrigin}</Var> through a linked\n                  environment.",
+      "to": "<Var>{activeThreadLinkOrigin}</Var> started this. You can type here or stop it.",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/McpAppFrame.tsx",
+      "from": "\"T3 ",
+      "to": "\"Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/MessagesTimeline.logic.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/QueuedRunsControl.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/RightPanelSurfaceContent.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/chat/TimelineAssistantRows.tsx",
+      "from": ">T3 Code",
+      "to": ">Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/chat/TimelineUserMessageRow.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/TriageDraftHero.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/guestMessageStyle.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/guestShareAvailability.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/turnDetailAnnouncement.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/useComposerMenuItems.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/chat/useSystemComposerBanners.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/MobileClientsUserProfilePage.logic.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/MobileClientsUserProfilePage.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/MobileClientsUserProfilePage.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx",
+      "from": ">T3 Connect",
+      "to": ">Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/T3ChatUserProfilePage.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/clerk/T3ChatUserProfilePage.tsx",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 7
+    },
+    {
+      "file": "src/components/clerk/T3ChatUserProfilePage.tsx",
+      "from": "\"T3 Chat",
+      "to": "\"Chat",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/T3ConnectAccountPages.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/T3ConnectAccountPages.tsx",
+      "from": "\"T3 Chat",
+      "to": "\"Chat",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/T3ConnectSidebarSignIn.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/clerk/T3ConnectUserProfilePage.tsx",
+      "from": "available through T3\n",
+      "to": "available through\n",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/T3ConnectUserProfilePage.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/components/clerk/T3ConnectUserProfilePage.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/clerk/T3ConnectUserProfilePage.tsx",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 2
+    },
+    {
+      "file": "src/components/clerk/authRedirect.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/useT3ChatLink.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/clerk/useT3ChatLink.ts",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 2
+    },
+    {
+      "file": "src/components/cloud/CloudEnvironmentConnectList.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 6
+    },
+    {
+      "file": "src/components/cloud/CloudEnvironmentConnectList.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/cloud/CloudEnvironmentConnectList.tsx",
+      "from": "`T3 Connect",
+      "to": "`Connect",
+      "count": 5
+    },
+    {
+      "file": "src/components/cloud/ConnectCliAuthSurface.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/cloud/ConnectOnboardingDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 4
+    },
+    {
+      "file": "src/components/cloud/ConnectOnboardingDialog.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/cloud/RelayClientInstallDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/cloud/RelayClientInstallDialog.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/cloud/RelayClientInstallDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/cloud/TunnelUsage.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/cloud/TunnelUsage.tsx",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 7
+    },
+    {
+      "file": "src/components/desktop/SshPasswordPromptDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/desktopUpdate.logic.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 5
+    },
+    {
+      "file": "src/components/issue/IssuesPage.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/UseInAnotherAppDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "src/components/mcp/UseInAnotherAppDialog.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/UseInAnotherAppDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 13
+    },
+    {
+      "file": "src/components/mcp/UseInAnotherAppDialog.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "name=T3%20Code",
+      "to": "name=Atum%20Work",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "connectorName=T3%20Code",
+      "to": "connectorName=Atum%20Work",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "src/components/mcp/mcpGate.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 6
+    },
+    {
+      "file": "src/components/onboarding/FirstRunGate.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/onboarding/WelcomePage.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 4
+    },
+    {
+      "file": "src/components/onboarding/WelcomePage.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/onboarding/WelcomePage.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 7
+    },
+    {
+      "file": "src/components/onboarding/WelcomePage.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/onboarding/WelcomePage.tsx",
+      "from": ">T3 Connect",
+      "to": ">Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/preview/PreviewPanel.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/preview/PreviewView.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/promptLinks/HostedPromptLinkLanding.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/promptLinks/HostedPromptLinkLanding.tsx",
+      "from": "{T3 Code",
+      "to": "{Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/promptLinks/NewThreadLinkView.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/promptLinks/NewThreadLinkView.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/promptLinks/linkedPrompt.ts",
+      "from": "{T3 Code",
+      "to": "{Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/pullRequest/PullRequestsPage.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/AcpSessionManagementSection.tsx",
+      "from": " T3 thread",
+      "to": " thread",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/AddEnvironmentDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/components/settings/BrowserImportWizard.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 4
+    },
+    {
+      "file": "src/components/settings/CaptureShortcutConfig.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "src/components/settings/CaptureShortcutConfig.tsx",
+      "from": ">T3 Code",
+      "to": ">Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ChatGptWelcomeCoordinator.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/CliCommandSettingsRow.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/CodexSetupSection.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 4
+    },
+    {
+      "file": "src/components/settings/CodexSetupSection.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/CodexSetupSection.tsx",
+      "from": " T3 desktop",
+      "to": " the desktop app",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ConnectDeviceApprovalSettings.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ConnectDeviceApprovalSettings.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ConnectionsSettings.logic.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/ConnectionsSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 6
+    },
+    {
+      "file": "src/components/settings/ConnectionsSettings.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 4
+    },
+    {
+      "file": "src/components/settings/ConnectionsSettings.tsx",
+      "from": ">T3 Code",
+      "to": ">Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ConnectionsSettings.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 5
+    },
+    {
+      "file": "src/components/settings/DatabaseStorageNotice.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/DatabaseStorageNotice.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/DiagnosticsSettings.tsx",
+      "from": " T3 Server",
+      "to": " Atum server",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/DiagnosticsSettings.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/EnvironmentRow.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/IntegrationsSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "src/components/settings/IntegrationsSettings.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/KeybindingsSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LabsSettingsPanel.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LabsSettingsPanel.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 6
+    },
+    {
+      "file": "src/components/settings/LabsSettingsPanel.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LinkMachineSelect.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LinkMachineSelect.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LinkedEnvironmentsSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LinkedEnvironmentsSettings.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LocalEnvironmentSetting.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LocalEnvironmentSetting.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/MultipleAccountsNote.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/NotificationSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ProviderSettingsForm.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/ProviderSettingsPanel.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ResourceTelemetryDiagnostics.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ResourceTelemetryDiagnostics.tsx",
+      "from": "\"T3 ",
+      "to": "\"Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ResourceTelemetryDiagnostics.tsx",
+      "from": ">T3 ",
+      "to": ">Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/RevokeConnectDeviceDialog.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 16
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 8
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/ScheduledTasksSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SecretsSettings.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SettingsPanels.logic.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SettingsPanels.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "src/components/settings/SnapShotSettings.tsx",
+      "from": "'T3 Code",
+      "to": "'Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SnapShotSetupDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 5
+    },
+    {
+      "file": "src/components/settings/SnapShotSetupDialog.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/StorageSettings.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ThemeImportDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/ThemePreviewCircles.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/UpdateTrackSwitchDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/providerStatus.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/scopedSettings.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/settingsSearch.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/settingsSearch.ts",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/SidebarChrome.tsx",
+      "from": "<T3Wordmark aria-label=\"T3\" className=\"h-[1cap] w-auto shrink-0\" />",
+      "to": "<T3Wordmark aria-label=\"Atum\" className=\"size-4 shrink-0 self-center\" />",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/SidebarChrome.tsx",
+      "from": "{\"Code\"}",
+      "to": "{\"Work\"}",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/SidebarChrome.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/SidebarFolderDrop.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/UpdateEverythingDialog.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/UpdateEverythingDialog.tsx",
+      "from": ">T3 Code",
+      "to": ">Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/sidebar/updateEverythingRun.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/ui/standalone-page.tsx",
+      "from": "font-medium tracking-tight\">Code</span>",
+      "to": "font-medium tracking-tight\">Work</span>",
+      "count": 1
+    },
+    {
+      "file": "src/components/ui/standalone-page.tsx",
+      "from": "<T3Wordmark className=\"h-3 w-auto shrink-0 text-foreground\" aria-hidden />",
+      "to": "<T3Wordmark className=\"size-5 shrink-0 self-center\" aria-hidden />",
+      "count": 1
+    },
+    {
+      "file": "src/components/ui/standalone-page.tsx",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/connection/clientMetadata.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 2
+    },
+    {
+      "file": "src/connection/platform.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/connection/platform.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "src/connection/platform.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/desktopAppActivation.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 3
+    },
+    {
+      "file": "src/guestPage.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/hooks/useOpenLocalWorkspace.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/hooks/useStartTriage.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/lib/bootError.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "src/lib/bootError.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 3
+    },
+    {
+      "file": "src/lib/diffRendering.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/onboarding/welcomePage.logic.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/onboarding/welcomePage.logic.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/routes/__root.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/shortcuts/chatRouteCommands.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/state/connectMcpApproval.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/state/peerLinks.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/state/primaryEnvironment.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/versionSkew.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "vite.config.ts",
+      "from": "baseName: \"T3 Code\"",
+      "to": "baseName: \"Atum Work\"",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/authorization/remote.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/authorization/service.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/compatibility.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 12
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 4
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": "`T3 Code",
+      "to": "`Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 9
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 6
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/errors.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/errors.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/hostFreeze.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/model.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/model.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/outdatedHostUpdate.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/presentation.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/routes.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/routes.ts",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/supervisor.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/contractLabels.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "../../packages/client-runtime/src/contractLabels.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/errors/network.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/linkRequest.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/errorPresentation.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/errorPresentation.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 5
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/errorPresentation.ts",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/managedRelay.ts",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 27
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/managedRelayState.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 8
+    },
+    {
+      "file": "../../packages/client-runtime/src/relay/managedRelayState.ts",
+      "from": " T3 Chat",
+      "to": " Chat",
+      "count": 3
+    },
+    {
+      "file": "../../packages/client-runtime/src/rpc/session.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/connectMcpApproval.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 4
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/device.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/environmentHttpAuth.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/peerPairingCode.ts",
+      "from": "\"T3 Code",
+      "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/projectRemoval.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/pullRequestDiffHttp.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/threadRequests.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/userMessage.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/webhookAddress.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "../../packages/client-runtime/src/work-log/t3ToolSentences.ts",
+      "from": " T3 thread",
+      "to": " thread",
+      "count": 53
+    },
+    {
+      "file": "../../packages/client-runtime/src/work-log/t3ToolSentences.ts",
+      "from": "\\nT3 thread",
+      "to": "\\nthread",
+      "count": 3
+    },
+    {
+      "file": "../../packages/client-runtime/src/work-log/t3ToolSentences.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/contracts/src/browserImport.ts",
+      "from": "Give T3 Code Full Disk Access",
+      "to": "Give Atum Full Disk Access",
+      "count": 1
+    },
+    {
+      "file": "../../packages/contracts/src/device.ts",
+      "from": "not on the T3 server's PATH. Install npm (it comes with Node.js from nodejs.org), restart T3 Code,",
+      "to": "not on the Atum server's PATH. Install npm (it comes with Node.js from nodejs.org), restart Atum,",
+      "count": 1
+    },
+    {
+      "file": "../../packages/contracts/src/managedPolicy.ts",
+      "from": "manages T3 Code updates.",
+      "to": "manages Atum updates.",
+      "count": 1
+    },
+    {
+      "file": "../../packages/contracts/src/pullRequest.ts",
+      "from": "in T3 Code",
+      "to": "in Atum",
+      "count": 2
+    },
+    {
+      "file": "../../packages/shared/src/authScopeOptions.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
+      "file": "../../packages/shared/src/claudeCompaction.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/codexAuthCallback.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 3
+    },
+    {
+      "file": "../../packages/shared/src/codexAuthCallback.ts",
+      "from": ">T3 Code",
+      "to": ">Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/codexAuthHandoff.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/htmlRender.ts",
+      "from": "\"T3 ",
+      "to": "\"Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/managedPolicyFile.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 6
+    },
+    {
+      "file": "../../packages/shared/src/managedPolicyFile.ts",
+      "from": "`T3 Code",
+      "to": "`Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/model.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/otelEnvironment.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/promptLinks.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 4
+    },
+    {
+      "file": "../../packages/shared/src/promptLinksCopy.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 4
+    },
+    {
+      "file": "../../packages/shared/src/relayClient.ts",
+      "from": "`T3 Code",
+      "to": "`Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/relayTracing.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/speechCopy.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/t3McpToolPresentation.ts",
+      "from": " T3 thread",
+      "to": " thread",
+      "count": 5
+    },
+    {
+      "file": "../../packages/shared/src/t3McpToolPresentation.ts",
+      "from": "\"T3 thread",
+      "to": "\"thread",
+      "count": 3
+    },
+    {
+      "file": "../../packages/shared/src/t3McpToolPresentation.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/t3McpToolPresentationCopy.ts",
+      "from": " T3 thread",
+      "to": " thread",
+      "count": 16
+    },
+    {
+      "file": "../../packages/shared/src/testing/providerEnv.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/themeCss.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 2
+    },
+    {
+      "file": "../../packages/shared/src/themePalettes.ts",
+      "from": "label: \"T3 Chat\"",
+      "to": "label: \"Classic\"",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/threadLinks.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/toolOutput.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "../../packages/shared/src/usageLimits.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
+    }
+  ],
+  "assets": [
+    {
+      "file": "src/components/T3Wordmark.tsx",
+      "source": "assets/T3Wordmark.tsx",
+      "upstreamSha256": "ba20ddca13c7436ca7ad1f25fbc1acc67b95b9242573fd6e70611f389deabf4d"
+    }
+  ],
+  "icons": {
+    "favicon.ico": "assets/icons/favicon.ico",
+    "favicon-16x16.png": "assets/icons/favicon-16x16.png",
+    "favicon-32x32.png": "assets/icons/favicon-32x32.png",
+    "apple-touch-icon.png": "assets/icons/apple-touch-icon.png",
+    "icon-192x192.png": "assets/icons/icon-192x192.png",
+    "icon-512x512.png": "assets/icons/icon-512x512.png"
+  }
+}

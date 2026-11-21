@@ -28,6 +28,8 @@
       "entry": [
         // These fixture scripts are injected into a browser page by path.
         "fixtures/*/*.js",
+        // Run by hand against Atum Kit's tokens.json from the Atum client repository.
+        "atum-work/theme.mjs",
         "knip-schemas.ts",
         "linux-after-pack.ts",
         "mobile-behavior/run.ts",

@@ -22,6 +22,20 @@ function resolveBelow(root, file) {
   return path;
 }
 
+// Map paths are relative to apps/web. The web bundle also compiles these packages' copy.
+// brand-map.mjs runs tokens only over web, shared and client-runtime; contracts takes explicit
+// message-text entries, never schema shapes or literals.
+const brandRoots = ["apps/web", "packages/shared", "packages/client-runtime", "packages/contracts"];
+
+function resolveBrandTarget(repo, file) {
+  const path = NodePath.resolve(repo, "apps/web", file);
+  NodeAssert.ok(
+    brandRoots.some((root) => path.startsWith(NodePath.resolve(repo, root) + "/")),
+    `Brand target is outside ${brandRoots.join(", ")}: ${file}`,
+  );
+  return path;
+}
+
 export function readBrandMap(path) {
   return { data: JSON.parse(NodeFS.readFileSync(path, "utf8")), directory: NodePath.dirname(path) };
 }
@@ -33,7 +47,7 @@ export function planBrand(repo, { data, directory }) {
 
   const writes = new Map();
   for (const { file, from, to, count } of data.strings) {
-    const path = resolveBelow(NodePath.resolve(repo, "apps/web"), file);
+    const path = resolveBrandTarget(repo, file);
     NodeAssert.ok(
       typeof from === "string" &&
         from.length > 0 &&
@@ -54,7 +68,7 @@ export function planBrand(repo, { data, directory }) {
   }
 
   for (const { file, source, upstreamSha256 } of data.assets) {
-    const path = resolveBelow(NodePath.resolve(repo, "apps/web"), file);
+    const path = resolveBrandTarget(repo, file);
     NodeAssert.ok(!writes.has(path), `Duplicate brand target: ${file}`);
     const before = NodeFS.readFileSync(path);
     const after = NodeFS.readFileSync(resolveBelow(directory, source));

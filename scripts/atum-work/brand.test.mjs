@@ -29,6 +29,11 @@ NodeTest.test(
       assertProviderIdentity(tmp);
       undo();
       NodeAssert.equal(NodeFS.readFileSync(file, "utf8"), "<title>T3 Code</title>");
+      const outside = { file: "../server/src/x.ts", from: "T3", to: "Atum", count: 1 };
+      NodeAssert.throws(
+        () => planBrand(tmp, { directory: tmp, data: { strings: [outside], assets: [] } }),
+        /Brand target is outside/,
+      );
       strings[0].count = 2;
       NodeAssert.throws(() => planBrand(tmp, map), /Brand token count changed/);
       NodeFS.writeFileSync(auth, 'agent_name_hint: "Changed"');

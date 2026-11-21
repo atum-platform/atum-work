@@ -30,7 +30,25 @@ The map has three fields:
   relative to the map. Upstream copies development icons during server assembly,
   so the Work build installs these overrides after that step.
 
+`atum-work/brand.json` is generated. Edit `atum-work/brand.rules.json` (explicit entries, then
+tokens that match only after a non-identifier character) and run
+`node scripts/atum-work/brand-map.mjs`; after a pin bump, rerun it and review the count diff.
+Tokens run over `apps/web`, `packages/shared` and `packages/client-runtime`. `packages/contracts`
+takes explicit message-text entries only. Provider-facing identity stays upstream. The map also
+limits the web locales to English (Vietnamese arrives with Q5), because rebranded English source
+no longer matches the upstream catalogs' hashes.
+
 Validate the map with `node scripts/atum-work/brand.mjs --check atum-work/brand.json`.
+Before a release, typecheck web, shared, client-runtime, contracts and server with the map applied.
+
+## Theme
+
+`atum-work/theme/atum.json` is an upstream environment theme (light with a dark variant and a small
+CSS block) generated from Atum Kit:
+`node scripts/atum-work/theme.mjs <atum-desktop>/packages/atum-kit/tokens.json`. The provenance file
+beside it records the Kit version and the tokens hash. Desktop main publishes and selects it once per
+home with the bundled CLI, before the first start: `theme set <path>/atum.json` with the scoped
+`T3CODE_HOME`. No fork patch is involved.
 In a dedicated checkout on macOS arm64, install the locked web, server and scripts
 dependencies using Vite+. Use the Node version specified in the root manifest,
 the LICENSE from that verified official Node distribution, and a Rust toolchain.
@@ -66,7 +84,10 @@ Desktop main owns update and rollback. The upstream launcher runs the child in
 restored pin immediately. Main preserves the upstream prepared/committed trial
 boundary and finishes auth reset before launching on a restored home.
 
-Provision the managed ACP provider with instance ID `atum-managed`. The sandboxed
+Provision the managed ACP provider with instance ID `atum-managed`, and set
+`textGenerationModelSelection` to it. Upstream's default title model is the `codex` instance, and
+the server runs a `codex` CLI it finds (for example `/opt/homebrew/bin/codex`) even with that
+instance disabled and PATH narrowed, which would send titles to the person's ChatGPT plan. The sandboxed
 owner view's preload exposes `window.atumWork.readModelAccess()`, a zero-argument
 read through desktop main to the managed-model proxy. Return `allowed`, `empty`,
 or `unavailable`. Main owns the caller's account and origin validation and bounds
