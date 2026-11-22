@@ -28,6 +28,9 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 
+import { AtumToolkit } from "./toolkits/atum/tools.ts";
+import * as AtumHandlers from "./toolkits/atum/handlers.ts";
+
 import packageJson from "../../package.json" with { type: "json" };
 import { parseBearerToken } from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
@@ -1413,6 +1416,7 @@ export const layerMcpTransport = <RA, RE, RR>(registrations: Layer.Layer<RA, RE,
 
 /** Every tool the T3 MCP server advertises. AgentContextBudget.test.ts measures this set. */
 export const layerTools = Layer.mergeAll(
+  toolkitRegistration(AtumToolkit, AtumHandlers.layer),
   layerPreviewToolkit,
   layerOrchestratorToolkit,
   layerThreadToolkit,
