@@ -95,44 +95,12 @@ the IPC call. No proxy credentials or URLs cross into the view. A refused or fai
 check keeps the draft and skips dispatch. The proxy's own metering decision also
 covers races after the read.
 
-## Protected Work question replies
+## Work question connector
 
-For a protected or unknown Matrix answer, Desktop main checks the existing
-protected model route, then calls this server with a one-time challenge
-registered by the in-flight native MCP invocation. The callback reads the
-current thread shell, active run and live MCP registry under the native thread
-command lock. It succeeds only for the Desktop-provisioned, policy-locked
-owner ACP instance. Ordinary provider names cannot grant release.
+Build Work runtime 0.1.12 on the upstream `v0.1.11` base using the optional
+fifth packer argument `v0.1.12`. The upstream tag still gates source ancestry.
 
-The callback syncs a content-free per-thread marker in an account directory
-beside the T3 server home. The file persists across server restarts and home
-rollback. Provider switch, session open and queued turn start check the
-marker. Native fork/merge, guest sharing and MCP transcript reads refuse
-protected context, and automatic title generation skips it. Hermes handles
-summary requests on the same protected proxy route. Once any thread has a
-marker, the Desktop proxy routes both managed Work gateways to the
-protected model. This deliberately favors keeping Work's managed transcript
-on the same route over keeping unrelated Work model choices on their prior
-route. Subscription threads still run on their own providers.
-
-Native seams used here include `apps/server/src/mcp/threadAccess.ts:147` and `:206`,
-`apps/server/src/mcp/McpSessionRegistry.ts:167`,
-`packages/shared/src/KeyedLock.ts:50`, and
-`apps/server/src/policy/ManagedPolicy.ts:80` and `:174`. The direct transcript
-fence does not isolate the files or process space of trusted same-user
-applications.
-
-### Work runtime 0.1.12
-
-Build this runtime on the existing upstream `v0.1.11` base using the optional
-fifth packer argument `v0.1.12`. The upstream tag still gates the source ancestry.
-
-The supervisor sends the connector token through an inherited pipe which the
-server drains and closes at startup. Every answer release rechecks its live
-native invocation through the Desktop admission callback. Protected callers may
-use only the question broker in MCP. Delegated results from protected children
-stay out of unprotected parents, including automatic completion delivery.
-
-The Desktop-provisioned Work policy is allowed only when the server finds no
-native managed policy and no per-user managed preferences plist. Presence of
-either source prevents the Work policy from taking its place.
+The supervisor passes the connector credential on an inherited pipe, which the
+server drains and closes at startup. Desktop checks the live native invocation
+before each answer release. Provider choice and informational provenance do
+not affect answer eligibility. T3 reads its native managed policy sources.

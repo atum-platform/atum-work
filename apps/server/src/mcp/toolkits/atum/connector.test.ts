@@ -24,7 +24,7 @@ it.each(["atum-managed", "codex", "claudeAgent", "antigravity"])(
     expect(result).toEqual({ state: "unavailable", request_id: "request" });
   },
 );
-it("does not expose protected content or follow a nonlocal transport", async () => {
+it("returns a live answer with unknown provenance and refuses nonlocal transport", async () => {
   let calls = 0;
   const input = {
     caller: {
@@ -46,8 +46,10 @@ it("does not expose protected content or follow a nonlocal transport", async () 
     },
   };
   expect(await askConnector({ ...input, endpoint: "http://127.0.0.1:1234/ask" })).toEqual({
-    state: "provenance_unavailable",
+    state: "answered",
     request_id: "request",
+    answer: "secret",
+    provenance: "unknown",
   });
   expect(await askConnector({ ...input, endpoint: "https://example.invalid/ask" })).toEqual({
     state: "unavailable",

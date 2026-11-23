@@ -44,3 +44,10 @@ Protected or unknown text remains closed at main and the toolkit. An updated
 archive/manifest, launched driver-to-post-resume calls across an installed
 bundle, and certified protected route and transcript reuse enforcement remain
 release requirements.
+
+## Owner decision 2026-11-23
+
+Work answers follow the user's provider choice under user attestation.
+Removed the transcript fence, provider restrictions and Work policy override.
+The connector retains per-invocation admission and transports its startup
+credential on an inherited pipe. Provenance is informational.

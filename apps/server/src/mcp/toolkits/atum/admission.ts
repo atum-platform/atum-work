@@ -7,7 +7,7 @@ import type { Caller } from "./connector.ts";
 
 interface Admission {
   binding: string;
-  check(protect: boolean): Promise<boolean | undefined>;
+  check(): Promise<boolean>;
 }
 
 const pending = new Map<string, Admission>();
@@ -39,21 +39,12 @@ export const layer = HttpRouter.add(
     }
     const id = headers["x-atum-work-admission"] ?? "";
     const admission = pending.get(id);
-    const action = headers["x-atum-work-action"];
-    if (
-      !admission ||
-      admission.binding !== headers["x-atum-work-caller"] ||
-      (action !== "bind" && action !== "protect")
-    ) {
+    if (!admission || admission.binding !== headers["x-atum-work-caller"]) {
       return HttpServerResponse.empty({ status: 409 });
     }
-    const protectedThread = yield* Effect.promise(() =>
-      admission.check(action === "protect").catch(() => undefined),
-    );
-    if (protectedThread === undefined || pending.get(id) !== admission) {
-      return HttpServerResponse.empty({ status: 409 });
-    }
-    // 204 identifies a protected caller, 202 a live unprotected caller.
-    return HttpServerResponse.empty({ status: protectedThread ? 204 : 202 });
+    const live = yield* Effect.promise(() => admission.check().catch(() => false));
+    return HttpServerResponse.empty({
+      status: live && pending.get(id) === admission ? 204 : 409,
+    });
   }),
 );

@@ -9,14 +9,7 @@ export interface Question {
   request_id: string;
 }
 export interface Result {
-  state:
-    | "answered"
-    | "waiting"
-    | "timed_out"
-    | "unavailable"
-    | "cancelled"
-    | "google_requires_atum"
-    | "provenance_unavailable";
+  state: "answered" | "waiting" | "timed_out" | "unavailable" | "cancelled";
   request_id: string;
   question_event_id?: string;
   answer?: string;
@@ -27,7 +20,6 @@ export async function askConnector(input: {
   question: Question;
   current(): Promise<boolean>;
   admission?: string;
-  isProtected?(): boolean;
   endpoint?: string | undefined;
   token?: string | undefined;
   signal?: AbortSignal;
@@ -71,16 +63,6 @@ export async function askConnector(input: {
     const result = (await response.json()) as Result;
     if (result.request_id !== input.question.request_id || !(await input.current()))
       return unavailable();
-    if (
-      result.state === "answered" &&
-      result.provenance !== "non_google" &&
-      !input.isProtected?.()
-    ) {
-      return {
-        state: result.provenance === "google" ? "google_requires_atum" : "provenance_unavailable",
-        request_id: input.question.request_id,
-      };
-    }
     if (result.state !== "answered") {
       const { state, request_id, question_event_id } = result;
       return { state, request_id, ...(question_event_id ? { question_event_id } : {}) };

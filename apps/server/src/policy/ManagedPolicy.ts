@@ -5,18 +5,15 @@
  * @module ManagedPolicy
  */
 import * as NodeModule from "node:module";
-import * as NodeOS from "node:os";
 
 import { ManagedPolicyDocument, type ManagedPolicySummary } from "@t3tools/contracts";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Hex from "effect/encoding/Hex";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -28,7 +25,6 @@ import {
   readManagedPolicyFile,
 } from "@t3tools/shared/managedPolicyFile";
 
-import { workPolicyPath } from "../mcp/toolkits/atum/protectedThread.ts";
 import { telemetryChannel } from "../config.ts";
 import * as ManagedLimits from "./managedLimits.ts";
 import * as ManagedProviders from "./managedProviders.ts";
@@ -181,73 +177,26 @@ export const load = Effect.fn("ManagedPolicy.load")(function* (path: string) {
 const make = Effect.gen(function* () {
   // Source builds may read a policy from elsewhere so it can be tried without root. Release
   // builds never do: any override a user can set is a way around the policy.
-  const workPath = workPolicyPath();
+  const devPath =
+    telemetryChannel === "dev"
+      ? yield* Config.option(Config.String("T3CODE_DEV_MANAGED_POLICY_PATH")).pipe(
+          Effect.orElseSucceed(() => Option.none<string>()),
+        )
+      : Option.none<string>();
   const platform = yield* HostProcess.Platform;
-  const nativePolicy = readManagedPolicy(
-    platform,
-    ManagedProviders.knownDriverLabels().map(({ driver }) => driver),
-  );
-
-  let policy: ManagedPolicy["Service"];
-  if (workPath !== undefined) {
-    const native = yield* nativePolicy;
-    const path = yield* Path.Path;
-    const userPlist =
-      platform === "darwin"
-        ? path.join(
-            "/Library/Managed Preferences",
-            NodeOS.userInfo().username,
-            "com.t3tools.t3code.plist",
-          )
-        : undefined;
-    const hasUserPolicy =
-      userPlist !== undefined &&
-      (yield* (yield* FileSystem.FileSystem)
-        .exists(userPlist)
-        .pipe(
-          Effect.mapError(
-            (cause) =>
-              new ManagedPolicyFileError({
-                path: userPlist,
-                reason: "the profile cannot be checked",
-                cause,
-              }),
-          ),
-        ));
-    if (native !== undefined || hasUserPolicy) {
-      return yield* new ManagedPolicyFileError({
-        path: native?.source ?? userPlist ?? workPath,
-        reason: "Work cannot replace the host's managed policy",
-      });
-    }
-    policy = yield* load(workPath);
-  } else {
-    const devPath =
-      telemetryChannel === "dev"
-        ? yield* Config.option(Config.String("T3CODE_DEV_MANAGED_POLICY_PATH")).pipe(
-            Effect.orElseSucceed(() => Option.none<string>()),
-          )
-        : Option.none<string>();
-    policy = yield* Option.match(devPath, {
-      onSome: load,
-      onNone: () =>
-        nativePolicy.pipe(
-          Effect.flatMap((found) =>
-            fromDocument(found?.source ?? managedPolicyPath(platform), found?.document),
-          ),
+  const policy = yield* Option.match(devPath, {
+    onSome: load,
+    onNone: () =>
+      readManagedPolicy(
+        platform,
+        ManagedProviders.knownDriverLabels().map(({ driver }) => driver),
+      ).pipe(
+        Effect.flatMap((found) =>
+          fromDocument(found?.source ?? managedPolicyPath(platform), found?.document),
         ),
-    });
-  }
+      ),
+  });
   const path = policy.path;
-  if (
-    workPath !== undefined &&
-    policy.document?.settings?.["providerInstances.atum-managed"]?.locked !== true
-  ) {
-    return yield* new ManagedPolicyFileError({
-      path,
-      reason: "Work's managed ACP instance is not locked",
-    });
-  }
   if (policy.summary !== undefined) {
     yield* Effect.logInfo("Managed policy applies.", {
       path,

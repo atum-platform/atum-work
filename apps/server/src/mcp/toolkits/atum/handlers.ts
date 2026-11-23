@@ -5,7 +5,6 @@ import * as McpToolAccess from "../../McpToolAccess.ts";
 import { assertLiveCaller, loadCaller, unavailable } from "../../threadAccess.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import { registerAdmission } from "./admission.ts";
-import { isProtectedThread, managedInstance, protectThread } from "./protectedThread.ts";
 import { endpoint, token } from "./config.ts";
 import { askConnector } from "./connector.ts";
 import { AtumToolkit } from "./tools.ts";
@@ -46,26 +45,9 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
         return resolved?.thread.providerSessionId === providerSessionId;
       }).pipe(Effect.orElseSucceed(() => false));
       const lock = yield* ThreadCommandExecutor.ThreadCommandExecutor;
-      let admitted = false;
-      const check = (protect: boolean) =>
-        lock.withLock(
-          threadId,
-          Effect.gen(function* () {
-            if (caller.caller?.activeRunId == null || !(yield* current)) return undefined;
-            if (protect) {
-              if (providerInstanceId !== managedInstance || !protectThread(threadId)) {
-                return undefined;
-              }
-              admitted = true;
-            }
-            const protectedThread = isProtectedThread(threadId);
-            return protectedThread && providerInstanceId !== managedInstance
-              ? undefined
-              : protectedThread;
-          }),
-        );
+      const check = lock.withLock(threadId, current);
       const runCheck = Effect.runPromiseWith(
-        yield* Effect.context<Effect.Services<ReturnType<typeof check>>>(),
+        yield* Effect.context<Effect.Services<typeof check>>(),
       );
       const runCurrent = Effect.runPromiseWith(
         yield* Effect.context<Effect.Services<typeof current>>(),
@@ -73,8 +55,8 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
       return yield* Effect.tryPromise({
         try: async (signal) => {
           const binding = { threadId, providerSessionId, providerInstanceId };
-          const admission = registerAdmission(binding, (protect) =>
-            signal.aborted ? Promise.resolve(undefined) : runCheck(check(protect), { signal }),
+          const admission = registerAdmission(binding, () =>
+            signal.aborted ? Promise.resolve(false) : runCheck(check, { signal }),
           );
           try {
             return await askConnector({
@@ -85,7 +67,6 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
               signal,
               current: () => runCurrent(current),
               admission: admission.id,
-              isProtected: () => admitted,
             });
           } finally {
             admission.close();

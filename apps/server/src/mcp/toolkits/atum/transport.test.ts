@@ -10,7 +10,6 @@ import * as Layer from "effect/Layer";
 import { HttpBody, HttpClient, HttpRouter, HttpServer } from "effect/http";
 import { vi } from "vite-plus/test";
 import { layer as admissionRoutes } from "./admission.ts";
-import { isProtectedThread, protectedDirectory } from "./protectedThread.ts";
 import * as ServerEnvironment from "../../../environment/ServerEnvironment.ts";
 import * as ThreadManagement from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as ServerSettings from "../../../serverSettings.ts";
@@ -23,16 +22,6 @@ vi.mock("./config.ts", () => ({
   endpoint: "http://127.0.0.1:43123/ask",
   token: "fixture",
 }));
-
-vi.mock("./protectedThread.ts", async (importOriginal) => {
-  const { mkdtempSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const root = mkdtempSync(join(tmpdir(), "atum-work-fence-"));
-  process.env.ATUM_WORK_CONNECTOR_PROTECTED_DIR = join(root, "protected-threads");
-  process.env.ATUM_WORK_CONNECTOR_POLICY = join(root, "policy.json");
-  return await importOriginal();
-});
 
 const environmentId = EnvironmentId.make("work-connector-fixture");
 const threadId = ThreadId.make("thread:work-connector");
@@ -58,7 +47,7 @@ it.live(
         let shell = baseShell;
         const received: Array<unknown> = [];
         let revokeInFlight: (() => Promise<void>) | undefined;
-        let replyProtected = false;
+        let provenance = "non_google";
         let admissionOrigin: string | undefined;
         const nativeFetch = globalThis.fetch;
         const connectorFetch = vi.fn<typeof fetch>(async (url, init) => {
@@ -73,32 +62,26 @@ it.live(
           const binding = Buffer.from(
             JSON.stringify([threadId, providerSessionId, providerInstanceId]),
           ).toString("base64url");
-          const check = (action: "bind" | "protect", caller = binding) =>
+          const check = (caller = binding) =>
             nativeFetch(`${admissionOrigin}/atum-work/connector/prepare`, {
               method: "POST",
               headers: {
                 authorization: "Bearer fixture",
                 "x-atum-work-admission": request.admission,
-                "x-atum-work-action": action,
                 "x-atum-work-caller": caller,
               },
             });
-          expect((await check("bind", "wrong")).status).toBe(409);
-          const bound = await check("bind");
-          expect([202, 204]).toContain(bound.status);
+          expect((await check("wrong")).status).toBe(409);
+          expect((await check()).status).toBe(204);
           await revokeInFlight?.();
-          const released = await check(replyProtected ? "protect" : "bind");
-          if (released.status === 409) {
-            return Response.json({
-              state: replyProtected ? "google_requires_atum" : "unavailable",
-              request_id: requestId,
-            });
+          if ((await check()).status !== 204) {
+            return Response.json({ state: "unavailable", request_id: requestId });
           }
           return Response.json({
             state: "answered",
             request_id: requestId,
             answer: "fixture answer",
-            provenance: replyProtected ? "google" : "non_google",
+            provenance,
           });
         });
         yield* Effect.acquireRelease(
@@ -108,9 +91,6 @@ it.live(
           () =>
             Effect.promise(async () => {
               vi.unstubAllGlobals();
-              const { rm } = await import("node:fs/promises");
-              const { dirname } = await import("node:path");
-              await rm(dirname(protectedDirectory!), { recursive: true, force: true });
             }),
         );
 
@@ -217,17 +197,15 @@ it.live(
               admission: expect.any(String),
             });
             if (resumed) {
-              replyProtected = true;
-              expect(yield* (yield* rpc("tools/call", call)).json).toMatchObject({
-                result: {
-                  structuredContent:
-                    name === "atum-managed"
-                      ? { state: "answered", answer: "fixture answer", provenance: "google" }
-                      : { state: "google_requires_atum" },
-                },
-              });
-              expect(isProtectedThread(threadId)).toBe(name === "atum-managed");
-              replyProtected = false;
+              for (const classification of ["google", "unknown"]) {
+                provenance = classification;
+                expect(yield* (yield* rpc("tools/call", call)).json).toMatchObject({
+                  result: {
+                    structuredContent: { state: "answered", answer: "fixture answer", provenance },
+                  },
+                });
+              }
+              provenance = "non_google";
             }
             previous = rpc;
             if (!resumed) yield* registry.revokeProviderSession(config.providerSessionId);

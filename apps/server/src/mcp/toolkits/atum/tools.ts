@@ -15,15 +15,7 @@ const AskMyAgentTool = Tool.make("ask_my_agent", {
     request_id: Schema.String,
   }),
   success: Schema.Struct({
-    state: Schema.Literals([
-      "answered",
-      "waiting",
-      "timed_out",
-      "unavailable",
-      "cancelled",
-      "google_requires_atum",
-      "provenance_unavailable",
-    ]),
+    state: Schema.Literals(["answered", "waiting", "timed_out", "unavailable", "cancelled"]),
     request_id: Schema.String,
     question_event_id: Schema.optionalKey(Schema.String),
     answer: Schema.optionalKey(Schema.String),

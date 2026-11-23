@@ -30,7 +30,6 @@ import {
   callerLinkOrigin,
 } from "./linkOrigin.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
-import { isProtectedThread } from "./toolkits/atum/protectedThread.ts";
 import { resolveInteractionMode, resolveRuntimeMode } from "./delegatedTaskModes.ts";
 import {
   assertFullAccess,
@@ -441,31 +440,20 @@ const routed = Effect.fn("McpToolAccess.routed")(function* <Tools extends Record
       return yield* Effect.die(
         `${name} acts as its calling thread, so outside clients must not be offered it.`,
       );
-
+    if (!takesLinkedEnvironment(tool)) continue;
     const forwarded = forwardedOf(declaration) as
       | Forwarded<object, unknown, Tool.Failure<Tools[keyof Tools]>, never>
       | undefined;
-    const acceptsEnvironment = takesLinkedEnvironment(tool);
-    if (acceptsEnvironment && remote === undefined)
+    if (remote === undefined)
       return yield* Effect.die(
         `${name} takes a linked environment, but it acts as its calling thread, which is here.`,
       );
     const here = handlers[name] as (
       params: object,
     ) => Effect.Effect<unknown, Tool.Failure<Tools[keyof Tools]>>;
-    handlers[name] = (input: { readonly environmentId?: EnvironmentId }) =>
+    handlers[name] = ({ environmentId, ...params }: { readonly environmentId?: EnvironmentId }) =>
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
-        // Only this brokered tool may act on behalf of a protected provider session.
-        // Check before local dispatch and peer forwarding, including future toolkits.
-        if (scope.thread && isProtectedThread(scope.thread.threadId) && name !== "ask_my_agent") {
-          return yield* new OrchestratorMcpFailure({
-            code: "capability_denied",
-            message: "This tool is unavailable in a protected Work thread.",
-          });
-        }
-        if (!acceptsEnvironment) return yield* here(input);
-        const { environmentId, ...params } = input;
         const target = PeerForwarding.remoteTarget(scope, environmentId);
         if (target === undefined) return yield* here(params);
         if (scope.linkedEnvironments === false) return yield* PeerForwarding.linkedEnvironmentsOff;

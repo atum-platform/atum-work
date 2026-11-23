@@ -1,4 +1,3 @@
-import { isProtectedThread, managedInstance } from "../mcp/toolkits/atum/protectedThread.ts";
 import type {
   OrchestrationV2ThreadLinkMetadata,
   GuestShareId,
@@ -14962,15 +14961,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
 
       const now = yield* DateTime.now;
+      const result = subagentResultForRun(childProjection, { ...childRun, status: outcome });
       const { parentRun, ...parentProjection } = yield* readDelegatedCompletionPlanRecords(
         parentThreadId,
         task,
       );
-      const protectedResult =
-        isProtectedThread(childThreadId) && !isProtectedThread(parentThreadId);
-      const result = protectedResult
-        ? { text: null, turnItemId: null }
-        : subagentResultForRun(childProjection, { ...childRun, status: outcome });
       const parentNode = parentTask.nodes.find((candidate) => candidate.id === task.id);
       const parentTurnItem = parentTask.turnItems.find(
         (candidate) => candidate.type === "subagent" && candidate.subagentId === task.id,
@@ -14983,9 +14978,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         completedAt: now,
         updatedAt: now,
         // The cancelling parent gets no wake, and the task records the run it settled from.
-        ...(cancelled ? { cancelledRunId: childRun.id } : {}),
-        ...(cancelled || protectedResult
-          ? { completionDelivery: { state: "disposed" as const, observedByRunId: null } }
+        ...(cancelled
+          ? {
+              cancelledRunId: childRun.id,
+              completionDelivery: { state: "disposed" as const, observedByRunId: null },
+            }
           : {}),
       };
       const completionPlan = yield* planDelegatedCompletionDelivery({
@@ -15940,22 +15937,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
     if (Option.isSome(existingReceipt)) {
       return yield* replayCommandReceipt(command, existingReceipt.value);
-    }
-
-    const protectedThread = isProtectedThread(commandThreadId(command));
-    if (
-      ((command.type === "provider.switch" || command.type === "thread.model-selection.set") &&
-        protectedThread &&
-        command.modelSelection.instanceId !== managedInstance) ||
-      ((command.type === "thread.fork" || command.type === "thread.merge_back") &&
-        (protectedThread || isProtectedThread(command.sourceThreadId))) ||
-      (command.type === "thread.guest-share.open" && protectedThread)
-    ) {
-      return yield* new OrchestratorCommandRejectedError({
-        commandId: command.commandId,
-        commandType: command.type,
-        cause: "This Work thread contains protected context and must stay on its managed route.",
-      });
     }
 
     // Recheck under the lock; the user may have raised modes since sender preflight.

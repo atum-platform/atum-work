@@ -1,4 +1,3 @@
-import { isProtectedThread, managedInstance } from "../mcp/toolkits/atum/protectedThread.ts";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
 import { expandAssistantCitationsForProvider } from "@t3tools/shared/assistantCitations";
@@ -528,12 +527,6 @@ export const layer: Layer.Layer<
         return;
       }
       captureStartingRun(run);
-      if (isProtectedThread(input.threadId) && run.modelSelection.instanceId !== managedInstance) {
-        return yield* new ProviderTurnStartError({
-          runId,
-          cause: "This Work thread must resume on its protected managed route.",
-        });
-      }
       const rootNode = projection.nodes.find((candidate) => candidate.id === run.rootNodeId);
       const attempt = projection.attempts.find((candidate) => candidate.id === run.activeAttemptId);
       const providerThread = projection.providerThreads.find(
@@ -607,15 +600,6 @@ export const layer: Layer.Layer<
           transfer.status === "pending" &&
           transfer.resolution === null,
       );
-      if (
-        nativeForkTransfer !== undefined &&
-        isProtectedThread(nativeForkTransfer.sourceThreadId)
-      ) {
-        return yield* new ProviderTurnStartError({
-          runId,
-          cause: "Protected Work context cannot be copied into another thread.",
-        });
-      }
       if (
         rootNode === undefined ||
         attempt === undefined ||
