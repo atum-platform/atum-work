@@ -1,3 +1,5 @@
+import * as Schema from "effect/Schema";
+import * as AtumJwks from "effect/jose/Jwks";
 import * as Alchemy from "alchemy";
 import * as Axiom from "@alchemy.run/axiom";
 import * as Cloudflare from "@alchemy.run/cloudflare";
@@ -168,9 +170,15 @@ export const layer = Api.make(
     const apnsDeliveryQueueSender = yield* Cloudflare.Queues.WriteQueue(apnsDeliveryQueue);
     const fcmDeliveryQueueSender = yield* Cloudflare.Queues.WriteQueue(fcmDeliveryQueue);
 
-    const clerkSecretKey = yield* Config.Redacted("CLERK_SECRET_KEY");
-    const clerkPublishableKey = yield* Config.String("CLERK_PUBLISHABLE_KEY");
-    const clerkJwtAudience = yield* Config.String("CLERK_JWT_AUDIENCE");
+    const atumEnabled = yield* Config.Boolean("ATUM_CONNECT_ENABLED").pipe(Config.withDefault(false));
+    const atumAssertion = atumEnabled ? {
+      issuer: yield* Config.String("ATUM_CONNECT_ASSERTION_ISSUER"),
+      audience: yield* Config.String("ATUM_CONNECT_ASSERTION_AUDIENCE"),
+      jwks: yield* Config.schema(Schema.fromJsonString(AtumJwks.KeySet), "ATUM_CONNECT_ASSERTION_JWKS"),
+    } : undefined;
+    const clerkSecretKey = atumEnabled ? Redacted.make("") : yield* Config.Redacted("CLERK_SECRET_KEY");
+    const clerkPublishableKey = atumEnabled ? "" : yield* Config.String("CLERK_PUBLISHABLE_KEY");
+    const clerkJwtAudience = atumEnabled ? "" : yield* Config.String("CLERK_JWT_AUDIENCE");
     const t3ChatLinkSecret = Option.getOrUndefined(
       Option.filter(
         yield* Config.option(Config.Redacted("T3CHAT_LINK_SECRET")),
@@ -240,6 +248,7 @@ export const layer = Api.make(
         ...(fcmServiceAccount ? { fcmServiceAccount } : {}),
         apns: apnsCredentials,
         apnsDeliveryJobSigningSecret: yield* apnsDeliveryJobSigningSecret,
+        ...(atumAssertion ? { atumAssertion } : {}),
         clerkSecretKey,
         clerkPublishableKey,
         clerkJwtAudience,

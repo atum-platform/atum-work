@@ -69,6 +69,7 @@ import * as EnvironmentLinks from "../environments/EnvironmentLinks.ts";
 import * as HeldHooks from "../hooks/HeldHooks.ts";
 import * as HookInbox from "../hooks/HookInbox.ts";
 import * as LiveActivities from "../agentActivity/LiveActivities.ts";
+import { verifyAtumAssertion } from "../auth/AtumAssertion.ts";
 import * as RelayConfiguration from "../Config.ts";
 import * as AgentActivityPublisher from "../agentActivity/AgentActivityPublisher.ts";
 import * as EnvironmentConnector from "../environments/EnvironmentConnector.ts";
@@ -1050,7 +1051,7 @@ export const layerTokenApi = HttpApiBuilder.group(
           scope: args.payload.scope,
         });
         yield* Effect.annotateCurrentSpan({
-          "relay.auth.mode": "clerk_bearer_token_exchange",
+          "relay.auth.mode": config.atumAssertion ? "atum_assertion_exchange" : "clerk_bearer_token_exchange",
           "relay.oauth.client_id": args.payload.client_id,
           "relay.oauth.scopes": args.payload.scope,
         });
@@ -1058,10 +1059,18 @@ export const layerTokenApi = HttpApiBuilder.group(
           return yield* new HttpApiError.Unauthorized({});
         }
 
-        const verified = yield* verifyClerkBearerToken(config, args.payload.subject_token).pipe(
+        const verified = yield* (config.atumAssertion
+          ? verifyAtumAssertion(config.atumAssertion, args.payload.subject_token)
+          : verifyClerkBearerToken(config, args.payload.subject_token).pipe(
+              Effect.flatMap((verified) =>
+                verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
+                  ? Effect.succeed({ sub: verified.sub })
+                  : Effect.fail(new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" })),
+              ),
+            )).pipe(
           Effect.catch(() => relayAuthInvalidError("invalid_bearer")),
         );
-        if (!verified.sub || !hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)) {
+        if (!verified.sub) {
           return yield* relayAuthInvalidError("invalid_bearer");
         }
         const proofKeyThumbprint = yield* requireDpopProof().pipe(
@@ -1738,6 +1747,9 @@ export function verifyRelayClientBearerToken(
   config: RelayConfiguration.RelayConfiguration["Service"],
   token: string,
 ) {
+  if (config.atumAssertion) {
+    return verifyAtumAssertion(config.atumAssertion, token);
+  }
   return verifyClerkBearerToken(config, token).pipe(
     Effect.flatMap((verified) =>
       verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)

@@ -57,6 +57,7 @@ export interface T3ChatSettings {
 export class RelayConfiguration extends Context.Service<
   RelayConfiguration,
   {
+    readonly atumAssertion?: import("./auth/AtumAssertion.ts").AtumAssertionPolicy;
     readonly relayIssuer: string;
     readonly apns: ApnsCredentials | null;
     readonly fcmServiceAccount?: Redacted.Redacted<string>;

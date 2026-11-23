@@ -1,0 +1,12 @@
+# T0/T1 no-spend verification — 2026-11-23
+
+Executed in the three sibling clones under the assigned worktree; branch `feat/t3-connect-t1-1124` in each. No nested agents/reviews, push, PR, CI, deploy or cloud commands. Clones use blob filtering. atum-app was read only; its branch was not changed.
+
+- `node --test atum-work/infra/relay/test-fixtures/*.mjs atum-platform/apps/shell/test-fixtures/connect-assertion.mjs atum-desktop/apps/desktop/test-fixtures/connect.mjs`: **exit 0, 20 tests**. Platform/desktop are siblings of atum-work for `atum-seam.mjs`.
+- `fixture-harness/node_modules/.bin/tsc --noEmit --target es2024 --module nodenext --moduleResolution nodenext --skipLibCheck --allowImportingTsExtensions --types node --typeRoots fixture-harness/node_modules/@types atum-work/infra/relay/src/auth/AtumAssertion.ts atum-platform/apps/shell/src/lib/connect-assertion.ts atum-platform/apps/shell/src/lib/connect-routes.ts atum-desktop/apps/desktop/electron/work/connect.ts`: **exit 0**. This checks new module contracts, not full Worker/Next/Electron composition.
+- `git diff --check` in each clone: **exit 0**.
+- Native durable replay tests, entire relay API/typecheck, existing hostOwnerBearer tests and own-thread handler/descendant suites: **not run / pending**, no exit code asserted. Full workspace dependencies could consume the remaining reserve; the machine began at 16Gi free and was at 14Gi after clones/minimal harness. No signed build was started here. No production/installed/off-network/revocation/Mullvad test was attempted.
+
+The pnpm harness installed only `effect@4.1.3`, `@noble/curves@1.9.1`, `@noble/hashes@1.8.0`, `typescript@6.0.3`, `@types/node@24.12.4`, with `--ignore-scripts` and one `.pnpm-store` under this worktree. Relay/shared node_modules were temporary links into that harness. Store, links and harness dependencies are removed after verification. All three clones plus harness/store were under 1.6GiB before cleanup, well under the 3GiB limit. No existing/global cache was removed. Recreate this minimal harness in the common parent or run through normally installed workspaces on a roomy machine.
+
+T0 is partly built: selected exact runtime/own-thread base, license and dependency inventory complete; main integration is pending five documented conflicts. T1 is partly built: identity verifier, platform routes, desktop adapter and fixture seam complete; desktop runtime wiring and live acceptance remain. D2 is still a spending gate. The quote is in `atum-connect-trial-quote.md`; no resources have been created.
