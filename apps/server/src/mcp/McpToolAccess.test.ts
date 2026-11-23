@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
+import { vi } from "vite-plus/test";
 
 import { OrchestratorProjectionError } from "../orchestration-v2/Orchestrator.ts";
 import * as PeerForwarding from "../peer/PeerForwarding.ts";
@@ -24,6 +25,11 @@ import * as McpHttpServer from "./McpHttpServer.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpToolAccess from "./McpToolAccess.ts";
 import { liveThreadShell } from "./McpToolAccess.testkit.ts";
+
+vi.mock("./toolkits/atum/protectedThread.ts", async (original) => ({
+  ...(await original<typeof import("./toolkits/atum/protectedThread.ts")>()),
+  isProtectedThread: (threadId: ThreadId) => threadId === "thread:protected-work",
+}));
 
 const supervisedThreadId = ThreadId.make("thread:supervised");
 const planThreadId = ThreadId.make("thread:plan");
@@ -252,6 +258,9 @@ const fullAccessLinkedClient: McpInvocationContext.McpInvocationScope = {
 const previewOnly = { ...fullAccess, capabilities: new Set(["preview"] as const) };
 
 it.effect.each([
+  ["reads", threadCaller(ThreadId.make("thread:protected-work")), {}, "capability_denied"],
+  ["starts_threads", threadCaller(ThreadId.make("thread:protected-work")), {}, "capability_denied"],
+  ["writes_threads", threadCaller(ThreadId.make("thread:protected-work")), {}, "capability_denied"],
   ["reads", ended, {}, "ran"],
   ["reads", supervisedClient, {}, "ran"],
   ["reads", readOnlyClient, {}, "ran"],

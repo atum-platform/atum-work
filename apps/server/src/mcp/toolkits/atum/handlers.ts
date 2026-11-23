@@ -5,7 +5,7 @@ import * as McpToolAccess from "../../McpToolAccess.ts";
 import { assertLiveCaller, loadCaller, unavailable } from "../../threadAccess.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import { registerAdmission } from "./admission.ts";
-import { managedInstance, protectThread } from "./protectedThread.ts";
+import { isProtectedThread, managedInstance, protectThread } from "./protectedThread.ts";
 import { endpoint, token } from "./config.ts";
 import { askConnector } from "./connector.ts";
 import { AtumToolkit } from "./tools.ts";
@@ -47,33 +47,38 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
       }).pipe(Effect.orElseSucceed(() => false));
       const lock = yield* ThreadCommandExecutor.ThreadCommandExecutor;
       let admitted = false;
-      const prepare = lock.withLock(
-        threadId,
-        Effect.gen(function* () {
-          if (
-            providerInstanceId !== managedInstance ||
-            caller.caller?.activeRunId == null ||
-            !(yield* current)
-          )
-            return false;
-          admitted = protectThread(threadId);
-          return admitted;
-        }),
-      );
-      const runPrepare = Effect.runPromiseWith(
-        yield* Effect.context<Effect.Services<typeof prepare>>(),
+      const check = (protect: boolean) =>
+        lock.withLock(
+          threadId,
+          Effect.gen(function* () {
+            if (caller.caller?.activeRunId == null || !(yield* current)) return undefined;
+            if (protect) {
+              if (providerInstanceId !== managedInstance || !protectThread(threadId)) {
+                return undefined;
+              }
+              admitted = true;
+            }
+            const protectedThread = isProtectedThread(threadId);
+            return protectedThread && providerInstanceId !== managedInstance
+              ? undefined
+              : protectedThread;
+          }),
+        );
+      const runCheck = Effect.runPromiseWith(
+        yield* Effect.context<Effect.Services<ReturnType<typeof check>>>(),
       );
       const runCurrent = Effect.runPromiseWith(
         yield* Effect.context<Effect.Services<typeof current>>(),
       );
       return yield* Effect.tryPromise({
         try: async (signal) => {
-          const admission = registerAdmission(() =>
-            signal.aborted ? Promise.resolve(false) : runPrepare(prepare),
+          const binding = { threadId, providerSessionId, providerInstanceId };
+          const admission = registerAdmission(binding, (protect) =>
+            signal.aborted ? Promise.resolve(undefined) : runCheck(check(protect), { signal }),
           );
           try {
             return await askConnector({
-              caller: { threadId, providerSessionId, providerInstanceId },
+              caller: binding,
               question,
               endpoint,
               token,

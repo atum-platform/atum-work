@@ -1814,6 +1814,12 @@ const make = Effect.gen(function* () {
     if (task.childThreadId === null) {
       return yield* readRemoteTask(scope, task, waitTimedOut, acknowledgeTerminal);
     }
+    const childThreadId = task.childThreadId;
+    const checkProtectedResult = () =>
+      isProtectedThread(childThreadId) && !isProtectedThread(scope.thread.threadId)
+        ? failure("capability_denied", "This child result belongs to a protected Work thread.")
+        : Effect.void;
+    yield* checkProtectedResult();
     const childControls = yield* threadManagement
       .getThreadRecords(
         task.childThreadId,
@@ -1876,6 +1882,7 @@ const make = Effect.gen(function* () {
         turnItemTypes: ["assistant_message", "error", "system_notice"],
       })
       .pipe(Effect.mapError(threadManagementFailure));
+    yield* checkProtectedResult();
     const childProjection = {
       ...childControls,
       messages: [...childControls.messages, ...resultRecords.messages],
@@ -2024,6 +2031,7 @@ const make = Effect.gen(function* () {
           ),
         );
     }
+    yield* checkProtectedResult();
     return response;
   });
 

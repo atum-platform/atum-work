@@ -67,23 +67,32 @@ it.live(
           }
           expect(String(url)).toBe("http://127.0.0.1:43123/ask");
           expect(new Headers(init?.headers).get("authorization")).toBe("Bearer fixture");
-          received.push(JSON.parse(String(init?.body)));
+          const request = JSON.parse(String(init?.body));
+          received.push(request);
+          const { threadId, providerSessionId, providerInstanceId } = request.caller;
+          const binding = Buffer.from(
+            JSON.stringify([threadId, providerSessionId, providerInstanceId]),
+          ).toString("base64url");
+          const check = (action: "bind" | "protect", caller = binding) =>
+            nativeFetch(`${admissionOrigin}/atum-work/connector/prepare`, {
+              method: "POST",
+              headers: {
+                authorization: "Bearer fixture",
+                "x-atum-work-admission": request.admission,
+                "x-atum-work-action": action,
+                "x-atum-work-caller": caller,
+              },
+            });
+          expect((await check("bind", "wrong")).status).toBe(409);
+          const bound = await check("bind");
+          expect([202, 204]).toContain(bound.status);
           await revokeInFlight?.();
-          if (replyProtected) {
-            const admission = JSON.parse(String(init?.body)).admission;
-            const headers = {
-              authorization: "Bearer fixture",
-              "x-atum-work-admission": admission,
-            };
-            const prepare = async () =>
-              nativeFetch(`${admissionOrigin}/atum-work/connector/prepare`, {
-                method: "POST",
-                headers,
-              });
-            const prepared = await prepare();
-            expect((await prepare()).status).toBe(409);
-            if (prepared.status !== 204)
-              return Response.json({ state: "google_requires_atum", request_id: requestId });
+          const released = await check(replyProtected ? "protect" : "bind");
+          if (released.status === 409) {
+            return Response.json({
+              state: replyProtected ? "google_requires_atum" : "unavailable",
+              request_id: requestId,
+            });
           }
           return Response.json({
             state: "answered",
@@ -183,7 +192,7 @@ it.live(
         expect(refused).not.toContain("fixture answer");
         expect(received).toHaveLength(0);
 
-        for (const name of ["atum-managed", "codex", "claudeAgent", "antigravity"]) {
+        for (const name of ["codex", "claudeAgent", "antigravity", "atum-managed"]) {
           const providerInstanceId = ProviderInstanceId.make(name);
           shell = {
             ...baseShell,
@@ -217,7 +226,7 @@ it.live(
                       : { state: "google_requires_atum" },
                 },
               });
-              expect(isProtectedThread(threadId)).toBe(true);
+              expect(isProtectedThread(threadId)).toBe(name === "atum-managed");
               replyProtected = false;
             }
             previous = rpc;

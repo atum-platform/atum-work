@@ -14962,11 +14962,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
 
       const now = yield* DateTime.now;
-      const result = subagentResultForRun(childProjection, { ...childRun, status: outcome });
       const { parentRun, ...parentProjection } = yield* readDelegatedCompletionPlanRecords(
         parentThreadId,
         task,
       );
+      const protectedResult =
+        isProtectedThread(childThreadId) && !isProtectedThread(parentThreadId);
+      const result = protectedResult
+        ? { text: null, turnItemId: null }
+        : subagentResultForRun(childProjection, { ...childRun, status: outcome });
       const parentNode = parentTask.nodes.find((candidate) => candidate.id === task.id);
       const parentTurnItem = parentTask.turnItems.find(
         (candidate) => candidate.type === "subagent" && candidate.subagentId === task.id,
@@ -14979,11 +14983,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         completedAt: now,
         updatedAt: now,
         // The cancelling parent gets no wake, and the task records the run it settled from.
-        ...(cancelled
-          ? {
-              cancelledRunId: childRun.id,
-              completionDelivery: { state: "disposed" as const, observedByRunId: null },
-            }
+        ...(cancelled ? { cancelledRunId: childRun.id } : {}),
+        ...(cancelled || protectedResult
+          ? { completionDelivery: { state: "disposed" as const, observedByRunId: null } }
           : {}),
       };
       const completionPlan = yield* planDelegatedCompletionDelivery({

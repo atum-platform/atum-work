@@ -121,3 +121,18 @@ Native seams used here include `apps/server/src/mcp/threadAccess.ts:147` and `:2
 `apps/server/src/policy/ManagedPolicy.ts:80` and `:174`. The direct transcript
 fence does not isolate the files or process space of trusted same-user
 applications.
+
+### Work runtime 0.1.12
+
+Build this runtime on the existing upstream `v0.1.11` base using the optional
+fifth packer argument `v0.1.12`. The upstream tag still gates the source ancestry.
+
+The supervisor sends the connector token through an inherited pipe which the
+server drains and closes at startup. Every answer release rechecks its live
+native invocation through the Desktop admission callback. Protected callers may
+use only the question broker in MCP. Delegated results from protected children
+stay out of unprotected parents, including automatic completion delivery.
+
+The Desktop-provisioned Work policy is allowed only when the server finds no
+native managed policy and no per-user managed preferences plist. Presence of
+either source prevents the Work policy from taking its place.

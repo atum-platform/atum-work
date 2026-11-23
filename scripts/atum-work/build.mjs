@@ -15,11 +15,16 @@ import {
 const repo = NodePath.resolve(import.meta.dirname, "../..");
 const rustTarget = "aarch64-apple-darwin";
 const rustManifest = "native/resource-monitor/Cargo.toml";
-const [pin, brandPath, nodeLicensePath, destination] = process.argv.slice(2);
+const [pin, brandPath, nodeLicensePath, destination, runtimeVersion = pin] = process.argv.slice(2);
 
 NodeAssert.ok(
-  pin && /^v\d+\.\d+\.\d+$/.test(pin) && brandPath && nodeLicensePath && destination,
-  "Usage: node scripts/atum-work/build.mjs <stable-tag> <brand.json> <Node LICENSE> <output-directory>",
+  pin &&
+    /^v\d+\.\d+\.\d+$/.test(pin) &&
+    brandPath &&
+    nodeLicensePath &&
+    destination &&
+    /^v\d+\.\d+\.\d+$/.test(runtimeVersion),
+  "Usage: node scripts/atum-work/build.mjs <stable-tag> <brand.json> <Node LICENSE> <output-directory> [<work-runtime-version>]",
 );
 // oxlint-disable-next-line t3code/no-global-process-runtime -- The standalone build entrypoint checks its host before the build toolchain starts.
 NodeAssert.equal(`${NodeOS.platform()}-${NodeOS.arch()}`, "darwin-arm64");
@@ -30,7 +35,7 @@ NodeAssert.equal(
   expectedNode,
   "Build with the same Node version that will be embedded",
 );
-const version = pin.slice(1);
+const version = runtimeVersion.slice(1);
 const outputDir = NodePath.resolve(destination);
 for (const file of [".env", ".env.local"]) {
   NodeAssert.ok(
