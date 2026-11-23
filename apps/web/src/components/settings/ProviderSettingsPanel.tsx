@@ -1,3 +1,4 @@
+import { isProviderSettingsVisible } from "./providerSettingsVisibility";
 import { SettingsGroup } from "./SettingsGroup";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import {
@@ -749,6 +750,7 @@ export function EnvironmentProviderSettings({
     Array<[ProviderInstanceId, ProviderInstanceConfig]>
   >();
   for (const [rawId, instance] of Object.entries(settings.providerInstances ?? {})) {
+    if (!isProviderSettingsVisible(instance)) continue;
     const driver = instance.driver;
     const list = instancesByDriver.get(driver) ?? [];
     list.push([rawId as ProviderInstanceId, instance]);
@@ -774,6 +776,7 @@ export function EnvironmentProviderSettings({
     const hasDefaultSlot = providerSettings.hasDefaultInstance || explicitInstance !== undefined;
     if (
       hasDefaultSlot &&
+      isProviderSettingsVisible(explicitInstance ?? {}) &&
       (driver === "codex" ||
         driver === "claudeAgent" ||
         isDirty ||

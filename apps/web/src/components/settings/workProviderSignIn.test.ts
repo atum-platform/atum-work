@@ -9,24 +9,18 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it("waits for the Work owner bridge to finish the Codex custody preflight", async () => {
-  const { promise, resolve } = Promise.withResolvers<boolean>();
-  const prepareCodexSignIn = vi.fn(() => promise);
+it("continues to native T3 authentication without the retired Work custody bridge", async () => {
+  const prepareCodexSignIn = vi.fn().mockResolvedValue(false);
   vi.stubGlobal("window", { atumWork: { prepareCodexSignIn } });
-  const ready = vi.fn();
-  const check = prepareWorkCodexSignIn().then(ready);
-  expect(prepareCodexSignIn).toHaveBeenCalledOnce();
-  expect(ready).not.toHaveBeenCalled();
-  resolve(true);
-  await check;
-  expect(ready).toHaveBeenCalledWith(true);
+  const startNativeAuth = vi.fn();
+  if (await prepareWorkCodexSignIn()) startNativeAuth();
+  expect(startNativeAuth).toHaveBeenCalledOnce();
+  expect(prepareCodexSignIn).not.toHaveBeenCalled();
 });
 
-it("refuses to start Codex when the Work bridge is unavailable", async () => {
+it("allows native login when the current Work host omits the retired bridge", async () => {
   vi.stubGlobal("window", { atumWork: {} });
-  expect(await prepareWorkCodexSignIn()).toBe(false);
-  await expect(openProviderSignIn("codex", "https://auth.openai.com/")).rejects.toThrow();
-  expect(openExternal).not.toHaveBeenCalled();
+  expect(await prepareWorkCodexSignIn()).toBe(true);
 });
 
 it.each(["codex", "claudeAgent", "antigravity"])(
