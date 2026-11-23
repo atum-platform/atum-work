@@ -108,6 +108,7 @@ export function SidebarThreadHeader({
           </>
         ) : null}
         <SidebarHeaderIconButton
+          data-sidebar-new-thread=""
           label={gt("New thread")}
           tooltip={
             showNewThreadInProjectHint ? (

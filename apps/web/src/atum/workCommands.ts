@@ -1,4 +1,6 @@
 import { dispatchMenuAction, runCommand } from "../shortcuts/dispatcher";
+import { isCommandPaletteOpen } from "../commandPaletteBus";
+import { dispatchSnapShotComposerFocus } from "../lib/desktopSnapShot";
 
 /** The commands Atum's title band offers as buttons over the roster column. */
 export const ATUM_BAND_COMMANDS = ["sidebar.toggle", "chat.new"] as const;
@@ -15,7 +17,12 @@ export function runAtumBandCommand(command: string): boolean {
     dispatchMenuAction(command);
     return true;
   }
-  return command === "chat.new" ? runCommand(command) : false;
+  if (command !== "chat.new" || !runCommand(command)) return false;
+  // On an empty draft T3 reuses it, so the press would show nothing: land the caret in its composer.
+  window.requestAnimationFrame(() => {
+    if (!isCommandPaletteOpen()) dispatchSnapShotComposerFocus();
+  });
+  return true;
 }
 
 export function installAtumWorkCommands(): () => void {

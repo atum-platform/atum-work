@@ -57,3 +57,14 @@ design spec `70dd4ea7` (§8.3, §9.5) on top of F1/F4 (`work-runtime-0113-plumbi
   partial install; it reports only those packages plus the pre-existing check-atum-icon-build.mjs), so this
   commit skipped the hook; fmt and lint ran separately. Hosted CI runs knip on a full install.
 - i18n: new strings use `gt()`/`<T>`; `vp run i18n:generate` and translations were not run.
+
+## Revamp (2026-11-23, owner findings on 0.20.52)
+
+- Work's conversation centres in its card: `ChatCanvas` takes `detailsCardHidden`, and ChatView sets it (and
+  ignores the inline-open flag in its own canvas read) in Work, which never renders the Thread details card. Before,
+  the canvas kept that card's lane and the thread and empty state sat off-centre.
+- `window.atumWorkCommands.run('chat.new')` lands the caret in the composer after the command runs (unless the
+  "new thread in…" palette opened): on an empty draft T3 reuses it, so the band's New thread showed nothing.
+- `data-sidebar-new-thread` on the roster's New thread button, for the Atum theme to hide (the band carries it).
+- Verified: web typecheck, scoped lint and fmt, `vp test run --project unit` on the atum, keybindings and canvas
+  logic tests (exit 0), and the desktop harness screenshots (atum-desktop `docs/work-ui-revamp-1123.md`).
