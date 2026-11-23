@@ -105,6 +105,8 @@ import { TimelineSystemDivider } from "./TimelineSystemDivider";
 
 import { forwardWheelToTimeline } from "./timelineMinimapWheel";
 import { TimelineMinimap } from "./TimelineMinimap";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { WorkThreadSkeleton } from "../../atum/WorkPresentation";
 import {
   type TimelineRowSharedState,
   type TimelineRowActivityState,
@@ -322,6 +324,8 @@ interface MessagesTimelineProps {
   onFooterGrow?: () => void;
   findOpen?: boolean;
   hideEmptyPlaceholder?: boolean;
+  /** The thread's detail is still loading; Work mode shows a quiet skeleton meanwhile. */
+  detailLoading?: boolean;
   /** Composer space to center the empty state against; held steady through collapse. */
   emptyPlaceholderInset: number;
   topFadeEnabled?: boolean;
@@ -420,6 +424,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   onViewportAttach,
   onFooterGrow,
   hideEmptyPlaceholder = false,
+  detailLoading = false,
   emptyPlaceholderInset,
   topFadeEnabled = false,
   historyControls,
@@ -484,6 +489,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const citationThreadRef = parseScopedThreadKey(routeThreadKey);
   const openPullRequest = useOpenPrLink(citationThreadRef ?? undefined);
   const [minimapStripMap] = useState(() => new Map<string, HTMLSpanElement>());
+  const atumWorkMode = useActiveAtumSurfaceMode() === "work";
   const normalizedFindQuery = findQuery.trim();
   const findActive = findExpanded;
 
@@ -1415,7 +1421,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
       return (
         <>
           {activityAnnouncer}
-          <div className="h-full min-h-0 bg-background" data-timeline-loading="true" />
+          <div className="h-full min-h-0 bg-background" data-timeline-loading="true">
+            {atumWorkMode && detailLoading ? <WorkThreadSkeleton /> : null}
+          </div>
         </>
       );
     }
@@ -1500,23 +1508,25 @@ const ConversationTimeline = memo(function ConversationTimeline({
               ListHeaderComponent={listHeader}
               ListFooterComponent={timelineListFooter}
             />
-            <TimelineMinimap
-              items={minimapItems}
-              hasPersistentGutter={minimapHasPersistentGutter}
-              hitStripWidth={minimapHitStripWidth}
-              currentIndex={minimapCurrentIndex}
-              atEnd={minimapAtEnd}
-              stripMap={minimapStripMap}
-              onWheel={forwardMinimapWheel}
-              onSelect={(item) => {
-                navigateTimeline();
-                void listRef.current?.scrollToIndex({
-                  index: item.rowIndex,
-                  animated: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-                  viewOffset: TIMELINE_MINIMAP_TARGET_OFFSET,
-                });
-              }}
-            />
+            {atumWorkMode ? null : (
+              <TimelineMinimap
+                items={minimapItems}
+                hasPersistentGutter={minimapHasPersistentGutter}
+                hitStripWidth={minimapHitStripWidth}
+                currentIndex={minimapCurrentIndex}
+                atEnd={minimapAtEnd}
+                stripMap={minimapStripMap}
+                onWheel={forwardMinimapWheel}
+                onSelect={(item) => {
+                  navigateTimeline();
+                  void listRef.current?.scrollToIndex({
+                    index: item.rowIndex,
+                    animated: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+                    viewOffset: TIMELINE_MINIMAP_TARGET_OFFSET,
+                  });
+                }}
+              />
+            )}
           </TooltipScrollDismissArea>
         </TimelineRowActivityCtx>
       </MarkdownFindContext>

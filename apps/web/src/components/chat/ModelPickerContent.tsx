@@ -62,7 +62,9 @@ import { announce } from "~/lib/announce";
 import { cn } from "~/lib/utils";
 import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
 import { TooltipProvider } from "../ui/tooltip";
-import { InlineButton } from "../ui/button";
+import { Button, InlineButton } from "../ui/button";
+import { isAtumWorkBuild } from "../../atum/surfaceMode";
+import { atumPickerRailOrder } from "../../atum/pickerRail.logic";
 import { Badge } from "../ui/badge";
 import {
   isProviderInstancePickerReady,
@@ -237,6 +239,34 @@ function ModelPickerProviderNotices({
     }
     onRequestClose?.();
     onOpenProviderSetup?.(entry.instanceId);
+  }
+
+  if (isAtumWorkBuild && setupEntries.length > 0) {
+    // One line, one capsule: the plan's own sign-in does the rest.
+    return (
+      <div className="flex shrink-0 flex-col items-center gap-3 border-t border-border/70 px-3 py-5 text-center">
+        {setupEntries.map((entry) => (
+          <div key={entry.instanceId} className="flex flex-col items-center gap-2">
+            <p className="text-sm font-medium text-foreground">
+              {gt("Use your {provider} plan", { provider: entry.displayName })}
+            </p>
+            <Button
+              type="button"
+              size="sm-pill"
+              disabled={preparing}
+              onClick={() => void openSetup(entry)}
+            >
+              {gt("Connect")}
+            </Button>
+          </div>
+        ))}
+        {error ? (
+          <p role="alert" className="text-xs text-destructive">
+            <T>ChatGPT is not ready to connect in Work. Try again.</T>
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -695,7 +725,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const sidebarInstanceEntries = (() => {
     const enabledEntries = instanceEntries.filter(isProviderInstancePickerVisible);
     if (!isLocked) {
-      return enabledEntries;
+      return isAtumWorkBuild
+        ? atumPickerRailOrder(enabledEntries, isProviderInstancePickerReady)
+        : enabledEntries;
     }
     const available: ProviderInstanceEntry[] = [];
     const disabled: ProviderInstanceEntry[] = [];

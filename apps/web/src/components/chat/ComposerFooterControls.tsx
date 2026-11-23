@@ -13,6 +13,7 @@ import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 import { resolveRuntimeModeOption, runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
 
 export type RuntimeModeOption = {
   mode: RuntimeMode;
@@ -32,7 +33,9 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   const gt = useGT();
   const messages = useMessages();
   const size = props.size ?? "sm";
-  const accessDisplay = props.accessDisplay ?? "label";
+  // Work mode keeps the project's runtime mode but never shows the permissions chip.
+  const workMode = useActiveAtumSurfaceMode() === "work";
+  const accessDisplay = workMode ? "hidden" : (props.accessDisplay ?? "label");
   const composerFloatingLayerProps = useComposerMenuProps();
   const [open, setOpen] = useComposerMenuState(props.hidden);
   const permissionsChipRef = useRef<HTMLButtonElement>(null);
@@ -118,6 +121,8 @@ export function ComposerPermissionsSection(props: {
     props.runtimeModeOptions.find((option) => option.mode === shownMode) ??
     resolveRuntimeModeOption("approval-required", messages);
   const descriptionId = useId();
+  const workMode = useActiveAtumSurfaceMode() === "work";
+  if (workMode) return null;
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
       <div className="font-medium text-muted-foreground text-xs">

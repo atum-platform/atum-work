@@ -19,6 +19,8 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { observeResize } from "~/lib/observeResize";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { WorkFileCards } from "../../atum/WorkPresentation";
 
 const EMPTY_DIRECTORY_OVERRIDES: Record<string, boolean> = {};
 const VIRTUALIZE_AFTER_ROWS = 250;
@@ -31,7 +33,21 @@ interface ChangedFileRow {
 
 type ChangedFileContextMenuHandler = (filePath: string, event: MouseEvent) => void;
 
-export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
+export const ChangedFilesCard = memo(function ChangedFilesCard(props: ChangedFilesCardProps) {
+  const workMode = useActiveAtumSurfaceMode() === "work";
+  return workMode ? (
+    <WorkFileCards
+      runId={props.runId}
+      files={props.files}
+      totalCount={props.totals.count}
+      onOpen={props.onOpenTurnDiff}
+    />
+  ) : (
+    <ChangedFilesTreeCard {...props} />
+  );
+});
+
+interface ChangedFilesCardProps {
   runId: RunId;
   /** May be a prefix of the changed files; `totals` covers all of them. */
   files: ReadonlyArray<TurnDiffFileChange>;
@@ -41,7 +57,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
   onToggleAllDirectories: () => void;
   onOpenTurnDiff: (runId: RunId, filePath?: string) => void;
   onFileContextMenu?: ChangedFileContextMenuHandler | undefined;
-}) {
+}
+
+function ChangedFilesTreeCard(props: ChangedFilesCardProps) {
   const {
     runId,
     files,
@@ -162,7 +180,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
       )}
     </div>
   );
-});
+}
 
 const ChangedFilesTree = memo(function ChangedFilesTree(props: {
   runId: RunId;

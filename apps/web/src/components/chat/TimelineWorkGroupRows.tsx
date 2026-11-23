@@ -30,6 +30,8 @@ import {
 } from "./MessagesTimeline.logic";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Spinner } from "../ui/spinner";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { AtumAtom } from "../../atum/WorkPresentation";
 import { WorktreeSetupCard } from "./WorktreeSetupCard";
 import { cn } from "~/lib/utils";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
@@ -353,6 +355,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
     use(TimelineRowActivityCtx);
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
+  const workMode = useActiveAtumSurfaceMode() === "work";
   const label = isPreparingWorktree ? (
     <T>Setting up worktree…</T>
   ) : compacting ? (
@@ -367,6 +370,7 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
       <div className="flex h-6 min-w-0 items-baseline gap-2 px-1 text-sm leading-relaxed text-muted-foreground tabular-nums">
+        {workMode && !isPreparingWorktree ? <AtumAtom className="self-center" /> : null}
         <span
           ref={shimmer ? observeVisibleAnimation : undefined}
           className="relative shrink-0 overflow-hidden whitespace-nowrap"
@@ -692,9 +696,18 @@ export function WorkGroupToggleTimelineRow({
   row: Extract<TimelineRow, { kind: "work-toggle" }>;
 }) {
   const ctx = use(TimelineRowCtx);
+  const gt = useGT();
+  const workMode = useActiveAtumSurfaceMode() === "work";
   return (
     <WorkGroupHeader
-      label={row.summary}
+      label={
+        workMode && row.hiddenCount > 1
+          ? gt("{summary} · {count, plural, one {# step} other {# steps}}", {
+              summary: row.summary,
+              count: row.hiddenCount,
+            })
+          : row.summary
+      }
       iconName={row.toolSurface ?? toolGroupSummaryIconName(row.summaryKind)}
       toolIcon={row.toolIcon}
       failed={row.hasFailure}

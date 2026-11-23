@@ -136,6 +136,18 @@ export function registerCommands(
   return pushScope(scopes, { commands, options });
 }
 
+/** Run a command the way its chord would, for hosts that offer it as a button (Atum's title band). */
+export function runCommand(command: KeybindingCommand): boolean {
+  const event = new KeyboardEvent("keydown", { cancelable: true });
+  for (let index = globalScopes.length - 1; index >= 0; index -= 1) {
+    const scope = globalScopes[index];
+    const handler = scope?.commands[command];
+    if (!scope || !handler || (scope.options.when && !scope.options.when(event))) continue;
+    if (handler(event) !== false) return true;
+  }
+  return false;
+}
+
 type MenuActionHandler = () => void;
 const menuActionHandlers = new Map<string, MenuActionHandler[]>();
 let menuActionInstalled = false;

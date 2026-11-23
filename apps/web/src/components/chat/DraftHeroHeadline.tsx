@@ -48,6 +48,8 @@ import { InlineButton } from "../ui/button";
 import { DraftProjectName } from "./DraftProjectName";
 import { DraftHeroProjectHeading } from "./DraftHeroProjectHeading";
 import { TriageDraftHero } from "./TriageDraftHero";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { WorkDraftHero } from "../../atum/WorkPresentation";
 
 const ADD_PROJECT_VALUE = "add-project";
 
@@ -89,6 +91,7 @@ export function DraftHeroHeadline({
   const pickerFilter = useComboboxFilter();
   const highlightedPickerValueRef = useRef<string | null>(null);
   const { canPinProjectGroup, toggleProjectGroupPin } = useProjectPin();
+  const workMode = useActiveAtumSurfaceMode() === "work";
 
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
@@ -353,6 +356,23 @@ export function DraftHeroHeadline({
       <TriageDraftHero
         machineLabel={environment?.label ?? null}
         serverVersion={environment?.serverConfig?.environment.serverVersion ?? null}
+      />
+    );
+  }
+
+  if (workMode && !isScratchDraft) {
+    return (
+      <WorkDraftHero
+        project={hasResolvedProject || canChooseProject ? projectSelector : null}
+        onSuggest={(prompt) => {
+          if (!draftId) return;
+          useComposerDraftStore.getState().setPrompt(draftId, prompt);
+          document
+            .querySelector<HTMLElement>(
+              '[data-chat-composer-stack] [contenteditable="true"], [data-chat-composer-stack] textarea',
+            )
+            ?.focus();
+        }}
       />
     );
   }

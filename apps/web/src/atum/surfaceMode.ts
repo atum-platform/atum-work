@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { EnvironmentId, type AtumSurfaceMode, type ProjectId } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { useStableCallback } from "../hooks/useStableCallback";
@@ -20,6 +20,22 @@ declare global {
       setSurfaceMode(projectId: string, mode: AtumSurfaceMode): Promise<void>;
     };
   }
+}
+
+// The active main chat's mode, for chrome outside ChatView (roster footer, composer menu).
+let activeMode: AtumSurfaceMode = isAtumWorkBuild ? "work" : "code";
+const activeModeListeners = new Set<() => void>();
+function publishActiveMode(mode: AtumSurfaceMode) {
+  if (activeMode === mode) return;
+  activeMode = mode;
+  for (const listener of activeModeListeners) listener();
+}
+function subscribeActiveMode(listener: () => void) {
+  activeModeListeners.add(listener);
+  return () => void activeModeListeners.delete(listener);
+}
+export function useActiveAtumSurfaceMode(): AtumSurfaceMode {
+  return useSyncExternalStore(subscribeActiveMode, () => activeMode);
 }
 
 export function useAtumSurfaceMode(projectId: ProjectId | null, environmentId?: EnvironmentId) {
@@ -67,6 +83,7 @@ export function useAtumSurfaceModeController(
   useEffect(() => {
     if (!isAtumWorkBuild || !active) return;
     document.documentElement.dataset.atumMode = mode;
+    publishActiveMode(mode);
     const snapshot = projectId ? { projectId, mode } : null;
     const bridge = {
       getSurfaceMode: () => snapshot,
@@ -87,3 +104,5 @@ export function useAtumSurfaceModeController(
       projectId ? setMode(projectId, value) : Promise.resolve(),
   };
 }
+
+export { isWorkModeHiddenSurface, workModeDisabledShortcuts } from "./surfaceMode.logic";

@@ -49,6 +49,7 @@ import {
   rankPullRequestMatches,
 } from "../pullRequest/pullRequestList.logic";
 import type { ComposerCommandItem } from "./ComposerCommandMenu";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
 import { matchComposerModelItems } from "./composerModelMentions";
 import type { ModelEsque } from "./providerIconUtils";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -108,6 +109,8 @@ export function useComposerMenuItems({
   };
 }) {
   const gt = useGT();
+  // Work mode suggests only T3's own commands and skills; a typed provider command still runs.
+  const providerCommandsSuggested = useActiveAtumSurfaceMode() === "code";
   const messages = useMessages();
   // Thread mentions rank by recency as of when the composer mounted.
   const [now] = useState(() => Date.now());
@@ -319,6 +322,7 @@ export function useComposerMenuItems({
       // T3's `/clear` replaces the provider's, which would clear a session T3 still treats as live.
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
         (item) =>
+          providerCommandsSuggested &&
           (item.command.name !== "compact" || compactSlashCommandAvailable) &&
           (item.command.name !== "clear" || !freshSessionAvailable),
       );

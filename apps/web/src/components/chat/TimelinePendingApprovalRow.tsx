@@ -12,6 +12,8 @@ import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions
 import { ToolActivityIconView, type WorkEntryIconName } from "./TimelineToolActivityIcon";
 import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { WorkApprovalRow } from "../../atum/WorkPresentation";
 
 const APPROVAL_PRESENTATION = {
   command: {
@@ -49,6 +51,30 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
   const m = useMessages();
   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
+  const workMode = useActiveAtumSurfaceMode() === "work";
+  if (workMode) {
+    return (
+      <WorkApprovalRow
+        approval={approval}
+        disabled={!canOperateThread}
+        isResponding={respondingRequestIds.includes(approval.requestId)}
+        onRespond={onRespondToApproval}
+        fallbackActions={
+          onRespondToApproval ? (
+            <ComposerPendingApprovalActions
+              presentation="inline"
+              requestId={approval.requestId}
+              disabled={!canOperateThread}
+              isResponding={respondingRequestIds.includes(approval.requestId)}
+              canRespond={canRespond}
+              options={approval.options}
+              onRespondToApproval={onRespondToApproval}
+            />
+          ) : null
+        }
+      />
+    );
+  }
   return (
     <WorkLogRow
       role="group"

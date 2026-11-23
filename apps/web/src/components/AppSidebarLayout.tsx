@@ -367,12 +367,10 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
     };
 
     window.addEventListener("keydown", onKeyDown, true);
-    const unsubscribe = window.desktopBridge?.onMenuAction((action) => {
-      if (action === "sidebar.toggle") toggleSidebar();
-    });
+    const unsubscribe = registerMenuAction("sidebar.toggle", toggleSidebar);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      unsubscribe?.();
+      unsubscribe();
     };
   }, [keybindings, router, showSidebar, toggleSidebar, usagePageOpen]);
 

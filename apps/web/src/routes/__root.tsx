@@ -1,4 +1,5 @@
 import { type ServerLifecycleWelcomePayload } from "@t3tools/contracts";
+import { installAtumWorkCommands } from "../atum/workCommands";
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
   Outlet,
@@ -137,9 +138,11 @@ function RootRouteNotFoundView() {
 }
 
 function RootRouteView() {
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Gives the native theme a mode before a project view mounts.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Gives the native theme a mode and the Atum host its band commands.
   useEffect(() => {
-    if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") document.documentElement.dataset.atumMode ??= "work";
+    if (import.meta.env.VITE_ATUM_WORK_BUILD !== "1") return;
+    document.documentElement.dataset.atumMode ??= "work";
+    return installAtumWorkCommands();
   }, []);
   // Above every branch: app services raise toasts for the whole page, so the surface they write to
   // must not unmount when the root switches branches (for example /welcome to the app shell).
