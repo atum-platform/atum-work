@@ -35,6 +35,7 @@ export interface ProviderInstanceEntry {
   readonly acpRegistryIconUrl?: string | undefined;
   readonly continuationGroupKey?: string | undefined;
   readonly enabled: boolean;
+  readonly showInPicker?: boolean;
   readonly installed: boolean;
   readonly status: ServerProviderState;
   readonly isDefault: boolean;
@@ -82,7 +83,7 @@ export function isProviderInstancePickerReady(entry: ProviderInstanceEntry): boo
 }
 
 export function isProviderInstancePickerVisible(entry: ProviderInstanceEntry): boolean {
-  return entry.enabled;
+  return entry.enabled && entry.showInPicker !== false;
 }
 
 export function deriveProviderInstanceEntries(
@@ -165,7 +166,9 @@ function applyProviderInstanceBranding(
   const explicitInstance = Object.hasOwn(settings.providerInstances, entry.instanceId)
     ? settings.providerInstances[entry.instanceId]
     : undefined;
-  if (entry.driverKind !== "acpRegistry" || explicitInstance === undefined) return entry;
+  if (explicitInstance === undefined) return entry;
+  if (explicitInstance.showInPicker === false) entry = { ...entry, showInPicker: false };
+  if (entry.driverKind !== "acpRegistry") return entry;
   const config =
     explicitInstance.config !== null && typeof explicitInstance.config === "object"
       ? (explicitInstance.config as Readonly<Record<string, unknown>>)

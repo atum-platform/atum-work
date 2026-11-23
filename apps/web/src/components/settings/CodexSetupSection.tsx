@@ -1,3 +1,4 @@
+import { openProviderSignIn, prepareWorkCodexSignIn } from "./workProviderSignIn";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
@@ -30,7 +31,6 @@ import {
 } from "react";
 import { T, useGT, useMessages } from "gt-react";
 
-import { ensureLocalApi } from "../../localApi";
 import { managedInstanceLocks, useManagedPolicy } from "../../state/managedPolicy";
 import { ManagedControl } from "../ManagedPolicy";
 import { useEnvironmentHttpBaseUrl } from "../../state/environments";
@@ -488,7 +488,7 @@ function ManagedCodexSetup({
       const receive = window.desktopBridge?.receiveProviderAuthCallback;
       if (receive && viaClientCallback && flowId) {
         if (receivingCallback.current === authorizationUrl) {
-          await ensureLocalApi().shell.openExternal(authorizationUrl);
+          await openProviderSignIn("codex", authorizationUrl);
           return;
         }
         receivingCallback.current = authorizationUrl;
@@ -499,7 +499,7 @@ function ManagedCodexSetup({
           completeAuth({ environmentId, input: { instanceId, flowId, callbackUrl } }),
         );
       } else {
-        await ensureLocalApi().shell.openExternal(authorizationUrl);
+        await openProviderSignIn("codex", authorizationUrl);
       }
     } catch {
       setError(gt("Could not finish sign-in on this computer. Try again."));
@@ -507,6 +507,11 @@ function ManagedCodexSetup({
   };
 
   const signIn = async (methodId: string, signal: AbortSignal) => {
+    if (pendingRef.current) return;
+    if (!(await prepareWorkCodexSignIn()) || signal.aborted) {
+      if (!signal.aborted) setError(gt("ChatGPT is not ready to connect in Work. Try again."));
+      return;
+    }
     if (pendingRef.current) return;
     setTransferFailed(false);
     setRequestedMethodId(methodId);
@@ -778,7 +783,7 @@ function ManagedCodexSetup({
             <Button
               size="xs"
               variant="ghost-muted"
-              onClick={() => void ensureLocalApi().shell.openExternal(url)}
+              onClick={() => void openPage(url, auth?.flowId ?? null, false)}
             >
               <T>Try sign-in in your browser</T>
               <ExternalLinkIcon className="size-3.5" />

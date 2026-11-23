@@ -2,15 +2,17 @@ import type { ProviderAuthResponse } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import { useEffect, useRef, useState } from "react";
 import { GhosttyTerminalSurface } from "../../terminal/ghostty/surface";
-import { ensureLocalApi } from "../../localApi";
+import { openProviderSignIn } from "./workProviderSignIn";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { terminalThemeFromApp } from "../ThreadTerminalDrawer";
 
 export default function ProviderAuthTerminal({
+  driver,
   output,
   outputOffset,
   onResponse,
 }: {
+  readonly driver: string;
   readonly output: string;
   readonly outputOffset?: number | undefined;
   readonly onResponse: (response: Extract<ProviderAuthResponse, { type: "terminal" }>) => void;
@@ -44,8 +46,7 @@ export default function ProviderAuthTerminal({
       beforeKey: (event) => event.key !== "Tab",
       onLinkActivate: (url) => {
         if (/^https?:\/\//i.test(url))
-          void ensureLocalApi()
-            .shell.openExternal(url)
+          void openProviderSignIn(driver, url)
             .catch(() => setError(gt("Could not open the provider link.")));
       },
     })

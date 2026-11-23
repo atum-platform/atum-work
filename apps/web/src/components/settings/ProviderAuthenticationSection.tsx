@@ -1,3 +1,4 @@
+import { openProviderSignIn } from "./workProviderSignIn";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import {
@@ -154,7 +155,7 @@ export function ProviderAuthenticationSection({
     }
     const requiresConsent = interaction?.type === "browser" && interaction.requiresConsent;
     // Reserve tabs before awaiting consent; browsers block later opens.
-    const pending = requiresConsent && !window.desktopBridge ? window.open("", "_blank") : null;
+    const pending = requiresConsent && !window.desktopBridge && !window.atumWork ? window.open("", "_blank") : null;
     if (pending) pending.opener = null;
     try {
       if (requiresConsent && !(await send({ type: "browser", action: "accept" }))) {
@@ -162,7 +163,7 @@ export function ProviderAuthenticationSection({
         return;
       }
       if (pending) pending.location.href = url;
-      else await ensureLocalApi().shell.openExternal(url);
+      else await openProviderSignIn(provider.driver, url);
       setError(null);
     } catch {
       pending?.close();
@@ -387,6 +388,7 @@ export function ProviderAuthenticationSection({
                 }
               >
                 <ProviderAuthTerminal
+                  driver={provider.driver}
                   key={`${auth?.flowId}:${interaction.id}`}
                   output={interaction.output}
                   outputOffset={interaction.outputOffset}

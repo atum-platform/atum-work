@@ -366,13 +366,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     searchInputRef,
     keybindings: providedKeybindings,
     modelOptionsByInstance,
-    instanceEntries,
     getModelDisabledReason,
     onInstanceModelChange,
     onToggleModel,
     onRequestClose,
     onOpenProviderSetup,
   } = props;
+  const instanceEntries = props.instanceEntries.filter((entry) => entry.showInPicker !== false);
   const [searchQuery, setSearchQuery] = useState("");
   const modelListRef = useRef<LegendListRef | null>(null);
   const pickerContentRef = useRef<HTMLDivElement>(null);
@@ -380,7 +380,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   useLayoutEffect(() => registerModelPickerContent(), []);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const { favorites } = useEnvironmentModelPreferences(props.environmentId);
-  const activeEntry = props.instanceEntries.find(
+  const activeEntry = instanceEntries.find(
     (entry) => entry.instanceId === props.activeInstanceId,
   );
   const activeModel = resolveModelPickerSelectedModel({
