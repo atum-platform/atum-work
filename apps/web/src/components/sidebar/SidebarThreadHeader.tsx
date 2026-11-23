@@ -99,6 +99,7 @@ export function SidebarThreadHeader({
       <div className="flex shrink-0 items-center">
         {hasProjects ? projectScope : null}
         <SidebarHeaderIconButton
+          data-sidebar-new-thread=""
           label={gt("New thread")}
           tooltip={
             showNewThreadInProjectHint ? (
