@@ -45,6 +45,8 @@ jobs:
           targets: aarch64-apple-darwin
       - name: Install locked web, server and scripts dependencies
         run: vp install --frozen-lockfile --filter=@t3tools/web... --filter=t3... --filter=@t3tools/scripts... --filter=@t3tools/oxlint-plugin-t3code...
+      - name: Fetch the upstream stable tag the fork is based on
+        run: git fetch --no-tags https://github.com/pingdotgg/t3code "refs/tags/${{ inputs.pin || 'v0.1.11' }}:refs/tags/${{ inputs.pin || 'v0.1.11' }}"
       - name: Fetch the Node LICENSE for the embedded Node version
         run: |
           node_version="$(node -p 'require("./package.json").engines.node')"
