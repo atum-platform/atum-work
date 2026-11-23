@@ -33,9 +33,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   const gt = useGT();
   const messages = useMessages();
   const size = props.size ?? "sm";
-  // Work mode keeps the project's runtime mode but never shows the permissions chip.
-  const workMode = useActiveAtumSurfaceMode() === "work";
-  const accessDisplay = workMode ? "hidden" : (props.accessDisplay ?? "label");
+  const accessDisplay = props.accessDisplay ?? "label";
   const composerFloatingLayerProps = useComposerMenuProps();
   const [open, setOpen] = useComposerMenuState(props.hidden);
   const permissionsChipRef = useRef<HTMLButtonElement>(null);

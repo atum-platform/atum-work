@@ -31,6 +31,7 @@ import {
 } from "./ComposerModelEffort";
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
+import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
 
 /**
  * The composer footer controls: the model picker (which also holds effort, speed and
@@ -133,6 +134,8 @@ export function ComposerControlsBar(props: {
     getModelDisabledReason,
   } = props;
   const accessMatchesDefault = compatibleRuntimeMode === defaultRuntimeMode;
+  // Work mode keeps the project's runtime mode and never shows permissions in the composer.
+  const workMode = useActiveAtumSurfaceMode() === "work";
   const {
     accessDisplay,
     showModeBlock,
@@ -141,7 +144,7 @@ export function ComposerControlsBar(props: {
     overflowShowsPermissions,
     pickerOwnsModeShortcut,
   } = resolveComposerControlsOwnership({
-    matchesDefault: accessMatchesDefault || props.permissionsShownInStrip,
+    matchesDefault: accessMatchesDefault || props.permissionsShownInStrip || workMode,
     collapsed: composerControlsCollapsed,
     measuredHiddenBlockCount,
   });

@@ -15,7 +15,9 @@ design spec `70dd4ea7` (§8.3, §9.5) on top of F1/F4 (`work-runtime-0113-plumbi
   `threadPanel.toggle` and `rightPanel.toggleMaximized` chords answer "not handled".
 - Roster footer: Pull requests and Issues hidden in Work; Usage hidden in the Atum build (no balance meters).
 - Timeline minimap hidden; provider slash commands dropped from suggestions only (typed, they still run).
-- Composer permissions chip and the Permissions section in the model/compact menus hidden in Work.
+- Composer permissions chip hidden in Work through T3's own ownership rule (`ComposerControlsBar`: Work counts
+  as "permissions not shown here"), and the Permissions section in the model/compact menus hidden. The chip
+  fix landed after the dependency cleanup, so its typecheck/lint/screenshot were not re-run; hosted CI covers it.
 - Not done: command-palette git/worktree/port-forward filtering and the Settings nav filter (§8.3 rows).
 
 ## F3: Work presentation (`atum/WorkPresentation.tsx`)
