@@ -1201,6 +1201,48 @@ const withToolAnalytics =
     return yield* registration.pipe(Effect.provideService(McpServer.McpServer, recordingServer));
   });
 
+/**
+ * A credential issued with a tool allow-list calls only those tools. Every registration passes through
+ * here, so a tool added later is refused for that credential until it is named in the list. The refusal
+ * happens before the handler, so nothing a refused tool reads or changes is touched.
+ */
+const withToolAllowList = Effect.fn("McpHttpServer.withToolAllowList")(function* <A, E, R>(
+  registration: Effect.Effect<A, E, R>,
+) {
+  const server = yield* McpServer.McpServer;
+  const allowListedServer = McpServer.McpServer.of({
+    ...server,
+    addTool: Effect.fn("McpServer.addTool")(function (options) {
+      const name = options.tool.name;
+      return server.addTool({
+        ...options,
+        handle: (payload) =>
+          Effect.flatMap(
+            Effect.serviceOption(McpInvocationContext.McpInvocationContext),
+            (scope) =>
+              McpInvocationContext.toolPermitted(Option.getOrUndefined(scope), name)
+                ? options.handle(payload)
+                : Effect.succeed(
+                    new McpSchema.CallToolResult({
+                      isError: true,
+                      structuredContent: {
+                        error: { _tag: "McpToolNotAllowed", tool: name },
+                      },
+                      content: [
+                        {
+                          type: "text",
+                          text: "This session's T3 credential does not include that tool.",
+                        },
+                      ],
+                    }),
+                  ),
+          ),
+      });
+    }),
+  });
+  return yield* registration.pipe(Effect.provideService(McpServer.McpServer, allowListedServer));
+});
+
 /** Each tool call gets a span named for its tool; arguments stay out, as they carry prompts and IDs. */
 const withToolSpans = Effect.fn("McpHttpServer.withToolSpans")(function* <A, E, R>(
   registration: Effect.Effect<A, E, R>,
@@ -1284,7 +1326,9 @@ export const toolkitRegistration = <Tools extends Record<string, Tool.Any>, EX, 
   Layer.effectDiscard(
     withToolAnalytics(
       withToolSpans(
-        withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+        withToolAllowList(
+          withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+        ),
       ),
     ),
   ).pipe(
@@ -1301,7 +1345,7 @@ const imageToolRegistration = <Tools extends Record<string, Tool.Any>, A, E, R, 
   register: Effect.Effect<A, E, R>,
   handlers: McpToolAccess.HandlersLayer<Tools, EX, RX>,
 ) =>
-  Layer.effectDiscard(withToolAnalytics(withToolSpans(register))).pipe(
+  Layer.effectDiscard(withToolAnalytics(withToolSpans(withToolAllowList(register)))).pipe(
     Layer.provide(McpToolAccess.HandlersLayer.layer(handlers)),
   );
 
@@ -1453,6 +1497,11 @@ const layerDeferredListing = McpServer.visibility(
     return Effect.fnUntraced(function* ({ method, target, headers }: McpServer.MiddlewareOptions) {
       if (method !== "tools/list") return true;
       const scope = yield* Effect.serviceOption(McpInvocationContext.McpInvocationContext);
+      // A credential with a tool allow-list is shown those tools and nothing else, `tool_search`
+      // included, and shown them outright: there is nothing left to defer.
+      if (Option.getOrUndefined(scope)?.toolAllowList !== undefined) {
+        return McpInvocationContext.toolPermitted(Option.getOrUndefined(scope), target);
+      }
       const providerSessionId = Option.getOrUndefined(scope)?.thread?.providerSessionId;
       if (headers[MCP_TOOL_EXPOSURE_HEADER] !== "deferred" || providerSessionId === undefined) {
         return target !== McpToolExposure.TOOL_SEARCH;

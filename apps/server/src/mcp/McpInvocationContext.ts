@@ -158,7 +158,26 @@ export interface McpInvocationScope {
   readonly origin?: string | undefined;
   /** False when the calling thread's project is on no forge T3 reads; `/mcp` reads it per request. */
   readonly forge?: boolean;
+  /**
+   * Set on a credential issued to work a fenced peer link started (`ProviderSessionManager`): the only
+   * tools it may list or call. Undefined means every tool its capabilities reach. An allow-list, so a
+   * tool added later is closed to such a session until it is named here.
+   */
+  readonly toolAllowList?: ReadonlySet<string> | undefined;
 }
+
+/**
+ * The tools a session that a fenced peer link started may use: those that act only on its own thread.
+ * It has no thread, project, environment, scheduling or delegation tools, so it cannot read, list,
+ * message or start another thread, nor learn the state of the registry beyond itself.
+ */
+export const OWN_THREAD_TOOL_ALLOW_LIST: ReadonlySet<string> = new Set(["send_to_user"]);
+
+/** Whether `scope` may list or call `tool`. */
+export const toolPermitted = (
+  scope: Pick<McpInvocationScope, "toolAllowList"> | undefined,
+  tool: string,
+): boolean => scope?.toolAllowList === undefined || scope.toolAllowList.has(tool);
 
 /**
  * T3 Code renders `t3-thread://` links as thread chips. Other MCP clients cannot open them, so

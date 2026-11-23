@@ -2150,3 +2150,194 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
+
+it.effect(
+  "a credential with a tool allow-list lists and runs only those tools, whatever the capability",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        // Real tool names; a canary stands for what another thread holds.
+        const canary = "CANARY-other-thread-4f1c";
+        const ran: string[] = [];
+        const scopeFor = (
+          token: string,
+          toolAllowList?: ReadonlySet<string>,
+        ): McpInvocationContext.McpThreadInvocationScope => ({
+          environmentId,
+          requestNamespace: token,
+          thread: {
+            threadId: ThreadId.make(`thread-${token}`),
+            providerSessionId: token,
+            providerInstanceId: ProviderInstanceId.make("codex"),
+          },
+          client: undefined,
+          capabilities: new Set(["orchestration", "worktree", "pull-requests", "issues"]),
+          issuedAt: 1,
+          ...(toolAllowList === undefined ? {} : { toolAllowList }),
+        });
+        const scopes = new Map([
+          [
+            "limitedToken",
+            scopeFor("limitedToken", McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST),
+          ],
+          ["noToolsToken", scopeFor("noToolsToken", new Set())],
+          ["fullToken", scopeFor("fullToken")],
+        ]);
+        const tool = (name: string, description: string) =>
+          Tool.make(name, {
+            description,
+            success: Schema.Struct({ ran: Schema.String }),
+            failure: OrchestratorMcpFailure,
+            failureMode: "return",
+          });
+        const names = [
+          "t3_thread_read",
+          "t3_thread_list",
+          "t3_thread_search",
+          "t3_thread_send",
+          "t3_thread_launch",
+          "t3_thread_wait",
+          "t3_thread_interrupt",
+          "create_threads",
+          "delegate_task",
+          "task_status",
+          "t3_environment_read",
+          "t3_environment_links",
+          "t3_project_list",
+          "list_scheduled_tasks",
+          "orchestrator_capabilities",
+          "send_to_user",
+        ] as const;
+        const ProbeToolkit = Toolkit.make(...names.map((name) => tool(name, `Probe ${name}.`)));
+        const handlers = Object.fromEntries(
+          names.map((name) => [
+            name,
+            McpToolAccess.reads(() =>
+              Effect.sync(() => {
+                ran.push(name);
+                return { ran: name === "t3_thread_read" ? canary : name };
+              }),
+            ),
+          ]),
+        ) as Parameters<typeof McpToolAccess.toLayer<typeof ProbeToolkit.tools>>[1];
+        const serverLayer = McpHttpServer.layerMcpTransport(
+          Layer.mergeAll(
+            McpHttpServer.toolkitRegistration(
+              ProbeToolkit,
+              McpToolAccess.toLayer(ProbeToolkit, handlers),
+            ),
+            McpHttpServer.layerToolSearch,
+          ),
+        ).pipe(
+          Layer.provide(ServerSettings.layerTest()),
+          Layer.provide(McpToolAccessTestkit.liveThreadsLayer),
+          Layer.provide(
+            Layer.mock(McpSessionRegistry.McpSessionRegistry)({
+              resolve: (token) => Effect.succeed(scopes.get(token)),
+            }),
+          ),
+        );
+        yield* HttpRouter.serve(serverLayer, { disableListenLog: true, disableLogger: true }).pipe(
+          Layer.build,
+        );
+        const httpClient = yield* HttpClient.HttpClient;
+        const session = (token: string, deferred: boolean) =>
+          Effect.gen(function* () {
+            const headers = {
+              accept: "application/json, text/event-stream",
+              authorization: `Bearer ${token}`,
+              ...(deferred ? { "t3-tool-exposure": "deferred" } : {}),
+            };
+            const initialize = yield* httpClient.post("/mcp", {
+              headers,
+              body: HttpBody.text(
+                `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1.0.0"}}}`,
+                "application/json",
+              ),
+            });
+            const rpc = (method: string, params: object) =>
+              httpClient
+                .post("/mcp", {
+                  headers: {
+                    ...headers,
+                    "mcp-session-id": initialize.headers["mcp-session-id"]!,
+                    "mcp-protocol-version": "2025-06-18",
+                  },
+                  body: HttpBody.text(
+                    JSON.stringify({ jsonrpc: "2.0", id: 2, method, params }),
+                    "application/json",
+                  ),
+                })
+                .pipe(
+                  Effect.flatMap((response) => response.text),
+                  Effect.map((text): unknown =>
+                    text
+                      .split("\n")
+                      .filter((line) => line.startsWith("data: ") || line.startsWith("{"))
+                      .map((line) => JSON.parse(line.replace(/^data: /u, "")) as { id?: number })
+                      .find((message) => message.id === 2),
+                  ),
+                );
+            return {
+              listed: rpc("tools/list", {}).pipe(
+                Effect.map((body) =>
+                  (body as { result: { tools: ReadonlyArray<{ name: string }> } }).result.tools
+                    .map((listed) => listed.name)
+                    .sort(),
+                ),
+              ),
+              call: (name: string, args: object = {}) =>
+                rpc("tools/call", { name, arguments: args }).pipe(
+                  Effect.map(
+                    (body) =>
+                      (
+                        body as {
+                          result: {
+                            isError?: boolean;
+                            structuredContent?: unknown;
+                            content: ReadonlyArray<{ text: string }>;
+                          };
+                        }
+                      ).result,
+                  ),
+                ),
+            };
+          });
+
+        const limited = yield* session("limitedToken", false);
+        const limitedDeferred = yield* session("limitedToken", true);
+        const noTools = yield* session("noToolsToken", false);
+        const full = yield* session("fullToken", false);
+
+        // Listing: the allow-list is all there is, `tool_search` and the deferred header included.
+        expect(yield* limited.listed).toEqual(["send_to_user"]);
+        expect(yield* limitedDeferred.listed).toEqual(["send_to_user"]);
+        expect(yield* noTools.listed).toEqual([]);
+        expect(yield* full.listed).toEqual([...names].sort());
+
+        // Calling: a tool that is not listed is not reachable by naming it, and its handler never runs.
+        const refused = [...names, "tool_search"].filter((name) => name !== "send_to_user");
+        for (const name of refused) {
+          for (const client of [limited, limitedDeferred, noTools]) {
+            const result = yield* client.call(
+              name,
+              name === "tool_search" ? { query: "thread" } : {},
+            );
+            expect.soft(result.isError, name).toBe(true);
+            expect.soft(JSON.stringify(result), name).not.toContain(canary);
+            expect.soft(result.structuredContent, name).toEqual({
+              error: { _tag: "McpToolNotAllowed", tool: name },
+            });
+          }
+        }
+        expect(ran).toEqual([]);
+
+        // The one allowed tool still works for the session that has it, and the full credential is untouched.
+        expect((yield* limited.call("send_to_user")).structuredContent).toEqual({
+          ran: "send_to_user",
+        });
+        expect((yield* full.call("t3_thread_read")).structuredContent).toEqual({ ran: canary });
+        expect((yield* noTools.call("send_to_user")).isError).toBe(true);
+      }),
+    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);

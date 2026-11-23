@@ -7,6 +7,7 @@ import {
   EnvironmentId,
   type ModelSelection,
   type OrchestrationV2AppThread,
+  type OrchestrationV2LinkOrigin,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderCapabilities,
@@ -42,6 +43,7 @@ import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -276,6 +278,7 @@ function makeThreadCreatedEvent(input: {
   readonly now: DateTime.Utc;
   readonly projectId?: ProjectId;
   readonly delegatedBy?: ThreadId;
+  readonly linkOrigin?: OrchestrationV2LinkOrigin;
 }) {
   return Effect.gen(function* () {
     const projectId =
@@ -309,6 +312,7 @@ function makeThreadCreatedEvent(input: {
               rootThreadId: input.delegatedBy,
             },
       forkedFrom: null,
+      ...(input.linkOrigin === undefined ? {} : { linkOrigin: input.linkOrigin }),
       createdAt: input.now,
       updatedAt: input.now,
       archivedAt: null,
@@ -5775,4 +5779,106 @@ it.effect("ProviderSessionManagerV2 gives a delegated child its project's device
     });
     assert.isTrue(child?.capabilities?.has("device"));
   }),
+);
+
+// A relay session must not read, list or start another thread through T3's MCP tools.
+it.effect(
+  "ProviderSessionManagerV2 limits the T3 credential of work a fenced peer link started to its own thread's tools",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      yield* Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const registry = yield* McpSessionRegistry.McpSessionRegistry;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const now = yield* DateTime.now;
+        const link = (access: OrchestrationV2LinkOrigin["access"]): OrchestrationV2LinkOrigin => ({
+          sessionId: `link-${String(access)}`,
+          label: "Assistant",
+          access,
+        });
+        const owner = ThreadId.make("thread-psm-allow-owner");
+        const fenced = ThreadId.make("thread-psm-allow-fenced");
+        const fencedChild = ThreadId.make("thread-psm-allow-fenced-child");
+        const unrecorded = ThreadId.make("thread-psm-allow-old-origin");
+        const fullAccess = ThreadId.make("thread-psm-allow-full-access");
+        const plain = ThreadId.make("thread-psm-allow-plain");
+        const providerSessionId = idAllocator.derive.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: owner, now }),
+            yield* makeThreadCreatedEvent({
+              idAllocator,
+              threadId: fenced,
+              now,
+              linkOrigin: link("auto-accept-edits"),
+            }),
+            yield* makeThreadCreatedEvent({
+              idAllocator,
+              threadId: fencedChild,
+              now,
+              delegatedBy: fenced,
+            }),
+            // An origin stamped before access was recorded stays fenced.
+            yield* makeThreadCreatedEvent({
+              idAllocator,
+              threadId: unrecorded,
+              now,
+              linkOrigin: link(undefined),
+            }),
+            yield* makeThreadCreatedEvent({
+              idAllocator,
+              threadId: fullAccess,
+              now,
+              linkOrigin: link("full-access"),
+            }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: plain, now }),
+          ],
+        });
+        const runtime = yield* manager.open({
+          threadId: owner,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        for (const threadId of [fenced, fencedChild, unrecorded, fullAccess, plain]) {
+          yield* runtime.resumeThread({
+            threadId,
+            providerThread: makeProviderThread({
+              idAllocator,
+              threadId,
+              providerSessionId,
+              now,
+              nativeThreadId: `native-${threadId}`,
+            }),
+          });
+        }
+        const allowListOf = Effect.fn("allowListOf")(function* (threadId: ThreadId) {
+          const config = yield* mcpSessions.read(threadId);
+          assert.isDefined(config);
+          const token = config!.authorizationHeader.replace(/^Bearer\s+/, "");
+          const resolved = yield* registry.resolve(token);
+          assert.isDefined(resolved);
+          // The registry's scope and the config the provider adapter reads agree.
+          assert.deepEqual(
+            [...(config!.toolAllowList ?? [])],
+            [...(resolved!.toolAllowList ?? [])],
+          );
+          return resolved!.toolAllowList === undefined ? undefined : [...resolved!.toolAllowList];
+        });
+        const ownThread = [...McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST];
+
+        assert.deepEqual(yield* allowListOf(fenced), ownThread);
+        // A subagent below fenced work cannot step outside it.
+        assert.deepEqual(yield* allowListOf(fencedChild), ownThread);
+        assert.deepEqual(yield* allowListOf(unrecorded), ownThread);
+        // The environment's own threads, and a link paired with full access, keep every tool.
+        assert.isUndefined(yield* allowListOf(plain));
+        assert.isUndefined(yield* allowListOf(fullAccess));
+      }).pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 60_000 })));
+    }),
 );
