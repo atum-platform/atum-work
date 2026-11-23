@@ -11,8 +11,11 @@ import { assertFullAccess, type Caller } from "./threadAccess.ts";
 /**
  * Below full access, work a link starts here (all of it carries that session in `linkOrigin`)
  * may change only work from the same link: not the user's threads, projects or settings, nor
- * this environment's links. Reads are not fenced. It is a routing rule for T3's tools; agents
- * still run as this environment's user, so a full-access link is not fenced at all.
+ * this environment's links. Reads by T3's tools are not fenced here, but a session such a link started
+ * gets no thread, project or environment tools at all (`McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST`,
+ * issued by `ProviderSessionManager`), so it cannot read another thread through them. It is a routing
+ * rule for T3's tools; agents still run as this environment's user, so a full-access link is not fenced
+ * at all.
  */
 
 /** The link a caller acts for: its own session, or the link that started its thread. */

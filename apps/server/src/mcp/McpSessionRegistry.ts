@@ -20,6 +20,8 @@ export interface McpCredentialRequest {
   readonly browserToolsAvailable?: boolean;
   readonly capabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
   readonly subagent?: boolean;
+  /** Only these tools list and run for the token; omitted means every tool its capabilities reach. */
+  readonly toolAllowList?: ReadonlySet<string>;
 }
 
 export interface McpIssuedCredential {
@@ -143,6 +145,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
           ...(request.capabilities ?? (browserToolsAvailable ? (["preview"] as const) : [])),
         ]),
         issuedAt: issuedAlive.wallMs,
+        ...(request.toolAllowList === undefined ? {} : { toolAllowList: request.toolAllowList }),
       };
       yield* SynchronizedRef.update(state, ({ records }) => {
         const next = new Map(records);
@@ -159,6 +162,7 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
           authorizationHeader: `Bearer ${rawToken}`,
           browserToolsAvailable: scope.capabilities.has("preview"),
           capabilities: scope.capabilities,
+          ...(scope.toolAllowList === undefined ? {} : { toolAllowList: scope.toolAllowList }),
         },
       };
     },

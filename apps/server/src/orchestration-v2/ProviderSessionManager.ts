@@ -2,6 +2,7 @@ import { AgentScope } from "@t3tools/shared/AgentScope";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
+  linkOriginIsFenced,
   isOrchestrationV2WorkActive,
   ModelSelection,
   type OrchestrationV2AppThread,
@@ -53,6 +54,7 @@ import * as ProviderInstallationGate from "../provider/ProviderInstallationGate.
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
+import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
@@ -561,6 +563,32 @@ export const layerWithOptions = (
       };
       const isMcpCredentialReserved = (threadId: ThreadId, mcpCredentialId: string) =>
         (mcpCredentialReservations.get(mcpReservationKey(threadId, mcpCredentialId)) ?? 0) > 0;
+      /**
+       * Work a fenced peer link started, and every subagent below it, runs for a cloud agent on this machine.
+       * Its T3 credential lists and calls only the tools bound to its own thread: link fencing stops its writes
+       * to other work, and this stops it reading, listing or starting any other thread. A thread whose lineage
+       * cannot be read is held to the same list, so a failed read never widens a credential.
+       */
+      const linkedThreadToolAllowList = Effect.fn(
+        "ProviderSessionManagerV2.linkedThreadToolAllowList",
+      )(function* (threadId: ThreadId) {
+        let current: ThreadId | null = threadId;
+        for (let depth = 0; current !== null && depth < 16; depth += 1) {
+          const thread: Option.Option<OrchestrationV2AppThread> = yield* projectionStore
+            .getThread(current)
+            .pipe(Effect.option);
+          if (Option.isNone(thread)) return McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST;
+          const origin = thread.value.linkOrigin;
+          if (origin !== undefined && linkOriginIsFenced(origin)) {
+            return McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST;
+          }
+          current =
+            thread.value.lineage.relationshipToParent === "subagent"
+              ? thread.value.lineage.parentThreadId
+              : null;
+        }
+        return current === null ? undefined : McpInvocationContext.OWN_THREAD_TOOL_ALLOW_LIST;
+      });
       const mcpPrepareLock = yield* KeyedLock.make<ThreadId>();
       /** Serialize prepares per thread so concurrent rotations cannot revoke each other's credentials. */
       const prepareMcpSession = (
@@ -586,6 +614,7 @@ export const layerWithOptions = (
                   Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
                   Effect.orElseSucceed(() => false),
                 );
+                const toolAllowList = yield* linkedThreadToolAllowList(threadId);
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before async validation so release cannot revoke between validation and reservation.
@@ -608,7 +637,9 @@ export const layerWithOptions = (
                     resolved.capabilities.has("preview") === browserToolsAvailable &&
                     resolved.capabilities.has("device") === deviceToolsAvailable &&
                     // A credential issued while the lineage read failed is replaced once it works.
-                    (resolved.thread.subagent === true) === subagent
+                    (resolved.thread.subagent === true) === subagent &&
+                    // A thread that gains or loses a fenced link keeps no credential of the other kind.
+                    (resolved.toolAllowList === undefined) === (toolAllowList === undefined)
                   ) {
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
                   }
@@ -621,6 +652,7 @@ export const layerWithOptions = (
                   browserToolsAvailable,
                   capabilities,
                   subagent,
+                  ...(toolAllowList === undefined ? {} : { toolAllowList }),
                 });
                 yield* mcpSessions.set({
                   ...credential.config,
