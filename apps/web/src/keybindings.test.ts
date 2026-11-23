@@ -1012,3 +1012,9 @@ describe("Usage shortcuts", () => {
     );
   });
 });
+
+it("reserves the mode chord only in the Atum shortcut context", () => {
+  const event = { key: "m", metaKey: true, ctrlKey: false, altKey: false, shiftKey: true };
+  assert.equal(resolveShortcutCommand(event, DEFAULT_RESOLVED_KEYBINDINGS, { platform: "MacIntel", context: { atumWorkBuild: false } }), "modelPicker.toggle");
+  assert.equal(resolveShortcutCommand(event, DEFAULT_RESOLVED_KEYBINDINGS, { platform: "MacIntel", context: { atumWorkBuild: true } }), "atum.mode.toggle");
+});

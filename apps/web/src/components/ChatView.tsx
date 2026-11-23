@@ -61,6 +61,7 @@ import { freshSessionBannerItem } from "./chat/ComposerFreshSession";
 import { armFreshSession, disarmFreshSession, useFreshSessionArmed } from "./chat/freshSessionArms";
 import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
+import { isAtumWorkBuild, useAtumSurfaceModeController } from "../atum/surfaceMode";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
 import * as Schema from "effect/Schema";
@@ -1705,6 +1706,11 @@ export default function ChatView(props: ChatViewProps) {
   });
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const backgroundThread = use(BackgroundThreadContext);
+  const atumMode = useAtumSurfaceModeController(
+    activeProject?.id ?? null,
+    environmentId,
+    !embedded && !backgroundThread,
+  );
   const scriptKeybindings =
     useAtomValue(serverEnvironment.configValueAtom(environmentId))?.keybindings ??
     DEFAULT_RESOLVED_KEYBINDINGS;
@@ -2807,6 +2813,10 @@ export default function ChatView(props: ChatViewProps) {
     },
     commands: {
       ...terminalShortcuts,
+      "atum.mode.toggle": () => {
+        if (!isAtumWorkBuild) return false;
+        void atumMode.setMode(atumMode.mode === "work" ? "code" : "work");
+      },
       ...rightPanelShortcuts,
       ...threadLifecycleShortcuts,
       "thread.copyReference": ({ event }) => {

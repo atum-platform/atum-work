@@ -64,6 +64,7 @@ function resolveContext(options: ShortcutMatchOptions | undefined): ShortcutMatc
     terminalOpen: false,
     previewFocus: false,
     previewOpen: false,
+    atumWorkBuild: import.meta.env.VITE_ATUM_WORK_BUILD === "1",
     isWeb: !isElectron,
     isDesktop: isElectron,
     editableFocus: false,

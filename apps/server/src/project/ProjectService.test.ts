@@ -990,3 +990,61 @@ it.effect("rejects an update that waited on the lock while its project was delet
     );
   }).pipe(Effect.provide(layerProjectServiceDependencies)),
 );
+
+it.effect("seeds repository projects as Code once and keeps the owner's later mode", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const runner = yield* ProcessRunner.ProcessRunner.pipe(Effect.provide(ProcessRunner.layer));
+    const service = yield* ProjectService.make;
+    const settings = yield* ServerSettings.ServerSettingsService;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "atum-mode-" });
+    yield* runner.run({ command: "git", args: ["init", root] });
+    const projectId = ProjectId.make("atum-mode-repo");
+    const input = {
+      projectId,
+      commandId: CommandId.make("atum-mode-create"),
+      workspaceRoot: root,
+      title: "Repository",
+    };
+    yield* service.create(input);
+    assert.equal(
+      (yield* settings.getSettings).projectSettingsOverrides[projectId]?.atumSurfaceMode,
+      "code",
+    );
+    yield* settings.updateSettings({
+      projectSettingsOverrides: { [projectId]: { atumSurfaceMode: "work" } },
+    });
+    yield* service.create(input);
+    assert.equal(
+      (yield* settings.getSettings).projectSettingsOverrides[projectId]?.atumSurfaceMode,
+      "work",
+    );
+    const docs = `${root}/documents`;
+    yield* fs.makeDirectory(docs);
+    // Nested folders inherit repository membership too.
+    const nested = ProjectId.make("atum-mode-nested");
+    yield* service.create({
+      projectId: nested,
+      commandId: CommandId.make("atum-mode-nested-create"),
+      workspaceRoot: docs,
+      title: "Nested",
+    });
+    assert.equal(
+      (yield* settings.getSettings).projectSettingsOverrides[nested]?.atumSurfaceMode,
+      "code",
+    );
+    const plain = yield* fs.makeTempDirectoryScoped({ prefix: "atum-mode-docs-" });
+    yield* runner.run({ command: "git", args: ["init", "--bare", plain] });
+    const relay = ProjectId.make("atum-mode-relay");
+    yield* service.create({
+      projectId: relay,
+      commandId: CommandId.make("atum-mode-relay-create"),
+      workspaceRoot: plain,
+      title: "Relay",
+    });
+    assert.equal(
+      (yield* settings.getSettings).projectSettingsOverrides[relay]?.atumSurfaceMode,
+      "work",
+    );
+  }).pipe(Effect.scoped, Effect.provide(layerProjectServiceDependencies)),
+);

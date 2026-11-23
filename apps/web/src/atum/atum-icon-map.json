@@ -1,0 +1,738 @@
+{
+  "Activity": {
+    "name": "pulse"
+  },
+  "AlarmClock": {
+    "name": "alarm"
+  },
+  "AlarmClockOff": {
+    "name": "alarm"
+  },
+  "AlertTriangle": {
+    "name": "warning"
+  },
+  "Archive": {
+    "name": "archive"
+  },
+  "ArchiveX": {
+    "name": "archive"
+  },
+  "ArrowDown": {
+    "name": "arrow-down"
+  },
+  "ArrowDownUp": {
+    "name": "arrows-down-up"
+  },
+  "ArrowLeft": {
+    "name": "arrow-left"
+  },
+  "ArrowRight": {
+    "name": "arrow-right"
+  },
+  "ArrowRightLeft": {
+    "name": "arrows-left-right"
+  },
+  "ArrowUp": {
+    "name": "arrow-up"
+  },
+  "ArrowUpCircle": {
+    "name": "arrow-circle-up"
+  },
+  "ArrowUpLeft": {
+    "name": "arrow-up-left"
+  },
+  "ArrowUpRight": {
+    "name": "arrow-up-right"
+  },
+  "AtSign": {
+    "name": "at"
+  },
+  "AudioLines": {
+    "name": "wave-sine"
+  },
+  "Battery": {
+    "name": "battery-medium"
+  },
+  "Blocks": {
+    "name": "puzzle-piece"
+  },
+  "BookOpen": {
+    "name": "book-open"
+  },
+  "Bookmark": {
+    "name": "bookmark-simple"
+  },
+  "Bot": {
+    "name": "sparkle"
+  },
+  "Box": {
+    "name": "package"
+  },
+  "Brain": {
+    "name": "brain"
+  },
+  "Bug": {
+    "name": "bug"
+  },
+  "Building": {
+    "name": "buildings"
+  },
+  "Cable": {
+    "name": "plug"
+  },
+  "Calendar": {
+    "name": "calendar-blank"
+  },
+  "CalendarArrowDown": {
+    "name": "calendar-blank"
+  },
+  "CalendarArrowUp": {
+    "name": "calendar-blank"
+  },
+  "CalendarClock": {
+    "name": "calendar-check"
+  },
+  "Camera": {
+    "name": "camera"
+  },
+  "ChartNoAxesColumn": {
+    "name": "chart-bar"
+  },
+  "Check": {
+    "name": "check"
+  },
+  "CheckCircle2": {
+    "name": "check-circle"
+  },
+  "ChevronDown": {
+    "name": "caret-down"
+  },
+  "ChevronLeft": {
+    "name": "caret-left"
+  },
+  "ChevronRight": {
+    "name": "caret-right"
+  },
+  "ChevronUp": {
+    "name": "caret-up"
+  },
+  "ChevronsDownUp": {
+    "name": "arrows-in-line-vertical"
+  },
+  "ChevronsLeftRightEllipsis": {
+    "name": "dots-three"
+  },
+  "ChevronsUpDown": {
+    "name": "caret-up-down"
+  },
+  "Circle": {
+    "name": "circle"
+  },
+  "CircleAlert": {
+    "name": "warning-circle"
+  },
+  "CircleArrowUp": {
+    "name": "arrow-circle-up"
+  },
+  "CircleCheck": {
+    "name": "check-circle"
+  },
+  "CircleDashed": {
+    "name": "circle-dashed"
+  },
+  "CircleDot": {
+    "name": "dot-outline"
+  },
+  "CircleDotDashed": {
+    "name": "circle-dashed"
+  },
+  "CircleSlash": {
+    "name": "prohibit"
+  },
+  "CircleStop": {
+    "name": "stop"
+  },
+  "CircleX": {
+    "name": "x-circle"
+  },
+  "ClipboardCopy": {
+    "name": "clipboard"
+  },
+  "Clock": {
+    "name": "clock"
+  },
+  "Clock3": {
+    "name": "clock"
+  },
+  "Cloud": {
+    "name": "cloud"
+  },
+  "CloudDownload": {
+    "name": "cloud-arrow-down"
+  },
+  "CloudUpload": {
+    "name": "cloud-arrow-up"
+  },
+  "Code": {
+    "name": "code"
+  },
+  "Code2": {
+    "name": "code"
+  },
+  "Columns2": {
+    "name": "columns"
+  },
+  "Copy": {
+    "name": "copy"
+  },
+  "CornerLeftUp": {
+    "name": "arrow-bend-left-up"
+  },
+  "CornerUpRight": {
+    "name": "arrow-bend-up-right"
+  },
+  "Cpu": {
+    "name": "cpu"
+  },
+  "Database": {
+    "name": "database"
+  },
+  "Download": {
+    "name": "download-simple"
+  },
+  "Ellipsis": {
+    "name": "dots-three"
+  },
+  "Eraser": {
+    "name": "eraser"
+  },
+  "ExternalLink": {
+    "name": "arrow-square-out"
+  },
+  "Eye": {
+    "name": "eye"
+  },
+  "EyeOff": {
+    "name": "eye-slash"
+  },
+  "File": {
+    "name": "file"
+  },
+  "FileCode2": {
+    "name": "file-code"
+  },
+  "FileDiff": {
+    "name": "git-diff"
+  },
+  "FileJson": {
+    "name": "file-code"
+  },
+  "FileSearch": {
+    "name": "magnifying-glass"
+  },
+  "FileSpreadsheet": {
+    "name": "file-xls"
+  },
+  "FileText": {
+    "name": "file-text"
+  },
+  "Files": {
+    "name": "files"
+  },
+  "Film": {
+    "name": "film-strip"
+  },
+  "FlaskConical": {
+    "name": "flask"
+  },
+  "FlaskConicalOff": {
+    "name": "flask"
+  },
+  "Folder": {
+    "name": "folder-simple"
+  },
+  "FolderClosed": {
+    "name": "folder-simple"
+  },
+  "FolderCode": {
+    "name": "folder-simple"
+  },
+  "FolderGit": {
+    "name": "folder-simple"
+  },
+  "FolderGit2": {
+    "name": "folder-simple"
+  },
+  "FolderOpen": {
+    "name": "folder-open"
+  },
+  "FolderPlus": {
+    "name": "folder-simple-plus"
+  },
+  "FolderTree": {
+    "name": "tree-structure"
+  },
+  "Gauge": {
+    "name": "gauge"
+  },
+  "GitBranch": {
+    "name": "git-branch"
+  },
+  "GitBranchPlus": {
+    "name": "git-branch"
+  },
+  "GitCommit": {
+    "name": "git-commit"
+  },
+  "GitCommitHorizontal": {
+    "name": "git-commit"
+  },
+  "GitFork": {
+    "name": "git-fork"
+  },
+  "GitMerge": {
+    "name": "git-merge"
+  },
+  "GitPullRequestArrow": {
+    "name": "git-pull-request"
+  },
+  "GitPullRequestClosed": {
+    "name": "git-pull-request"
+  },
+  "GitPullRequestDraft": {
+    "name": "git-pull-request"
+  },
+  "Globe": {
+    "name": "globe-simple"
+  },
+  "Globe2": {
+    "name": "globe"
+  },
+  "GripVertical": {
+    "name": "dots-six-vertical"
+  },
+  "Hammer": {
+    "name": "hammer"
+  },
+  "HardDrive": {
+    "name": "hard-drives"
+  },
+  "History": {
+    "name": "clock-counter-clockwise"
+  },
+  "Home": {
+    "name": "house"
+  },
+  "Image": {
+    "name": "image"
+  },
+  "Inbox": {
+    "name": "tray"
+  },
+  "Info": {
+    "name": "info"
+  },
+  "KeyRound": {
+    "name": "key"
+  },
+  "Keyboard": {
+    "name": "keyboard"
+  },
+  "Languages": {
+    "name": "translate"
+  },
+  "Laptop": {
+    "name": "laptop"
+  },
+  "Layers": {
+    "name": "stack"
+  },
+  "Lightbulb": {
+    "name": "lightbulb"
+  },
+  "Link": {
+    "name": "link"
+  },
+  "Link2": {
+    "name": "link"
+  },
+  "Link2Off": {
+    "name": "link-break"
+  },
+  "ListChecks": {
+    "name": "list-checks"
+  },
+  "ListFilter": {
+    "name": "funnel-simple"
+  },
+  "ListPlus": {
+    "name": "list-plus"
+  },
+  "ListTodo": {
+    "name": "list-checks"
+  },
+  "ListTree": {
+    "name": "tree-structure"
+  },
+  "LoaderCircle": {
+    "name": "spinner"
+  },
+  "Lock": {
+    "name": "lock-simple"
+  },
+  "LockOpen": {
+    "name": "lock-simple-open"
+  },
+  "LogIn": {
+    "name": "sign-in"
+  },
+  "Mail": {
+    "name": "envelope-simple"
+  },
+  "Maximize": {
+    "name": "arrows-out"
+  },
+  "Maximize2": {
+    "name": "arrows-out-simple"
+  },
+  "MemoryStick": {
+    "name": "memory"
+  },
+  "MessageCircle": {
+    "name": "chat-circle"
+  },
+  "MessageCircleQuestion": {
+    "name": "question"
+  },
+  "MessageSquare": {
+    "name": "chat-circle"
+  },
+  "MessageSquareDashed": {
+    "name": "chat-circle-dots"
+  },
+  "MessageSquareOff": {
+    "name": "chat-circle"
+  },
+  "MessageSquarePlus": {
+    "name": "note-pencil"
+  },
+  "MessageSquareText": {
+    "name": "chat-text"
+  },
+  "MessageSquareWarning": {
+    "name": "warning-circle"
+  },
+  "MessagesSquare": {
+    "name": "chats-circle"
+  },
+  "Mic": {
+    "name": "microphone"
+  },
+  "MicOff": {
+    "name": "microphone-slash"
+  },
+  "Minimize2": {
+    "name": "arrows-in-simple"
+  },
+  "Minus": {
+    "name": "minus"
+  },
+  "Monitor": {
+    "name": "monitor"
+  },
+  "Moon": {
+    "name": "moon"
+  },
+  "MoreHorizontal": {
+    "name": "dots-three"
+  },
+  "MoreVertical": {
+    "name": "dots-three-vertical"
+  },
+  "MousePointer2": {
+    "name": "cursor"
+  },
+  "MousePointerClick": {
+    "name": "cursor-click"
+  },
+  "OctagonAlert": {
+    "name": "warning-octagon"
+  },
+  "OctagonX": {
+    "name": "x-circle"
+  },
+  "Package": {
+    "name": "package"
+  },
+  "PackagePlus": {
+    "name": "package"
+  },
+  "Paintbrush": {
+    "name": "paint-brush"
+  },
+  "Palette": {
+    "name": "palette"
+  },
+  "PanelBottom": {
+    "name": "terminal-window"
+  },
+  "PanelLeft": {
+    "name": "sidebar-simple"
+  },
+  "PanelLeftClose": {
+    "name": "sidebar-simple"
+  },
+  "PanelRight": {
+    "name": "sidebar-simple",
+    "mirror": true
+  },
+  "PanelsTopLeft": {
+    "name": "layout"
+  },
+  "Paperclip": {
+    "name": "paperclip"
+  },
+  "Pause": {
+    "name": "pause"
+  },
+  "PenLine": {
+    "name": "pencil-simple-line"
+  },
+  "Pencil": {
+    "name": "pencil-simple"
+  },
+  "PictureInPicture2": {
+    "name": "picture-in-picture"
+  },
+  "Pilcrow": {
+    "name": "paragraph"
+  },
+  "Pin": {
+    "name": "push-pin"
+  },
+  "PinOff": {
+    "name": "push-pin-slash"
+  },
+  "Play": {
+    "name": "play"
+  },
+  "Plug": {
+    "name": "plug"
+  },
+  "Plug2": {
+    "name": "plug"
+  },
+  "Plus": {
+    "name": "plus"
+  },
+  "Power": {
+    "name": "power"
+  },
+  "Presentation": {
+    "name": "presentation"
+  },
+  "QrCode": {
+    "name": "qr-code"
+  },
+  "Quote": {
+    "name": "quotes"
+  },
+  "RadioTower": {
+    "name": "broadcast"
+  },
+  "Redo2": {
+    "name": "arrow-u-up-right"
+  },
+  "RefreshCw": {
+    "name": "arrows-clockwise"
+  },
+  "Reply": {
+    "name": "arrow-bend-up-left"
+  },
+  "RotateCcw": {
+    "name": "arrow-counter-clockwise"
+  },
+  "RotateCw": {
+    "name": "arrow-clockwise"
+  },
+  "Route": {
+    "name": "path"
+  },
+  "Rows3": {
+    "name": "rows"
+  },
+  "Scale": {
+    "name": "scales"
+  },
+  "Scan": {
+    "name": "scan"
+  },
+  "ScrollText": {
+    "name": "scroll"
+  },
+  "Search": {
+    "name": "magnifying-glass"
+  },
+  "Send": {
+    "name": "paper-plane-right"
+  },
+  "Server": {
+    "name": "hard-drives"
+  },
+  "Settings": {
+    "name": "gear"
+  },
+  "Settings2": {
+    "name": "gear-six"
+  },
+  "Shield": {
+    "name": "shield"
+  },
+  "ShieldCheck": {
+    "name": "shield-check"
+  },
+  "ShieldOff": {
+    "name": "shield-slash"
+  },
+  "ShieldQuestion": {
+    "name": "shield"
+  },
+  "SlidersHorizontal": {
+    "name": "sliders-horizontal"
+  },
+  "Smartphone": {
+    "name": "device-mobile"
+  },
+  "SmilePlus": {
+    "name": "smiley"
+  },
+  "Square": {
+    "name": "stop"
+  },
+  "SquareArrowOutUpRight": {
+    "name": "arrow-square-out"
+  },
+  "SquareMenu": {
+    "name": "info"
+  },
+  "SquarePen": {
+    "name": "note-pencil"
+  },
+  "SquareSplitHorizontal": {
+    "name": "columns"
+  },
+  "SquareSplitVertical": {
+    "name": "rows"
+  },
+  "Star": {
+    "name": "star"
+  },
+  "Sun": {
+    "name": "sun"
+  },
+  "Table2": {
+    "name": "table"
+  },
+  "Tag": {
+    "name": "tag"
+  },
+  "Target": {
+    "name": "target"
+  },
+  "Terminal": {
+    "name": "terminal-window"
+  },
+  "TerminalSquare": {
+    "name": "terminal-window"
+  },
+  "Text": {
+    "name": "text-aa"
+  },
+  "TextSearch": {
+    "name": "magnifying-glass"
+  },
+  "TextWrap": {
+    "name": "paragraph"
+  },
+  "Ticket": {
+    "name": "ticket"
+  },
+  "Trash2": {
+    "name": "trash"
+  },
+  "TrendingDown": {
+    "name": "trend-down"
+  },
+  "TrendingUp": {
+    "name": "trend-up"
+  },
+  "TriangleAlert": {
+    "name": "warning"
+  },
+  "Type": {
+    "name": "text-aa"
+  },
+  "Undo2": {
+    "name": "arrow-u-up-left"
+  },
+  "Unlink": {
+    "name": "link-break"
+  },
+  "Unlink2": {
+    "name": "link-break"
+  },
+  "Unplug": {
+    "name": "plug"
+  },
+  "Upload": {
+    "name": "upload-simple"
+  },
+  "User": {
+    "name": "user"
+  },
+  "UserCheck": {
+    "name": "user-check"
+  },
+  "UserLock": {
+    "name": "user"
+  },
+  "UserPlus": {
+    "name": "user-plus"
+  },
+  "UserRound": {
+    "name": "user-circle"
+  },
+  "UserRoundX": {
+    "name": "user"
+  },
+  "Users": {
+    "name": "users"
+  },
+  "Volume2": {
+    "name": "speaker-simple-high"
+  },
+  "VolumeOff": {
+    "name": "speaker-simple-slash"
+  },
+  "WifiOff": {
+    "name": "wifi-slash"
+  },
+  "Workflow": {
+    "name": "tree-structure"
+  },
+  "WrapText": {
+    "name": "paragraph"
+  },
+  "Wrench": {
+    "name": "wrench"
+  },
+  "X": {
+    "name": "x"
+  },
+  "XCircle": {
+    "name": "x-circle"
+  },
+  "Zap": {
+    "name": "lightning"
+  }
+}

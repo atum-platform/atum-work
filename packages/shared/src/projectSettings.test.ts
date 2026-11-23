@@ -456,3 +456,17 @@ it("keeps project speech vocabulary on its originating project and clears it to 
   });
   expect(resolveProjectSettings(restored, projectId).settings.speechProjectCustomWords).toEqual([]);
 });
+
+it("inherits surface mode and preserves each project's override", () => {
+  const settings = {
+    ...DEFAULT_SERVER_SETTINGS,
+    projectSettingsOverrides: { [projectId]: { atumSurfaceMode: "code" as const } },
+  };
+  expect(resolveProjectSettings(settings, projectId).settings.atumSurfaceMode).toBe("code");
+  expect(resolveProjectSettings(settings, otherProjectId).settings.atumSurfaceMode).toBe("work");
+  const changed = applyServerSettingsPatch(settings, {
+    projectSettingsOverrides: { [otherProjectId]: { atumSurfaceMode: "code" } },
+  });
+  expect(resolveProjectSettings(changed, projectId).settings.atumSurfaceMode).toBe("code");
+  expect(resolveProjectSettings(changed, otherProjectId).settings.atumSurfaceMode).toBe("code");
+});

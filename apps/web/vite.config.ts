@@ -2,6 +2,7 @@
 import * as NodeFSP from "node:fs/promises";
 import * as NodeZlib from "node:zlib";
 
+import { atumIconAlias, atumIconsPlugin } from "./vite/atumIcons.mjs";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import compression from "compression";
@@ -317,6 +318,7 @@ export default defineConfig(({ command }) => {
     },
     assetsInclude: ["**/*.wasm"],
     plugins: [
+      process.env.VITE_ATUM_WORK_BUILD === "1" ? atumIconsPlugin() : undefined,
       bootstrapTitlePlugin(),
       devCompressionPlugin(),
       chunkCycleGuardPlugin(),
@@ -383,6 +385,7 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       tsconfigPaths: true,
+      alias: process.env.VITE_ATUM_WORK_BUILD === "1" ? [atumIconAlias] : [],
       dedupe: ["react", "react-dom"],
     },
     experimental: {

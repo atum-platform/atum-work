@@ -56,6 +56,7 @@ const MODEL_PICKER_KEYBINDING_COMMANDS = [
 ] as const;
 
 export const STATIC_KEYBINDING_COMMANDS = [
+  "atum.mode.toggle",
   "workspace.focusNext",
   "workspace.focusPrevious",
   "sidebar.toggle",

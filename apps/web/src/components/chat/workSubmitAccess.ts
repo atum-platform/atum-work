@@ -6,6 +6,7 @@ type WorkAccessState = "allowed" | "empty" | "unavailable";
 
 /** The owner view's preload delegates this read to desktop main. */
 export interface WorkSubmitAccessBridge {
+  reportSurfaceMode?(snapshot: import("../../atum/surfaceMode").SurfaceModeSnapshot | null): Promise<void>;
   readonly readModelAccess: () => Promise<WorkAccessState>;
   /** Opens the existing Protons top-up page; older preloads do not expose it. */
   readonly openProtons?: () => Promise<boolean>;

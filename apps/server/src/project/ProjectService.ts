@@ -38,6 +38,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { deletedProjectOverridePatch } from "../provider/ProjectSettingsOverrideSweep.ts";
 import { makeIsManagedWorktreePath } from "../worktreesDirectory.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import { unsetInheritedRepositoryEnv } from "../vcs/VcsProcess.ts";
 import * as ProjectEnrichmentService from "./ProjectEnrichmentService.ts";
 import { makeIsWorktreeContainer } from "./worktreeContainer.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
@@ -186,6 +187,10 @@ export const make = Effect.gen(function* () {
   const threadCommands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const fileSystem = yield* FileSystem.FileSystem;
+  const modeProcessRunner = yield* ProcessRunner.ProcessRunner.pipe(
+    Effect.provide(ProcessRunner.layer),
+  );
+  const modePlatform = yield* HostProcess.Platform;
   const isManagedWorktreePath = yield* makeIsManagedWorktreePath;
   const isWorktreeContainer = yield* makeIsWorktreeContainer.pipe(
     Effect.provide(ProcessRunner.layer),
@@ -425,6 +430,50 @@ export const make = Effect.gen(function* () {
         workspaceRoot,
         ...(input.scripts === undefined ? {} : { scripts: input.scripts }),
       });
+      const settings = yield* serverSettings.getSettings.pipe(
+        Effect.mapError(
+          (cause) =>
+            new ProjectOperationError({
+              operation: "dispatch-project-command",
+              projectId: input.projectId,
+              cause,
+            }),
+        ),
+      );
+      if (settings.projectSettingsOverrides[input.projectId]?.atumSurfaceMode === undefined) {
+        const isRepo = yield* modeProcessRunner
+          .run({
+            command: "git",
+            args: ["-C", workspaceRoot, "rev-parse", "--is-inside-work-tree"],
+            env: unsetInheritedRepositoryEnv(process.env, modePlatform),
+            timeoutBehavior: "timedOutResult",
+          })
+          .pipe(
+            Effect.map(
+              (result) => result.code === 0 && result.stdout.trim() === "true" && !result.timedOut,
+            ),
+            Effect.orElseSucceed(() => false),
+          );
+        yield* serverSettings
+          .updateSettings({
+            projectSettingsOverrides: {
+              [input.projectId]: {
+                ...settings.projectSettingsOverrides[input.projectId],
+                atumSurfaceMode: isRepo ? "code" : "work",
+              },
+            },
+          })
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new ProjectOperationError({
+                  operation: "dispatch-project-command",
+                  projectId: input.projectId,
+                  cause,
+                }),
+            ),
+          );
+      }
       yield* projectEnrichment.invalidate([workspaceRoot]);
       return yield* readCommitted(input.projectId);
     },
