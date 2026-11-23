@@ -1,3 +1,4 @@
+import { isProtectedThread, managedInstance } from "../mcp/toolkits/atum/protectedThread.ts";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -2997,6 +2998,16 @@ export const layerWithOptions = (
           sessionOpen.withLock(
             input.providerSessionId,
             Effect.gen(function* () {
+              const protectedThread = isProtectedThread(input.threadId);
+              const refuseProtected = () =>
+                new ProviderSessionOpenError({
+                  instanceId: input.modelSelection.instanceId,
+                  providerSessionId: input.providerSessionId,
+                  cause: "This Work thread must stay on its protected managed route.",
+                });
+              if (protectedThread && input.modelSelection.instanceId !== managedInstance) {
+                return yield* refuseProtected();
+              }
               const cwd = input.runtimePolicy.cwd;
               if (cwd !== null) {
                 const workspaceIsDirectory = yield* fileSystem.stat(cwd).pipe(
@@ -3015,6 +3026,9 @@ export const layerWithOptions = (
               if (live !== undefined) yield* releaseForLinkedEnvironments(live);
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
+                if (protectedThread && existing.runtime.instanceId !== managedInstance) {
+                  return yield* refuseProtected();
+                }
                 const attached = existing.attachedThreadIds.has(input.threadId);
                 if (!attached && !existing.supportsMultipleProviderThreads) {
                   return yield* new ProviderSessionOpenError({

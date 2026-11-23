@@ -7,8 +7,10 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
-import { HttpBody, HttpClient, HttpRouter } from "effect/http";
+import { HttpBody, HttpClient, HttpRouter, HttpServer } from "effect/http";
 import { vi } from "vite-plus/test";
+import { layer as admissionRoutes } from "./admission.ts";
+import { isProtectedThread, protectedDirectory } from "./protectedThread.ts";
 import * as ServerEnvironment from "../../../environment/ServerEnvironment.ts";
 import * as ThreadManagement from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as ServerSettings from "../../../serverSettings.ts";
@@ -21,6 +23,16 @@ vi.mock("./config.ts", () => ({
   endpoint: "http://127.0.0.1:43123/ask",
   token: "fixture",
 }));
+
+vi.mock("./protectedThread.ts", async (importOriginal) => {
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const root = mkdtempSync(join(tmpdir(), "atum-work-fence-"));
+  process.env.ATUM_WORK_CONNECTOR_PROTECTED_DIR = join(root, "protected-threads");
+  process.env.ATUM_WORK_CONNECTOR_POLICY = join(root, "policy.json");
+  return await importOriginal();
+});
 
 const environmentId = EnvironmentId.make("work-connector-fixture");
 const threadId = ThreadId.make("thread:work-connector");
@@ -46,6 +58,8 @@ it.live(
         let shell = baseShell;
         const received: Array<unknown> = [];
         let revokeInFlight: (() => Promise<void>) | undefined;
+        let replyProtected = false;
+        let admissionOrigin: string | undefined;
         const nativeFetch = globalThis.fetch;
         const connectorFetch = vi.fn<typeof fetch>(async (url, init) => {
           if (/^http:\/\/127\.0\.0\.1:\d+\/mcp$/.test(String(url))) {
@@ -55,18 +69,40 @@ it.live(
           expect(new Headers(init?.headers).get("authorization")).toBe("Bearer fixture");
           received.push(JSON.parse(String(init?.body)));
           await revokeInFlight?.();
+          if (replyProtected) {
+            const admission = JSON.parse(String(init?.body)).admission;
+            const headers = {
+              authorization: "Bearer fixture",
+              "x-atum-work-admission": admission,
+            };
+            const prepare = async () =>
+              nativeFetch(`${admissionOrigin}/atum-work/connector/prepare`, {
+                method: "POST",
+                headers,
+              });
+            const prepared = await prepare();
+            expect((await prepare()).status).toBe(409);
+            if (prepared.status !== 204)
+              return Response.json({ state: "google_requires_atum", request_id: requestId });
+          }
           return Response.json({
             state: "answered",
             request_id: requestId,
             answer: "fixture answer",
-            provenance: "non_google",
+            provenance: replyProtected ? "google" : "non_google",
           });
         });
         yield* Effect.acquireRelease(
           Effect.sync(() => {
             vi.stubGlobal("fetch", connectorFetch);
           }),
-          () => Effect.sync(() => vi.unstubAllGlobals()),
+          () =>
+            Effect.promise(async () => {
+              vi.unstubAllGlobals();
+              const { rm } = await import("node:fs/promises");
+              const { dirname } = await import("node:path");
+              await rm(dirname(protectedDirectory!), { recursive: true, force: true });
+            }),
         );
 
         const outsideToken = "outside.fixture";
@@ -100,9 +136,15 @@ it.live(
             }),
           ),
         );
-        yield* HttpRouter.serve(server, { disableListenLog: true, disableLogger: true }).pipe(
-          Layer.build,
-        );
+        yield* HttpRouter.serve(Layer.merge(server, admissionRoutes), {
+          disableListenLog: true,
+          disableLogger: true,
+        }).pipe(Layer.build);
+        const listener = yield* HttpServer.HttpServer;
+        if (listener.address._tag === "UnixPathAddress")
+          throw new Error("Expected loopback fixture");
+        const host = listener.address._tag === "InetAddressV6" ? "[::1]" : "127.0.0.1";
+        admissionOrigin = `http://${host}:${listener.address.port}`;
 
         const http = yield* HttpClient.HttpClient;
         const open = Effect.fnUntraced(function* (authorization: string) {
@@ -163,7 +205,21 @@ it.live(
             expect(received.at(-1)).toEqual({
               caller: { threadId, providerSessionId: config.providerSessionId, providerInstanceId },
               question: args,
+              admission: expect.any(String),
             });
+            if (resumed) {
+              replyProtected = true;
+              expect(yield* (yield* rpc("tools/call", call)).json).toMatchObject({
+                result: {
+                  structuredContent:
+                    name === "atum-managed"
+                      ? { state: "answered", answer: "fixture answer", provenance: "google" }
+                      : { state: "google_requires_atum" },
+                },
+              });
+              expect(isProtectedThread(threadId)).toBe(true);
+              replyProtected = false;
+            }
             previous = rpc;
             if (!resumed) yield* registry.revokeProviderSession(config.providerSessionId);
           }

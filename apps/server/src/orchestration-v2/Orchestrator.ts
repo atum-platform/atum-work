@@ -1,3 +1,4 @@
+import { isProtectedThread, managedInstance } from "../mcp/toolkits/atum/protectedThread.ts";
 import type {
   OrchestrationV2ThreadLinkMetadata,
   GuestShareId,
@@ -15937,6 +15938,22 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
 
     if (Option.isSome(existingReceipt)) {
       return yield* replayCommandReceipt(command, existingReceipt.value);
+    }
+
+    const protectedThread = isProtectedThread(commandThreadId(command));
+    if (
+      ((command.type === "provider.switch" || command.type === "thread.model-selection.set") &&
+        protectedThread &&
+        command.modelSelection.instanceId !== managedInstance) ||
+      ((command.type === "thread.fork" || command.type === "thread.merge_back") &&
+        (protectedThread || isProtectedThread(command.sourceThreadId))) ||
+      (command.type === "thread.guest-share.open" && protectedThread)
+    ) {
+      return yield* new OrchestratorCommandRejectedError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: "This Work thread contains protected context and must stay on its managed route.",
+      });
     }
 
     // Recheck under the lock; the user may have raised modes since sender preflight.

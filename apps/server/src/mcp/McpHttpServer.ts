@@ -1415,7 +1415,9 @@ export const layerMcpTransport = <RA, RE, RR>(registrations: Layer.Layer<RA, RE,
   }).pipe(Layer.provide(layerMcpAuthMiddleware));
 
 export const layerAtumToolkit = atumConnectorConfigured()
-  ? toolkitRegistration(AtumToolkit, AtumHandlers.layer)
+  ? toolkitRegistration(AtumToolkit, AtumHandlers.layer).pipe(
+      Layer.provide(ThreadCommandExecutor.layer),
+    )
   : Layer.empty;
 
 /** Every tool the T3 MCP server advertises. AgentContextBudget.test.ts measures this set. */

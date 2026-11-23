@@ -1,3 +1,4 @@
+import { isProtectedThread } from "../mcp/toolkits/atum/protectedThread.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { isAttachmentOnlyBootstrapPrompt } from "@t3tools/shared/composerContextReferences";
 import {
@@ -137,7 +138,9 @@ const make = Effect.gen(function* () {
     ) {
       const { threadId, runId } = current.forkedFrom;
       seen.add(threadId);
+      if (isProtectedThread(threadId)) return undefined;
       const source = yield* messagesThroughRun(threadId, runId, current.createdAt);
+      if (isProtectedThread(threadId)) return undefined;
       if (source === undefined) break;
       history.push(source.messages);
       title ??= source.thread.title;
@@ -218,6 +221,8 @@ const make = Effect.gen(function* () {
       const worktreeExists =
         worktreePath !== null &&
         (yield* fileSystem.exists(worktreePath).pipe(Effect.orElseSucceed(() => false)));
+      // Check after reading the history and settings, just before handing bytes to a generator.
+      if (isProtectedThread(input.threadId)) return { status: "unchanged" as const };
       const result = yield* textGeneration.generateThreadTitle({
         cwd: worktreeExists ? worktreePath : project.value.workspaceRoot,
         message: context.message,

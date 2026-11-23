@@ -1,4 +1,5 @@
-import { assert, describe, it, vi } from "@effect/vitest";
+import { assert, describe, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   CommandId,
@@ -36,6 +37,12 @@ import * as ThreadTitleRegeneration from "./ThreadTitleRegenerationService.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 import { placeholderThreadTitle } from "./placeholderThreadTitle.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+
+const protectedThreads = vi.hoisted(() => new Set<string>());
+vi.mock("../mcp/toolkits/atum/protectedThread.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../mcp/toolkits/atum/protectedThread.ts")>()),
+  isProtectedThread: (id: string) => protectedThreads.has(id),
+}));
 
 const projectId = ProjectId.make("project:title-regeneration");
 const modelSelection = {
@@ -334,6 +341,39 @@ describe("formatThreadTitleContext", () => {
 });
 
 describe("ThreadTitleRegenerationService", () => {
+  it.effect("refuses plan selection and skips title inference after a thread is protected", () =>
+    Effect.gen(function* () {
+      const harness = makeHarness();
+      yield* Effect.gen(function* () {
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const titleRegeneration = yield* ThreadTitleRegeneration.ThreadTitleRegenerationService;
+        const { sourceThreadId: threadId } = yield* forkSeededSource("thread:title:protected");
+        const requestId = yield* armRegeneration({
+          command: "command:title:protected:regenerate",
+          threadId,
+        });
+
+        protectedThreads.add(threadId);
+        try {
+          const selection = yield* threads
+            .dispatch({
+              type: "thread.model-selection.set",
+              commandId: CommandId.make("command:title:protected:switch"),
+              threadId,
+              modelSelection,
+            })
+            .pipe(Effect.flip);
+          assert.include(String(selection.cause), "protected context");
+
+          yield* titleRegeneration.execute({ threadId, requestId, kind: { type: "regenerate" } });
+          assert.equal(harness.generateThreadTitle.mock.calls.length, 0);
+        } finally {
+          protectedThreads.delete(threadId);
+        }
+      }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
   it.effect("keeps a title set before the first message unless it is a placeholder", () =>
     Effect.gen(function* () {
       const seed = "work on this and pr to dev";

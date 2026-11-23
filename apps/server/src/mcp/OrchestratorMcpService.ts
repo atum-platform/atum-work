@@ -1,3 +1,4 @@
+import { isProtectedThread } from "./toolkits/atum/protectedThread.ts";
 import {
   CommandId,
   type RunId,
@@ -3528,6 +3529,15 @@ const make = Effect.gen(function* () {
           ),
         { concurrency: 1 },
       );
+      if (
+        isProtectedThread(input.threadId) ||
+        timeline.items.some((row) => isProtectedThread(row.sourceThreadId))
+      ) {
+        return yield* new OrchestratorMcpFailure({
+          code: "capability_denied",
+          message: "Read this protected Work transcript in the owner view.",
+        });
+      }
       const messagesByThreadId = new Map(sourceMessages);
       const thread = threadDetail(
         scope,

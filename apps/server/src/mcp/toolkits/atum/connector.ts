@@ -26,6 +26,8 @@ export async function askConnector(input: {
   caller: Caller;
   question: Question;
   current(): Promise<boolean>;
+  admission?: string;
+  isProtected?(): boolean;
   endpoint?: string | undefined;
   token?: string | undefined;
   signal?: AbortSignal;
@@ -59,14 +61,21 @@ export async function askConnector(input: {
         authorization: `Bearer ${input.token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ caller: input.caller, question: input.question }),
+      body: JSON.stringify({
+        caller: input.caller,
+        question: input.question,
+        ...(input.admission ? { admission: input.admission } : {}),
+      }),
     });
     if (!response.ok || !(await input.current())) return unavailable();
     const result = (await response.json()) as Result;
     if (result.request_id !== input.question.request_id || !(await input.current()))
       return unavailable();
-    // Until the release pin has transcript fencing and a certified route, protected bytes stay closed.
-    if (result.state === "answered" && result.provenance !== "non_google") {
+    if (
+      result.state === "answered" &&
+      result.provenance !== "non_google" &&
+      !input.isProtected?.()
+    ) {
       return {
         state: result.provenance === "google" ? "google_requires_atum" : "provenance_unavailable",
         request_id: input.question.request_id,

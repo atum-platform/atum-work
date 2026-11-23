@@ -25,6 +25,7 @@ import {
   readManagedPolicyFile,
 } from "@t3tools/shared/managedPolicyFile";
 
+import { workPolicyPath } from "../mcp/toolkits/atum/protectedThread.ts";
 import { telemetryChannel } from "../config.ts";
 import * as ManagedLimits from "./managedLimits.ts";
 import * as ManagedProviders from "./managedProviders.ts";
@@ -177,12 +178,15 @@ export const load = Effect.fn("ManagedPolicy.load")(function* (path: string) {
 const make = Effect.gen(function* () {
   // Source builds may read a policy from elsewhere so it can be tried without root. Release
   // builds never do: any override a user can set is a way around the policy.
+  const workPath = workPolicyPath();
   const devPath =
-    telemetryChannel === "dev"
-      ? yield* Config.option(Config.String("T3CODE_DEV_MANAGED_POLICY_PATH")).pipe(
-          Effect.orElseSucceed(() => Option.none<string>()),
-        )
-      : Option.none<string>();
+    workPath !== undefined
+      ? Option.some(workPath)
+      : telemetryChannel === "dev"
+        ? yield* Config.option(Config.String("T3CODE_DEV_MANAGED_POLICY_PATH")).pipe(
+            Effect.orElseSucceed(() => Option.none<string>()),
+          )
+        : Option.none<string>();
   const platform = yield* HostProcess.Platform;
   const policy = yield* Option.match(devPath, {
     onSome: load,
@@ -197,6 +201,15 @@ const make = Effect.gen(function* () {
       ),
   });
   const path = policy.path;
+  if (
+    workPath !== undefined &&
+    policy.document?.settings?.["providerInstances.atum-managed"]?.locked !== true
+  ) {
+    return yield* new ManagedPolicyFileError({
+      path,
+      reason: "Work's managed ACP instance is not locked",
+    });
+  }
   if (policy.summary !== undefined) {
     yield* Effect.logInfo("Managed policy applies.", {
       path,

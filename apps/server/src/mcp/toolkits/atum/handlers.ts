@@ -3,6 +3,9 @@ import * as Effect from "effect/Effect";
 import * as McpSessionRegistry from "../../McpSessionRegistry.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { assertLiveCaller, loadCaller, unavailable } from "../../threadAccess.ts";
+import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
+import { registerAdmission } from "./admission.ts";
+import { managedInstance, protectThread } from "./protectedThread.ts";
 import { endpoint, token } from "./config.ts";
 import { askConnector } from "./connector.ts";
 import { AtumToolkit } from "./tools.ts";
@@ -42,19 +45,47 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
         );
         return resolved?.thread.providerSessionId === providerSessionId;
       }).pipe(Effect.orElseSucceed(() => false));
+      const lock = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+      let admitted = false;
+      const prepare = lock.withLock(
+        threadId,
+        Effect.gen(function* () {
+          if (
+            providerInstanceId !== managedInstance ||
+            caller.caller?.activeRunId == null ||
+            !(yield* current)
+          )
+            return false;
+          admitted = protectThread(threadId);
+          return admitted;
+        }),
+      );
+      const runPrepare = Effect.runPromiseWith(
+        yield* Effect.context<Effect.Services<typeof prepare>>(),
+      );
       const runCurrent = Effect.runPromiseWith(
         yield* Effect.context<Effect.Services<typeof current>>(),
       );
       return yield* Effect.tryPromise({
-        try: (signal) =>
-          askConnector({
-            caller: { threadId, providerSessionId, providerInstanceId },
-            question,
-            endpoint,
-            token,
-            signal,
-            current: () => runCurrent(current),
-          }),
+        try: async (signal) => {
+          const admission = registerAdmission(() =>
+            signal.aborted ? Promise.resolve(false) : runPrepare(prepare),
+          );
+          try {
+            return await askConnector({
+              caller: { threadId, providerSessionId, providerInstanceId },
+              question,
+              endpoint,
+              token,
+              signal,
+              current: () => runCurrent(current),
+              admission: admission.id,
+              isProtected: () => admitted,
+            });
+          } finally {
+            admission.close();
+          }
+        },
         catch: unavailable,
       });
     }),
