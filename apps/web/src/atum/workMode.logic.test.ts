@@ -10,7 +10,7 @@ describe("Work mode", () => {
       expect(isWorkModeHiddenSurface(true, { kind })).toBe(true);
       expect(isWorkModeHiddenSurface(false, { kind })).toBe(false);
     }
-    for (const kind of ["files", "file", "preview", "device", "side-chat"] as const) {
+    for (const kind of ["files", "file", "preview", "device", "linked-thread"] as const) {
       expect(isWorkModeHiddenSurface(true, { kind })).toBe(false);
     }
   });
