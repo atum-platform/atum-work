@@ -412,7 +412,7 @@ type OnboardingAgentDriver = (typeof INSTALLABLE_DRIVERS)[number];
 const isInstallableDriver = (driver: string): driver is OnboardingAgentDriver =>
   (INSTALLABLE_DRIVERS as ReadonlyArray<string>).includes(driver);
 
-interface AgentTerminalSession {
+export interface AgentTerminalSession {
   readonly environmentId: EnvironmentId;
   readonly driver: OnboardingAgentDriver;
   readonly providerInstanceId: ServerProvider["instanceId"];
@@ -1286,12 +1286,14 @@ function AgentRow({
   );
 }
 
-function AgentInstallTerminal({
+export function AgentInstallTerminal({
   session,
+  openWebLink,
   onCommandFinished,
   onClose,
 }: {
   readonly session: AgentTerminalSession;
+  readonly openWebLink?: ((url: string) => Promise<void>) | undefined;
   readonly onCommandFinished: () => void;
   readonly onClose: () => void;
 }) {
@@ -1458,6 +1460,7 @@ function AgentInstallTerminal({
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
+            openWebLink={openWebLink}
             onSessionExited={onClose}
             autoFocus
             visible

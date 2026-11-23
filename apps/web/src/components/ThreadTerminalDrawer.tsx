@@ -479,6 +479,7 @@ interface TerminalViewportProps {
   providerInstanceId?: ProviderInstanceId;
   onSessionExited: () => void;
   onAddTerminalContext?: (selection: TerminalContextSelection) => void;
+  openWebLink?: ((url: string) => Promise<void>) | undefined;
   /** Focuses the viewport when it mounts; otherwise focus arrives through `focusTerminal`. */
   autoFocus?: boolean;
   visible: boolean;
@@ -515,6 +516,7 @@ function TerminalSessionViewport({
   providerInstanceId,
   onSessionExited,
   onAddTerminalContext,
+  openWebLink,
   autoFocus = false,
   visible,
   keybindings,
@@ -524,6 +526,7 @@ function TerminalSessionViewport({
   const terminalRef = useRef<GhosttyTerminalSurface | null>(null);
   const visibleRef = useRef(visible);
   const environmentId = threadRef.environmentId;
+  const launchWebLink = useEffectEvent((url: string) => openWebLink?.(url));
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const hasTerminalWriteAccess = useEffectEvent(() =>
     readEnvironmentScope(environmentId, AuthTerminalOperateScope),
@@ -1072,6 +1075,13 @@ function TerminalSessionViewport({
         const latestTerminal = terminalRef.current;
         if (!latestTerminal) return;
         if (isTerminalUrl(text)) {
+          const handoff = launchWebLink(text);
+          if (handoff) {
+            void handoff.catch(() =>
+              writeSystemMessage(latestTerminal, m(msg("Unable to open link"))),
+            );
+            return;
+          }
           if (!localApi) {
             writeSystemMessage(
               latestTerminal,

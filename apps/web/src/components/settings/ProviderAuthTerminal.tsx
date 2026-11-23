@@ -46,8 +46,9 @@ export default function ProviderAuthTerminal({
       beforeKey: (event) => event.key !== "Tab",
       onLinkActivate: (url) => {
         if (/^https?:\/\//i.test(url))
-          void openProviderSignIn(driver, url)
-            .catch(() => setError(gt("Could not open the provider link.")));
+          void openProviderSignIn(driver, url).catch(() =>
+            setError(gt("Could not open the provider link.")),
+          );
       },
     })
       .then((terminal) => {

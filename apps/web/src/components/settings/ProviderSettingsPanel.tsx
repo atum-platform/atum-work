@@ -105,6 +105,7 @@ import { useSecretSources } from "./SecretSourceInput";
 import { TextGeneratorsSettings } from "./TextGeneratorsSettings";
 import { UsageProviderSettings } from "./UsageProviderSettings";
 import { ProviderSetupSection, readAntigravityAuthMethod } from "./ProviderSetupSection";
+import { WorkClaudeSetupSection } from "./WorkClaudeSetupSection";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
 import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSection";
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
@@ -1430,6 +1431,12 @@ function ProviderInstanceRow({
               })
             }
           />
+        ) : mode === "editor" &&
+          !readOnly &&
+          window.atumWork &&
+          driver === "claudeAgent" &&
+          liveProvider ? (
+          <WorkClaudeSetupSection environmentId={environmentId} provider={liveProvider} />
         ) : mode === "editor" &&
           !readOnly &&
           liveProvider &&

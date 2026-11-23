@@ -13,7 +13,10 @@ import "~/index.css";
 
 import { render } from "../../../test/render";
 import { __setClientSettingsForTests } from "../../hooks/useSettings";
-import { deriveProviderInstanceEntries } from "../../providerInstances";
+import {
+  brandProviderInstanceEntries,
+  deriveProviderInstanceEntries,
+} from "../../providerInstances";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 
 it("keeps each registry image when adding a model from another ACP agent", async () => {
@@ -342,4 +345,56 @@ it("keeps the touch keyboard down while choosing a provider", async () => {
   await page.getByRole("button", { name: /^Claude/ }).click();
   await expect.element(page.getByRole("option", { name: /Claude model/ })).toBeVisible();
   await expect.element(search).not.toHaveFocus();
+});
+
+it("hides an enabled delegated provider from tabs and model search", async () => {
+  const owner = ProviderInstanceId.make("atum-managed");
+  const delegated = ProviderInstanceId.make("atum-managed-delegated");
+  const driver = ProviderDriverKind.make("acpRegistry");
+  const entries = brandProviderInstanceEntries(
+    deriveProviderInstanceEntries(
+      [owner, delegated].map((instanceId) => ({
+        instanceId,
+        driver,
+        displayName: instanceId === owner ? "Atum" : "Atum Delegated",
+        enabled: true,
+        installed: true,
+        version: null,
+        status: "ready",
+        auth: { status: "authenticated" },
+        checkedAt: "2026-01-01T00:00:00.000Z",
+        models: [
+          {
+            slug: "luna",
+            name: instanceId === owner ? "Luna" : "Delegated Luna",
+            isCustom: false,
+            capabilities: {},
+          },
+        ],
+        slashCommands: [],
+        skills: [],
+      })),
+    ),
+    { providerInstances: { [delegated]: { driver, showInPicker: false } } },
+  );
+  expect(entries.find((entry) => entry.instanceId === delegated)?.enabled).toBe(true);
+  await using screen = await render(
+    <ProviderModelPicker
+      environmentId={null}
+      activeInstanceId={owner}
+      model="luna"
+      lockedProvider={null}
+      instanceEntries={entries}
+      modelOptionsByInstance={new Map(entries.map((entry) => [entry.instanceId, entry.models]))}
+      onInstanceModelChange={vi.fn()}
+    />,
+  );
+  await screen.getByRole("button", { name: "Luna", exact: true }).click();
+  await expect
+    .element(page.getByRole("button", { name: "Atum Delegated", exact: true }))
+    .not.toBeInTheDocument();
+  await page.getByRole("combobox").fill("Delegated");
+  await expect
+    .element(page.getByRole("option", { name: /Delegated Luna/ }))
+    .not.toBeInTheDocument();
 });

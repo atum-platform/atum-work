@@ -70,6 +70,7 @@ import {
   shouldShowInstanceBadge,
   type ProviderInstanceEntry,
 } from "../../providerInstances";
+import { prepareWorkCodexSignIn } from "../settings/workProviderSignIn";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
 import { hasRuntimeModelCatalog } from "../../providerModels";
 
@@ -216,6 +217,28 @@ function ModelPickerProviderNotices({
   const gt = useGT();
   const messages = useMessages();
   const navigate = useNavigate();
+  const [preparing, setPreparing] = useState(false);
+  const [error, setError] = useState(false);
+  const opening = useRef(false);
+
+  async function openSetup(entry: ProviderInstanceEntry) {
+    if (opening.current) return;
+    if (entry.driverKind === "codex" && window.atumWork) {
+      opening.current = true;
+      setPreparing(true);
+      setError(false);
+      const ready = await prepareWorkCodexSignIn();
+      opening.current = false;
+      setPreparing(false);
+      if (!ready) {
+        setError(true);
+        return;
+      }
+    }
+    onRequestClose?.();
+    onOpenProviderSetup?.(entry.instanceId);
+  }
+
   return (
     <>
       {setupEntries.length > 0 ? (
@@ -227,10 +250,8 @@ function ModelPickerProviderNotices({
               </p>
               <InlineButton
                 className="mt-1"
-                onClick={() => {
-                  onRequestClose?.();
-                  onOpenProviderSetup?.(entry.instanceId);
-                }}
+                disabled={preparing}
+                onClick={() => void openSetup(entry)}
               >
                 {setupEntries.length > 1
                   ? gt("Set up {provider}", { provider: entry.displayName })
@@ -238,6 +259,11 @@ function ModelPickerProviderNotices({
               </InlineButton>
             </div>
           ))}
+          {error ? (
+            <p role="alert" className="px-1 text-xs text-destructive">
+              <T>ChatGPT is not ready to connect in Work. Try again.</T>
+            </p>
+          ) : null}
         </div>
       ) : (
         <ComboboxEmpty className="empty:h-0">{emptyLabel}</ComboboxEmpty>
@@ -380,9 +406,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   useLayoutEffect(() => registerModelPickerContent(), []);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const { favorites } = useEnvironmentModelPreferences(props.environmentId);
-  const activeEntry = instanceEntries.find(
-    (entry) => entry.instanceId === props.activeInstanceId,
-  );
+  const activeEntry = instanceEntries.find((entry) => entry.instanceId === props.activeInstanceId);
   const activeModel = resolveModelPickerSelectedModel({
     driverKind: activeEntry?.driverKind,
     model: props.model,

@@ -155,7 +155,10 @@ export function ProviderAuthenticationSection({
     }
     const requiresConsent = interaction?.type === "browser" && interaction.requiresConsent;
     // Reserve tabs before awaiting consent; browsers block later opens.
-    const pending = requiresConsent && !window.desktopBridge && !window.atumWork ? window.open("", "_blank") : null;
+    const pending =
+      requiresConsent && !window.desktopBridge && !window.atumWork
+        ? window.open("", "_blank")
+        : null;
     if (pending) pending.opener = null;
     try {
       if (requiresConsent && !(await send({ type: "browser", action: "accept" }))) {

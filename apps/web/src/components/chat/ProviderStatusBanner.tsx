@@ -95,6 +95,7 @@ export function useProviderStatusBannerDismissed(bannerKey: string | null): bool
 export function hasProviderSetup(status: ServerProvider): boolean {
   return (
     status.driver === "antigravity" ||
+    (status.driver === "claudeAgent" && Boolean(globalThis.window?.atumWork)) ||
     status.setup?.canAuthenticate === true ||
     status.setup?.canInstall === true
   );
