@@ -16,6 +16,8 @@ export interface McpProviderSessionConfig {
   readonly authorizationHeader: string;
   /** Omit preview_* instructions when the user withholds agent browser access. */
   readonly browserToolsAvailable: boolean;
+  /** Snapshot at session creation; settings edits apply to fresh sessions. */
+  readonly agentInstructions?: string | undefined;
   readonly capabilities?: ReadonlySet<string>;
   /** Present when the server lets this credential list and call only these tools. */
   readonly toolAllowList?: ReadonlySet<string>;

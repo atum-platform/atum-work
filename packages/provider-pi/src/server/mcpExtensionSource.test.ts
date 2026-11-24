@@ -723,3 +723,12 @@ describe("Pi skill references", () => {
     }
   });
 });
+
+it("keeps configured agent instructions stable in Pi's native system prompt", async () => {
+  const bridge = await loadMcpBridge({ agentInstructions: "Atum orientation" });
+  const hook = bridge.handlers.get("before_agent_start")!;
+  const first = await hook({ systemPrompt: "base" }, { ui: { notify: assert.fail } });
+  const next = await hook({ systemPrompt: "base" }, { ui: { notify: assert.fail } });
+  assert.include(first!.systemPrompt, "Atum orientation");
+  assert.deepEqual(first, next);
+});

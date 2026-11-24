@@ -656,6 +656,16 @@ export const layerWithOptions = (
                 });
                 yield* mcpSessions.set({
                   ...credential.config,
+                  agentInstructions:
+                    existing?.agentInstructions ??
+                    (Option.isNone(serverSettings)
+                      ? ""
+                      : yield* Effect.gen(function* () {
+                          const settings = yield* serverSettings.value.getSettings;
+                          const thread = yield* projectionStore.getThread(threadId);
+                          return resolveProjectSettings(settings, thread.projectId).settings
+                            .agentInstructions;
+                        }).pipe(Effect.orDie)),
                   hasPendingWake: projectionStore
                     .getThreadRecords(threadId, ["runs", "subagents"])
                     .pipe(
