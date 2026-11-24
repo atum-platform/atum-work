@@ -115,6 +115,8 @@ export function atumTheme(tokens) {
     `:root { --radius: ${px(tokens.radius.md)}; --font-sans: ${tokens.font.text}; --font-mono: ${tokens.font.mono}; }`,
     // A notice is quiet glass with a hairline; only its glyph carries the colour (STYLE.md section 3).
     `[data-slot="alert"][data-variant] { --alert-glass-tint: transparent; border-color: var(--border); }`,
+    // Switches take Kit's proportions (.ak-switch is 22 by 38): a 20px thumb gives exactly that.
+    `[data-slot="switch"][data-size="default"] { --thumb-size: 20px; }`,
   ].join("\n");
   return {
     version: 1,

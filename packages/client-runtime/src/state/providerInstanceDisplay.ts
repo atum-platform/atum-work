@@ -64,23 +64,32 @@ export function providerAccentForegroundColor(accentColor: string) {
   return blackContrast >= whiteContrast ? "#000000" : "#ffffff";
 }
 
+/**
+ * The initials badge tells two instances of one driver apart. Instances hidden from the picker
+ * (`showInPicker: false`, such as a host's internal relay or delegated account) never stand
+ * beside a visible one there, so visible and hidden instances are only compared among themselves.
+ */
 export function shouldShowInstanceBadge(
   entry: {
     readonly driverKind: ProviderDriverKind;
     readonly accentColor?: string | undefined;
     readonly acpRegistryAgentId?: string | undefined;
     readonly enabled: boolean;
+    readonly showInPicker?: boolean | undefined;
   },
   entries: Iterable<{
     readonly driverKind: ProviderDriverKind;
     readonly acpRegistryAgentId?: string | undefined;
     readonly enabled: boolean;
+    readonly showInPicker?: boolean | undefined;
   }>,
 ): boolean {
   if (normalizeProviderAccentColor(entry.accentColor)) return true;
+  const entryHidden = entry.showInPicker === false;
   let sharedProviderCount = 0;
   for (const candidate of entries) {
     if (candidate.driverKind !== entry.driverKind) continue;
+    if ((candidate.showInPicker === false) !== entryHidden) continue;
     // Historical threads still need to distinguish accounts that are all disabled.
     if (entry.enabled && !candidate.enabled) continue;
     if (

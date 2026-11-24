@@ -87,4 +87,12 @@ describe("shouldShowInstanceBadge", () => {
     expect(shouldShowInstanceBadge(disabled, [disabled, { ...disabled }])).toBe(true);
     expect(shouldShowInstanceBadge(disabled, [disabled])).toBe(false);
   });
+
+  it("does not let an instance hidden from the picker badge a visible one", () => {
+    const visible = { driverKind: codex, enabled: true };
+    const hidden = { driverKind: codex, enabled: true, showInPicker: false };
+    expect(shouldShowInstanceBadge(visible, [visible, hidden])).toBe(false);
+    expect(shouldShowInstanceBadge(hidden, [visible, hidden])).toBe(false);
+    expect(shouldShowInstanceBadge(visible, [visible, { ...visible }, hidden])).toBe(true);
+  });
 });
