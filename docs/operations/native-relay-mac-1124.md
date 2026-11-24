@@ -63,3 +63,18 @@ generation 403, fresh approval recovery, and foreign-Mac 403. Actual Electron
 `session.fetch` preserves the cookie header used by native CSRF approval.
 Desktop renderer native TypeScript check passes after linking the installed
 streamdown dependency; the stock JS compiler was superseded by the native one.
+
+
+## Final frozen confirmation
+
+Cloud source d6d1dec739a1: exact final acceptance command exits 0, 45 tests
+passed. The actual host receiver cold bootstrap and expiry projection pass.
+Real Hermes preserves SOUL and memory, writes one user/assistant pair, uses
+zero provider tokens, and publishes one real Synapse reply without replay.
+Real TCP response loss reuses the run; restart cancels the predecessor and
+completes its native successor; live revocation returns HTTP 403. This
+supersedes the intermediate cloud fixture failures and earlier cancellation-only
+fault receipt. Desktop HEAD 03a1bccc has 107 focused passing tests, electron and
+native renderer typechecks exit 0, and exact-head public_guard exit 0 after
+fetching origin/main. Actual Electron cookie-channel smoke also exits 0.
+Both repositories are local-only and no provider credentials were used.

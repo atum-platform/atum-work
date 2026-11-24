@@ -1,23 +1,65 @@
 {
   "date": "2026-11-24",
   "scope": "local decoy homes and deterministic mock providers; no owner login, push, PR, CI or deployment",
-  "bases": {"connect": "ac9118cf5", "runtime": "38ace137e5", "bothAreAncestors": true},
+  "bases": {
+    "connect": "ac9118cf5",
+    "runtime": "38ace137e5",
+    "bothAreAncestors": true
+  },
   "checks": {
     "frozenInstall": 0,
     "workTypecheck": 0,
     "workBundleBuild": 0,
     "builtWorkStartup": 0,
-    "workNativeTests": {"passed": 54, "exit": 0},
-    "nativeMetadataRegression": {"passed": 1, "exit": 0},
-    "desktopTests": {"passed": 107, "exit": 0},
+    "workNativeTests": {
+      "passed": 54,
+      "exit": 0
+    },
+    "nativeMetadataRegression": {
+      "passed": 1,
+      "exit": 0
+    },
+    "desktopTests": {
+      "passed": 107,
+      "exit": 0
+    },
     "desktopElectronTypecheck": 0,
-    "desktopPublicGuard": {"head": "03a1bccc", "exit": 0},
+    "desktopPublicGuard": {
+      "head": "03a1bccc9c8efc640fbd901ab16b9b7d934b485a",
+      "exit": 0
+    },
     "desktopRendererNativeTypecheck": 0,
     "realElectronCookieChannel": 0,
-    "ordinaryAndLinkedPeerOAuth": {"exit": 0, "staleGeneration": 403, "freshApprovalRestores": true, "foreignMac": 403},
-    "twoRealWorkServers": {"exit": 0, "stoppedALeavesBReachable": true},
-    "realHermesWorkMatrixChat": {"exit": 0, "replyCount": 1, "replaySentAgain": false, "deliveryLedger": "delivered"},
-    "transportFaults": {"exit": 0, "droppedResponse": "same-ID replay completed once", "restart": "original run cancelled; no duplicate send", "liveRevokeStatus": 403}
+    "ordinaryAndLinkedPeerOAuth": {
+      "exit": 0,
+      "staleGeneration": 403,
+      "freshApprovalRestores": true,
+      "foreignMac": 403
+    },
+    "twoRealWorkServers": {
+      "exit": 0,
+      "stoppedALeavesBReachable": true
+    },
+    "realHermesWorkMatrixChat": {
+      "exit": 0,
+      "replyCount": 1,
+      "replaySentAgain": false,
+      "deliveryLedger": "delivered",
+      "hostReceiver": true,
+      "soulAndMemory": true,
+      "hermesRoles": [
+        "user",
+        "assistant"
+      ],
+      "providerTokens": 0
+    },
+    "transportFaults": {
+      "exit": 0,
+      "droppedResponse": "same-ID replay completed once",
+      "restart": "original cancelled; native successor completed; original same-ID replay retained",
+      "liveRevokeStatus": 403
+    },
+    "nativeSessionExpiryProjection": 0
   },
   "acceptance": {
     "2": "real cold local OAuth plus tested desktop CSRF/callback orchestration; remote Connect activation is separate",
@@ -25,16 +67,24 @@
     "13": "real Work HTTP 403 on live revoke; local switch cannot be overridden by stale cloud snapshot",
     "17": "old generation/revision denied by toolkit binding checks; new session metadata persists in native DB",
     "19": "two actual Work servers with independent homes and Mac IDs; A stopped while B remained reachable; foreign-Mac grant denied",
-    "20": "renewal card, native sessionExpiresAt projection and one-tap flow tested locally; intentionally off Macs do not prompt",
-    "11_12": "local TCP drop and restart cancellation tested; no live Connect relay or automatic successor completion claimed"
+    "20": "sessionExpiresAt projected by S2; renewal card and one-tap flow tested; intentionally off Macs do not prompt",
+    "11_12": "real local TCP drop and successful native restart successor; no deployed Connect relay claim"
   },
   "latestCombinedRun": {
-    "exit": 1,
-    "macStagesPassed": ["toolkit", "startup", "two-macs", "ordinary-and-peer-oauth"],
-    "failure": "parallel cloud lane added chat_fixture.py identity-seed assertion; Decoy Atum Agent absent from retained envelope",
-    "log": "/private/tmp/native-mac-final-accept/chat.log",
-    "ownership": "reported to cloud lane coordinator; its checkout remains read-only"
+    "exit": 0,
+    "cloudHead": "d6d1dec739a1b12a58edeed703fc40bfedb451ba",
+    "cloudFocusedTests": 45,
+    "command": "scripts/native-t3-bridge/accept_local.sh <work-checkout> /private/tmp/native-mac-frozen-final",
+    "evidence": "/private/tmp/native-mac-frozen-final",
+    "macFocusedChecks": "toolkit, built startup, two Macs, ordinary/peer OAuth, stale/fresh generation, foreign Mac, real Electron cookie channel all exit 0",
+    "priorFailures": "cloud identity fixture and in-flight receiver fixture changes were corrected before this frozen passing run"
   },
-  "priorPassingEvidence": ["/private/tmp/native-mac-chat-fixed.json", "/private/tmp/native-mac-faults.json"],
-  "sourceLimits": ["T1 Atum identity adapter remains an uncalled exported seam; Connect account activation belongs to coordinator", "No real subscription-provider or deployed Connect acceptance performed"]
+  "priorPassingEvidence": [
+    "/private/tmp/native-mac-chat-fixed.json",
+    "/private/tmp/native-mac-faults.json"
+  ],
+  "sourceLimits": [
+    "T1 Atum identity adapter remains an uncalled exported seam; Connect account activation belongs to coordinator",
+    "No real subscription-provider or deployed Connect acceptance performed"
+  ]
 }
