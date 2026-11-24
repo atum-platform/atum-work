@@ -531,6 +531,7 @@ function createDefaultClientMetadata(): AuthClientMetadata {
 }
 
 function toClientMetadata(record: {
+  readonly nativeForwardConsent?: string | null;
   readonly label: string | null;
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
@@ -540,6 +541,7 @@ function toClientMetadata(record: {
 }): AuthClientMetadata {
   return {
     ...(record.label ? { label: record.label } : {}),
+    ...(record.nativeForwardConsent ? { nativeForwardConsent: record.nativeForwardConsent } : {}),
     ...(record.ipAddress ? { ipAddress: record.ipAddress } : {}),
     ...(record.userAgent ? { userAgent: record.userAgent } : {}),
     deviceType: record.deviceType,
@@ -762,6 +764,7 @@ const make = Effect.gen(function* () {
         method: claims.method,
         client: {
           label: client.label ?? null,
+          ...(client.nativeForwardConsent ? { nativeForwardConsent: client.nativeForwardConsent } : {}),
           ipAddress: client.ipAddress ?? null,
           userAgent: client.userAgent ?? null,
           deviceType: client.deviceType,

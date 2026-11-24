@@ -140,6 +140,9 @@ export async function boundRegistry(input: {
     throw new Error("Binding revoked during call");
   return response.json();
   } catch (error) {
-    throw new Error(`native_registry_${stage}`, { cause: error });
+    const reason = (error as NodeJS.ErrnoException)?.code === "ENOENT" ? "missing_record" :
+      error instanceof Error && error.message === "Native consent revoked" ? "consent_revoked" :
+      error instanceof Error && error.message === "Stale or foreign agent binding" ? "stale_binding" : "refused";
+    throw new Error(`native_registry_${stage}_${reason}`, { cause: error });
   }
 }

@@ -86,6 +86,16 @@ const makeDiskSessionStoreLayer = Effect.fn("makeDiskSessionStoreLayer")(functio
 });
 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("SessionStore.layer", (it) => {
+  it.effect("persists native consent in the existing session and revokes it with that session", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionStore.SessionStore;
+      const consent = "decoy-native-consent";
+      const issued = yield* sessions.issue({ subject: "mcp-client", client: { deviceType: "bot", nativeForwardConsent: consent } });
+      expect((yield* sessions.verify(issued.token)).client.nativeForwardConsent).toBe(consent);
+      yield* sessions.revoke(issued.sessionId);
+      expect((yield* Effect.flip(sessions.verify(issued.token)))._tag).toBeDefined();
+    }).pipe(Effect.provide(layerSessionStore())),
+  );
   it.effect.each(["revoke", "revokeAllExcept", "replace"] as const)(
     "invalidates every connection for a session on %s and leaves other sessions active",
     (operation) =>
