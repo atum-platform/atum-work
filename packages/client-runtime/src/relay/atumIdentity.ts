@@ -5,10 +5,20 @@ export interface AtumConnectIdentitySource {
 }
 
 export function createAtumConnectIdentity(
-  platformOrigin: string,
-  source: AtumConnectIdentitySource,
+  platformOrigin: string | { readonly getAssertion: () => Promise<string> },
+  source?: AtumConnectIdentitySource,
   request: typeof fetch = fetch,
 ) {
+  if (typeof platformOrigin !== "string") {
+    return {
+      async getAssertion(): Promise<string> {
+        const assertion = await platformOrigin.getAssertion();
+        if (typeof assertion !== "string" || !assertion) throw new Error("Invalid Atum assertion response");
+        return assertion;
+      },
+    };
+  }
+  if (!source) throw new Error("Atum identity source required");
   const origin = new URL(platformOrigin);
   if (
     origin.protocol !== "https:" ||

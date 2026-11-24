@@ -23,7 +23,9 @@ const app = <AppRoot router={router} />;
 
 // Split by runtime to keep Clerk out of local startup and clerk-js out of browser builds.
 const managedAuthShellModule =
-  clerkPublishableKey && hasCloudPublicConfig()
+  import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+    ? import("./atum/ConnectAuthShell")
+    : clerkPublishableKey && hasCloudPublicConfig()
     ? isElectron
       ? import("./components/clerk/ElectronManagedAuthShell")
       : import("./components/clerk/BrowserManagedAuthShell")
@@ -39,8 +41,8 @@ export const startup = Promise.all([
     if (chunkLoadState.reloadScheduled) return;
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
-        {ManagedAuthShell && clerkPublishableKey ? (
-          <ManagedAuthShell publishableKey={clerkPublishableKey}>{app}</ManagedAuthShell>
+        {ManagedAuthShell ? (
+          <ManagedAuthShell publishableKey={clerkPublishableKey ?? ""}>{app}</ManagedAuthShell>
         ) : (
           app
         )}

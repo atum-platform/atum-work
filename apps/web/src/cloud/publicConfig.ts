@@ -47,7 +47,8 @@ export function resolveCloudPublicConfig(): CloudPublicConfig {
     ),
     clerkJwtTemplate: trimNonEmpty(import.meta.env.VITE_CLERK_JWT_TEMPLATE as string | undefined),
     relayUrl: normalizeSecureRelayUrl(
-      (import.meta.env.VITE_T3CODE_RELAY_URL as string | undefined) ?? "",
+      (import.meta.env.VITE_T3CODE_RELAY_URL as string | undefined) ??
+        (import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? "https://relay.atumplatform.com" : ""),
     ),
     relayTracing: {
       tracesUrl: normalizeSecureUrl(
@@ -65,6 +66,7 @@ let desktopRelayTelemetry: boolean | null = null;
 
 /** Whether relay spans may be exported now; the desktop host may not know yet at startup. */
 export function relayTelemetryEnabled(): boolean | null {
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return false;
   if (typeof window === "undefined" || !window.desktopBridge) return true;
   desktopRelayTelemetry ??= window.desktopBridge.getRelayTelemetryEnabled();
   return desktopRelayTelemetry;
@@ -87,6 +89,7 @@ export function resolveRelayTracingConfig() {
 
 export function hasCloudPublicConfig(): boolean {
   const config = resolveCloudPublicConfig();
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return config.relayUrl !== null;
   if (!config.clerkPublishableKey || !config.clerkJwtTemplate || !config.relayUrl) {
     return false;
   }

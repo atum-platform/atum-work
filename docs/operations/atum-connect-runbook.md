@@ -8,6 +8,29 @@ This is the fork's MIT T3 Connect stack, server and shared client runtime, credi
 
 ## Reproduce without cloud resources
 
+Atum web builds now mount the native Connect identity shell without a Clerk key. The owner-view
+preload supplies `atumWork.getConnectAssertion()`; only desktop main contacts the Shell assertion
+issuer with its MAS session. Every registration/discovery token read asks the bridge again, and an
+account change or view teardown rejects late replies. The Atum relay origin defaults to
+`https://relay.atumplatform.com`; `VITE_T3CODE_RELAY_URL` can override it at build time. Atum relay
+telemetry is disabled. The desktop account chrome continues to own sign-out and account switching;
+Clerk profile/avatar UI is omitted in Atum builds.
+
+The local proof also mounts the actual web identity provider without Clerk, tests fresh assertions
+and account teardown, and runs the shared relay session/client/discovery/account tests. Its HTTP
+integration obtains assertions through the actual web bridge adapter with a fake desktop host,
+registers a real Work server, rejects expired assertions and cross-owner registration, and opens
+`/mcp` using native OAuth. It does not call the configured production relay origin.
+
+Verification on 2026-11-24: proof exit 0; renderer identity test 1/1, shared relay tests 41/41,
+assertion/seam/DPoP tests 17/17, and loopback registration/MCP/reconnect PASS (packaged server
+0.1.11). The standalone shared identity TypeScript check passed (exit 0). Companion desktop
+commit `78452b440c4590991d925ffc555181cac56fe41e` passed 34 focused tests, full desktop typecheck
+and focused ESLint (all exit 0). After fetching desktop `origin/main`,
+`python3 scripts/public_guard.py --base origin/main` passed (exit 0), scanning five new commits.
+The minimal proof install does not constitute a full web-workspace build/typecheck or installed
+0.1.15 acceptance; the coordinator must run the assembled package before distribution.
+
 Prerequisites: macOS, npm, OpenSSL, Node 24.11.1+ (repository builds normally use Node 26.13.1), and a packaged T3 server. The default is `/Applications/T3 Code (Beta).app`; override `ATUM_T3_EXECUTABLE` with its Electron executable and `ATUM_T3_SERVER` with the packaged `apps/server/dist/bin.mjs`. The proof does not install or modify the app. For a source build, point those variables at the Node executable and built server entrypoint.
 
 From repository root:

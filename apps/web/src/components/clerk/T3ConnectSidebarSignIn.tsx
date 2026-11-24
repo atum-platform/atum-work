@@ -1,4 +1,5 @@
-import { UserButton, useAuth } from "@clerk/react";
+import { UserButton } from "@clerk/react";
+import { useConnectAuth as useAuth } from "../../cloud/connectAuth";
 import { T, useMessages } from "gt-react";
 import { LogInIcon, RotateCwIcon } from "lucide-react";
 
@@ -15,7 +16,7 @@ export function T3ConnectSidebarSignIn() {
 }
 
 export function T3ConnectSidebarAvatar() {
-  if (!hasCloudPublicConfig()) return null;
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1" || !hasCloudPublicConfig()) return null;
 
   return <ConfiguredT3ConnectSidebarAvatar />;
 }

@@ -30,6 +30,7 @@ export interface ManagedRelaySession {
 }
 
 export interface ManagedRelaySessionInput {
+  readonly cacheToken?: boolean;
   readonly accountId: string;
   readonly readClerkToken: () => Promise<string | null>;
 }
@@ -85,6 +86,7 @@ export function createManagedRelaySession(input: ManagedRelaySessionInput): Mana
   let tokenProviderGeneration = 0;
 
   const readCachedClerkToken = async (nowMillis: number): Promise<string | null> => {
+    if (input.cacheToken === false) return readClerkToken();
     if (cachedToken && cachedToken.expiresAtMillis > nowMillis + CLERK_TOKEN_EXPIRY_SKEW_MS) {
       return cachedToken.token;
     }

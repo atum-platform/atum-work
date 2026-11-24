@@ -38,6 +38,7 @@ export function useT3ConnectAccountPage(): {
   readonly open: ((page?: T3ConnectAccountPageUrl) => void) | null;
   readonly portals: ReactNode;
 } {
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return { open: null, portals: null };
   const clerk = useClerk();
   const { isSignedIn } = useAuth();
   const m = useMessages();

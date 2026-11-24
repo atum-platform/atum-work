@@ -5,6 +5,7 @@ import { resolveClerkSignInProps } from "./authRedirect";
 import { retryClerkLoad } from "./clerkLoadFailure";
 
 export function useT3ConnectAuthPrompt() {
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return { openAuthPrompt: () => window.location.reload() };
   const clerk = useClerk();
   const openAuthPrompt = () => {
     if (clerk.status === "error") {

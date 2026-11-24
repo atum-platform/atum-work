@@ -8,7 +8,7 @@ proof_deps="$(mktemp -d /private/tmp/atum-connect-deps-XXXXXX)"
 created_link=false
 cleanup() {
   if [[ "$created_link" = true ]]; then rm "$repo_dir/node_modules"; fi
-  rm -rf "$proof_deps"
+  python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1])' "$proof_deps"
 }
 trap cleanup EXIT
 if [[ ! -e node_modules ]]; then
@@ -16,14 +16,7 @@ if [[ ! -e node_modules ]]; then
   cp infra/relay/test-fixtures/package-lock.json "$proof_deps/package-lock.json"
   npm ci --prefix "$proof_deps" --ignore-scripts --legacy-peer-deps --no-audit --no-fund
   mkdir -p "$proof_deps/node_modules/@t3tools"
-  "$node_bin" --input-type=module - "$repo_dir" "$proof_deps" <<'JS'
-import {readdir,readFile,symlink} from 'node:fs/promises';
-const [repo,deps]=process.argv.slice(2);
-for(const dir of await readdir(repo+'/packages')) {
- try {const p=repo+'/packages/'+dir;const {name}=JSON.parse(await readFile(p+'/package.json','utf8'));
- if(name?.startsWith('@t3tools/'))await symlink(p,deps+'/node_modules/'+name);}catch(e){if(!['ENOENT','EEXIST'].includes(e.code))throw e;}
-}
-JS
+  "$node_bin" infra/relay/test-fixtures/link-deps.mjs "$repo_dir" "$proof_deps"
   ln -s "$proof_deps/node_modules" node_modules
   created_link=true
 fi

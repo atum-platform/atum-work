@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAtumConnectIdentity, managedEnvironmentMcpUrl} from '../../../packages/client-runtime/src/relay/atumIdentity.ts';
 
+test('desktop identity asks the bridge on every use and rejects missing assertions', async () => {
+  let reads = 0;
+  const identity = createAtumConnectIdentity({getAssertion: async () => `assertion-${++reads}`});
+  assert.equal(await identity.getAssertion(), 'assertion-1');
+  assert.equal(await identity.getAssertion(), 'assertion-2');
+  await assert.rejects(createAtumConnectIdentity({getAssertion: async () => ''}).getAssertion());
+});
+
 test('Atum adapter uses the platform assertion endpoint without exposing owner parameters', async () => {
   const identity = createAtumConnectIdentity('https://platform.test', {
     ownerId: () => 'owner', getPlatformBearer: async () => 'synthetic',

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/react";
+import { useConnectAuth as useAuth } from "~/cloud/connectAuth";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { T } from "gt-react";

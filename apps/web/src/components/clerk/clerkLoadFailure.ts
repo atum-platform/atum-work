@@ -1,6 +1,7 @@
 import { useClerk } from "@clerk/react";
 
 export function useClerkLoadFailed() {
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return false;
   return useClerk().status === "error";
 }
 

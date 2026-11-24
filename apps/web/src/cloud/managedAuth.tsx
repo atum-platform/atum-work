@@ -29,6 +29,7 @@ export function activateManagedRelayAuthentication(
   setManagedRelaySession(appAtomRegistry, {
     accountId,
     readClerkToken,
+    cacheToken: import.meta.env.VITE_ATUM_WORK_BUILD !== "1",
   });
 }
 

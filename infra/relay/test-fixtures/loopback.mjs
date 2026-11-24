@@ -1,6 +1,7 @@
 // Native T3 control-plane + installed native Mac server. Cloudflare APIs are replaced only
 // at the managed-endpoint boundary by a disposable TLS loopback tunnel; no cloud calls.
 import assert from "node:assert/strict";
+import { atumConnectIdentity } from "../../../apps/web/src/atum/connectIdentity.ts";
 import { spawn, execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer as httpServer, request as httpRequest } from "node:http";
@@ -71,6 +72,8 @@ try {
   mac = spawn(exe, [bin, "--bootstrap-fd", "3"], {
     env: {
       ...process.env,
+      T3CODE_TELEMETRY_ENABLED: "false",
+      T3CODE_OTEL_SDK_DISABLED: "true",
       ELECTRON_RUN_AS_NODE: "1",
       NODE_OPTIONS: `--require=${guard}`,
       CODEX_HOME: root + "/codex",
@@ -179,7 +182,7 @@ try {
   const broker = generateKeyPairSync("ed25519"),
     platform = generateKeyPairSync("ed25519");
   const relayIssuer = "https://relay.test";
-  const assertion = (sub = owner) => {
+  const assertion = (sub = owner, expired = false) => {
     const iat = Math.floor(Date.now() / 1000);
     const unsigned =
       encode({ alg: "EdDSA", typ: "atum-relay-assertion+jwt", kid: "test" }) +
@@ -189,7 +192,7 @@ try {
         aud: relayIssuer,
         sub,
         iat,
-        exp: iat + 60,
+        exp: expired ? iat - 120 : iat + 60,
         jti: randomUUID(),
       });
     return (
@@ -318,7 +321,13 @@ try {
   });
   const relayPort = await listen(relay);
   const relayUrl = `http://127.0.0.1:${relayPort}`;
-  const auth = { authorization: "Bearer " + assertion() };
+  let bridgeReads = 0;
+  globalThis.window = { atumWork: { getConnectAssertion: async () => { bridgeReads++; return assertion(); } } };
+  const identity = atumConnectIdentity;
+  const auth = { authorization: "Bearer " + await identity.getAssertion() };
+  assert.notEqual(await identity.getAssertion(), await identity.getAssertion());
+  assert.equal(bridgeReads, 3);
+  assert.equal((await json(relayUrl + "/v1/environments", undefined, { authorization: "Bearer " + assertion(owner, true) })).status, 401);
   const features = {
     notificationsEnabled: false,
     liveActivitiesEnabled: false,
@@ -343,6 +352,8 @@ try {
       { cookie },
     ),
   );
+  const wrongOwnerLink = await json(relayUrl + "/v1/client/environment-links", { ...features, proof }, { authorization: "Bearer " + assertion("46400000-0000-4000-8000-000000000002") });
+  assert.ok(wrongOwnerLink.status >= 400 && wrongOwnerLink.status < 500);
   const registered = await checked(
     await json(relayUrl + "/v1/client/environment-links", { ...features, proof }, auth),
   );
@@ -445,6 +456,9 @@ try {
       result: "PASS",
       macVersion: descriptor.serverVersion,
       registered: true,
+      fakeDesktopBridgeReads: bridgeReads,
+      expiredAssertionDenied: true,
+      wrongOwnerRegistrationDenied: true,
       atumWrongOwnerDenied: true,
       invalidIdentityDenied: true,
       mcpOAuth: true,
