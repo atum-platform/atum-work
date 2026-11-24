@@ -102,6 +102,15 @@ try {
 
   browser = await chromium.launch();
   const page = await browser.newPage();
+  await page.addInitScript(() => {
+    window.__atumSmokeStartupPhases = [];
+    window.atumWork = {
+      reportSidebar: async () => {},
+      reportStartupPhase: async (phase) => {
+        window.__atumSmokeStartupPhases.push(phase);
+      },
+    };
+  });
   await page.route("**/*", (route) =>
     new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
   );
@@ -171,6 +180,16 @@ try {
   );
   NodeAssert.equal(instructions, expectedInstructions, "Fresh packaged HOME lost Atum orientation");
   console.log("Fresh packaged HOME resolves automatic B1 orientation exactly.");
+  await page.waitForFunction(
+    () => ["ws-connected", "providers-ready", "threads-painted"].every(
+      (phase) => window.__atumSmokeStartupPhases.includes(phase),
+    ),
+    undefined,
+    { timeout: 15_000 },
+  );
+  const phases = await page.evaluate(() => window.__atumSmokeStartupPhases);
+  NodeAssert.equal(new Set(phases).size, phases.length, "Startup phases repeated");
+  console.log(`Packaged startup reports: ${phases.join(", ")}.`);
   const connectHelp = NodeChildProcess.execFileSync(executable, ["connect", "--help"], {
     cwd,
     env,
