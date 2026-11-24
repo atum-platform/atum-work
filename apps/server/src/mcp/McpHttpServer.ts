@@ -1,3 +1,8 @@
+import {
+  ForwardAdmissionError,
+  forwardGrantsFile,
+  admitForwardToken,
+} from "./toolkits/atum/forwardAdmission.ts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -349,7 +354,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
   ) {
     const authorization = request.headers.authorization;
     const token = parseBearerToken(request) ?? "";
-    const invocation =
+    let invocation =
       (yield* registry.resolve(token)) ??
       (Option.isSome(clients) && token.length > 0
         ? yield* clients.value.authenticate(request)
@@ -370,6 +375,16 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
         presentedToken: token.length > 0,
         offerOAuth: Option.isSome(clients) && !looksLikeProviderToken(token),
       });
+    }
+    if (forwardGrantsFile && invocation.client) {
+      const nativeConsent = yield* Effect.tryPromise({
+        try: () => admitForwardToken(forwardGrantsFile!, token),
+        catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
+      }).pipe(
+        Effect.orElseSucceed(() => undefined),
+      );
+      if (!nativeConsent) return HttpServerResponse.empty({ status: 403 });
+      invocation = { ...invocation, client: { ...invocation.client, nativeConsent } };
     }
     const asked = withModeLimit(withSenderThread(invocation, request), request);
     if (asked === undefined) return invalidModeLimit;
@@ -401,6 +416,21 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
     const linkExpiresAt = admitted.client?.linkExpiresAt;
     return yield* httpEffect.pipe(
       Effect.provideService(McpInvocationContext.McpInvocationContext, admitted),
+      Effect.flatMap((response) =>
+        Effect.gen(function* () {
+          if (forwardGrantsFile && admitted.client) {
+            const valid = yield* Effect.tryPromise({
+              try: () => admitForwardToken(forwardGrantsFile!, parseBearerToken(request) ?? ""),
+              catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
+            }).pipe(
+              Effect.as(true),
+              Effect.orElseSucceed(() => false),
+            );
+            if (!valid) return HttpServerResponse.empty({ status: 403 });
+          }
+          return response;
+        }),
+      ),
       Effect.map(normalizeMcpHttpResponse),
       Effect.map((response) => endWithSession(response, request, admitted.client)),
       Effect.map((response) =>

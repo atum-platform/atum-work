@@ -1,3 +1,5 @@
+import { forwardGrantsFile, nativeThreadGrant } from "./forwardAdmission.ts";
+import { callerFile } from "./nativeCaller.ts";
 // @effect-diagnostics nodeBuiltinImport:off -- Owner-managed consent snapshot, reread per operation.
 import * as NodeFSP from "node:fs/promises";
 import type { Caller } from "./connector.ts";
@@ -27,7 +29,12 @@ export async function readGrant(
   now: number,
 ): Promise<BoundGrant> {
   if (!path) throw new Error("Agent binding unavailable");
-  const grants = JSON.parse(await NodeFSP.readFile(path, "utf8")) as BoundGrant[];
+  let grants: BoundGrant[];
+  try { grants = JSON.parse(await NodeFSP.readFile(path, "utf8")) as BoundGrant[]; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; grants = []; }
+  if (!grants.some(g => g.threadId === caller.threadId && g.providerSessionId === caller.providerSessionId && g.providerInstanceId === caller.providerInstanceId)) {
+    grants = [JSON.parse(await NodeFSP.readFile(callerFile(path, caller), "utf8")) as BoundGrant];
+  }
   const grant = grants.find(
     (g) =>
       g.threadId === caller.threadId &&
@@ -49,6 +56,10 @@ export async function readGrant(
     grant.binding.consent_revision < 1
   )
     throw new Error("Stale or foreign agent binding");
+  if (forwardGrantsFile) {
+    const current = await nativeThreadGrant(forwardGrantsFile, caller.threadId);
+    if (!current || JSON.stringify(current.binding) !== JSON.stringify(grant.binding)) throw new Error("Native consent revoked");
+  }
   return grant;
 }
 

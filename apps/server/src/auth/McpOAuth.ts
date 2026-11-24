@@ -1,4 +1,11 @@
 import {
+  consentFingerprint,
+  ForwardAdmissionError,
+  forwardGrantsFile,
+  forwardGrant,
+  bindForwardToken,
+} from "../mcp/toolkits/atum/forwardAdmission.ts";
+import {
   AuthAccessWriteScope,
   type AuthMcpApprovalDecision,
   type AuthMcpAuthorizationRequest,
@@ -192,6 +199,7 @@ export interface AuthorizationRequest {
 interface PendingCode {
   readonly clientId: string;
   readonly clientName: string;
+  readonly forwardConsent?: string;
   readonly peerLink: boolean;
   readonly redirectUri: string;
   readonly codeChallenge: string;
@@ -448,11 +456,21 @@ const make = Effect.gen(function* () {
   ) {
     const now = yield* Clock.currentTimeMillis;
     const code = Buffer.from(yield* random.randomBytes(32)).toString("base64url");
+    const forwardConsent = forwardGrantsFile
+      ? consentFingerprint(
+          yield* Effect.tryPromise({
+            try: () => forwardGrant(forwardGrantsFile!, authorization.client.clientId),
+            catch: () =>
+              new McpOAuthPageError({ description: "Owner consent changed. Reapprove this Mac." }),
+          }),
+        )
+      : undefined;
     yield* Ref.update(codes, (current) => {
       const next = new Map(Array.from(current).filter(([, pending]) => pending.expiresAtMs > now));
       next.set(code, {
         clientId: authorization.client.clientId,
         clientName: authorization.client.name,
+        ...(forwardConsent === undefined ? {} : { forwardConsent }),
         peerLink: authorization.client.peerLink,
         redirectUri: authorization.redirectUri,
         codeChallenge: authorization.codeChallenge,
@@ -466,6 +484,17 @@ const make = Effect.gen(function* () {
   });
 
   const approve: McpOAuth["Service"]["approve"] = Effect.fn("McpOAuth.approve")(function* (input) {
+    if (forwardGrantsFile) {
+      yield* Effect.tryPromise({
+        try: () => forwardGrant(forwardGrantsFile!, input.authorization.client.clientId),
+        catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
+      }).pipe(
+        Effect.mapError(
+          () =>
+            new McpOAuthPageError({ description: "Owner consent required. Reapprove this Mac." }),
+        ),
+      );
+    }
     const { decision } = input;
     let access = decision.access;
     if (decision._tag === "pairing-code") {
@@ -561,6 +590,14 @@ const make = Effect.gen(function* () {
       ) {
         return yield* fail("invalid_grant", "The authorization code is invalid or expired.");
       }
+      if (forwardGrantsFile) {
+        const currentConsent = yield* Effect.tryPromise({
+          try: () => forwardGrant(forwardGrantsFile!, clientId),
+          catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
+        }).pipe(Effect.mapError(() => fail("invalid_grant", "Owner consent required.")));
+        if (consentFingerprint(currentConsent) !== pending.forwardConsent)
+          return yield* fail("invalid_grant", "Consent changed since approval.");
+      }
       const issued = yield* environmentAuth
         .issueMcpClientSession({
           label: pending.clientName,
@@ -577,6 +614,16 @@ const make = Effect.gen(function* () {
             ),
           ),
         );
+      if (forwardGrantsFile) {
+        yield* Effect.tryPromise({
+          try: () => bindForwardToken(forwardGrantsFile!, issued.token, clientId),
+          catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
+        }).pipe(
+          Effect.mapError(() =>
+            fail("invalid_grant", "Owner consent changed. Reapprove this Mac."),
+          ),
+        );
+      }
       return {
         access_token: issued.token,
         token_type: "Bearer",

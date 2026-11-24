@@ -1,3 +1,4 @@
+import type { ForwardGrant } from "./toolkits/atum/forwardAdmission.ts";
 import {
   type AgentFeedbackMode,
   type AuthMcpClientAccess,
@@ -37,6 +38,7 @@ export interface McpThreadCaller {
 }
 
 export interface McpClientCaller {
+  readonly nativeConsent?: ForwardGrant;
   readonly sessionId: string;
   readonly label: string;
   readonly access: AuthMcpClientAccess;
