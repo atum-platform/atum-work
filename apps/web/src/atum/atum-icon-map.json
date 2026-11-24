@@ -11,6 +11,9 @@
   "AlertTriangle": {
     "name": "warning"
   },
+  "AppWindow": {
+    "name": "app-window"
+  },
   "Archive": {
     "name": "archive"
   },
@@ -37,6 +40,9 @@
   },
   "ArrowUpCircle": {
     "name": "arrow-circle-up"
+  },
+  "ArrowUpDown": {
+    "name": "arrows-down-up"
   },
   "ArrowUpLeft": {
     "name": "arrow-up-left"
@@ -146,6 +152,9 @@
   "CircleDotDashed": {
     "name": "circle-dashed"
   },
+  "CircleHelp": {
+    "name": "question"
+  },
   "CircleSlash": {
     "name": "prohibit"
   },
@@ -162,6 +171,9 @@
     "name": "clock"
   },
   "Clock3": {
+    "name": "clock"
+  },
+  "ClockAlert": {
     "name": "clock"
   },
   "Cloud": {
@@ -248,6 +260,9 @@
   "FlaskConicalOff": {
     "name": "flask"
   },
+  "FoldVertical": {
+    "name": "arrows-in-line-vertical"
+  },
   "Folder": {
     "name": "folder-simple"
   },
@@ -322,6 +337,9 @@
   },
   "Home": {
     "name": "house"
+  },
+  "Hourglass": {
+    "name": "clock"
   },
   "Image": {
     "name": "image"
@@ -674,6 +692,9 @@
   },
   "Undo2": {
     "name": "arrow-u-up-left"
+  },
+  "UnfoldVertical": {
+    "name": "arrows-out"
   },
   "Unlink": {
     "name": "link-break"

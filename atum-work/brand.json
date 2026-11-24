@@ -44,6 +44,18 @@
       "count": 1
     },
     {
+      "file": "src/atum/pickerRail.logic.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
+      "file": "src/atum/workCommands.ts",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 1
+    },
+    {
       "file": "src/branding.logic.ts",
       "from": "(input.development ? \"Dev\" : \"Beta\")",
       "to": "(input.development ? \"Dev\" : \"Latest\")",
@@ -204,6 +216,12 @@
       "from": "Started by an agent on <Var>{activeThreadLinkOrigin}</Var> through a linked\n                  environment.",
       "to": "<Var>{activeThreadLinkOrigin}</Var> started this. You can type here or stop it.",
       "count": 1
+    },
+    {
+      "file": "src/components/chat/FeedbackRequestCard.tsx",
+      "from": " T3 ",
+      "to": " Atum ",
+      "count": 2
     },
     {
       "file": "src/components/chat/McpAppFrame.tsx",
@@ -740,6 +758,24 @@
       "count": 1
     },
     {
+      "file": "src/components/settings/EnvironmentsMap.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
+      "file": "src/components/settings/EnvironmentsMap.tsx",
+      "from": "\"T3 Connect",
+      "to": "\"Connect",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/EnvironmentsMapDetails.tsx",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 2
+    },
+    {
       "file": "src/components/settings/IntegrationsSettings.tsx",
       "from": " T3 Code",
       "to": " Atum",
@@ -761,7 +797,7 @@
       "file": "src/components/settings/LabsSettingsPanel.tsx",
       "from": " T3 Code",
       "to": " Atum",
-      "count": 1
+      "count": 3
     },
     {
       "file": "src/components/settings/LabsSettingsPanel.tsx",
@@ -773,7 +809,7 @@
       "file": "src/components/settings/LabsSettingsPanel.tsx",
       "from": " T3 ",
       "to": " Atum ",
-      "count": 1
+      "count": 5
     },
     {
       "file": "src/components/settings/LinkMachineSelect.tsx",
@@ -950,6 +986,12 @@
       "count": 1
     },
     {
+      "file": "src/components/settings/environmentsMap.logic.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 3
+    },
+    {
       "file": "src/components/settings/providerStatus.ts",
       "from": " T3 Code",
       "to": " Atum",
@@ -1031,6 +1073,12 @@
       "file": "src/components/ui/standalone-page.tsx",
       "from": "\"T3 Code",
       "to": "\"Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/workflows/WorkflowsPage.tsx",
+      "from": " T3 Code",
+      "to": " Atum",
       "count": 1
     },
     {
@@ -1125,6 +1173,12 @@
     },
     {
       "file": "src/state/connectMcpApproval.ts",
+      "from": " T3 Connect",
+      "to": " Connect",
+      "count": 1
+    },
+    {
+      "file": "src/state/environments.ts",
       "from": " T3 Connect",
       "to": " Connect",
       "count": 1
@@ -1422,6 +1476,12 @@
       "from": "in T3 Code",
       "to": "in Atum",
       "count": 2
+    },
+    {
+      "file": "../../packages/shared/src/FeatureFlags.ts",
+      "from": " T3 Code",
+      "to": " Atum",
+      "count": 1
     },
     {
       "file": "../../packages/shared/src/authScopeOptions.ts",

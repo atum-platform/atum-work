@@ -2,7 +2,7 @@ import { expect, it } from 'vite-plus/test'
 import { isProviderSettingsVisible } from './providerSettingsVisibility'
 
 it('hides the delegated relay while preserving its enabled configuration', () => {
-  const configured = {
+  const configured: Record<string, { enabled: boolean; showInPicker?: boolean }> = {
     owner: { enabled: true, showInPicker: true },
     delegated: { enabled: true, showInPicker: false },
     codex: { enabled: true }

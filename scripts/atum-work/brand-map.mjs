@@ -88,7 +88,7 @@ NodeAssert.ok(
 
 NodeFS.writeFileSync(
   outPath,
-  JSON.stringify({ strings, assets, icons: rules.icons }, null, 2) + "\n",
+  JSON.stringify({ ...(rules.agentInstructions ? { agentInstructions: rules.agentInstructions } : {}), strings, assets, icons: rules.icons }, null, 2) + "\n",
 );
 const files = new Set(strings.map(({ file }) => file)).size;
 console.log(`${strings.length} replacements in ${files} files, ${assets.length} assets`);
