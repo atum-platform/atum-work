@@ -62,8 +62,10 @@ already exists. Admins retain their existing instance authority.
 **PLAN (no secrets/provider calls):** create a 0600 operator env file outside Git
 with the shape below (synthetic values are sufficient for this offline plan).
 Cloudflare credentials must come from the coordinator's existing Infisical
-profile, using `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, the native
-Alchemy environment credential names. Never print the token or
+profile. The Infisical secret named `CLOUDFLARE_ACCOUNT_ID` is mis-named: it
+contains a user API token, not the account ID. Supply that token as
+`CLOUDFLARE_ACCOUNT_API_TOKEN` and set `CLOUDFLARE_ACCOUNT_ID` to the literal
+Cloudflare account ID from the reviewed account inventory. Never print the token or
 source it into a traced shell. Review DNS zone/account ownership and current
 usage first; do not create another zone for a subdomain accidentally. Both zone
 names may be `atumplatform.com` to reuse the owned active zone; native allocation
@@ -130,9 +132,11 @@ ATUM_STAGING_INSTANCE=i-033b1e0fdc0f605e0 bash infra/aws/staging/ssm-run.sh \
    configuration). Create a VPC TCP service with the **current** database
    container private IP, certificate pin and PostgreSQL protocol. No public port,
    ingress route or DNS record is needed for this origin. Use coordinator CF
-   credentials from Infisical, same account as Alchemy:
+   credentials from Infisical, same account as Alchemy. TCP VPC services require
+   Wrangler **4.168.0 or newer**; verify the installed version before applying:
 
 ```bash
+npx wrangler --version
 npx wrangler cert upload certificate-authority --ca-cert /absolute/private/connect-db-ca.pem --name atum-connect-db-ca
 # Set CERTIFICATE_ID, MARKETPLACE_TUNNEL_ID and DB_PRIVATE_IP to the observed non-secret IDs.
 npx wrangler vpc service create atum-connect-postgres --type tcp --tcp-port 5432 \

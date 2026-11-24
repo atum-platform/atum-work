@@ -54,7 +54,7 @@ const response = await fetch(new URL('/api/work/connect/jwks', issuer), {redirec
 if (!response.ok || JSON.stringify(await response.json()) !== JSON.stringify(JSON.parse(process.env.ATUM_CONNECT_ASSERTION_JWKS))) throw new Error('JWKS mismatch');
 const denied = await fetch(new URL('/api/work/connect/assertion', issuer), {method:'POST',headers:{authorization:'Bearer invalid-verification-probe'},redirect:'error'});
 if (denied.status !== 401) throw new Error('Unsigned assertion request not refused');
-const relay = await fetch(process.env.ATUM_CONNECT_ASSERTION_AUDIENCE, {redirect:'error'});
+const relay = await fetch(process.env.ATUM_CONNECT_ASSERTION_AUDIENCE, {redirect:'manual'});
 if (relay.status >= 500) throw new Error('Relay unavailable');
 const metadata = await fetch(new URL('/.well-known/oauth-authorization-server', process.env.ATUM_CONNECT_ASSERTION_AUDIENCE), {redirect:'error'});
 if (!metadata.ok || (await metadata.json()).issuer !== process.env.ATUM_CONNECT_ASSERTION_AUDIENCE) throw new Error('Relay metadata unavailable');

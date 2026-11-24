@@ -11,7 +11,7 @@ mkdir -p "$private"
 export ATUM_MARKETPLACE_RUNTIME="$runtime"
 # compose needs the existing image revision even for exec; no container is recreated.
 export ATUM_MARKETPLACE_REVISION="$(basename "$(readlink -f "$kit")")"
-dc=(docker compose -f "$kit/compose.yaml" -f "$kit/compose.aws.yaml")
+dc=(docker compose -f "$kit/deploy/marketplace/compose.yaml" -f "$kit/deploy/marketplace/compose.aws.yaml")
 container="$("${dc[@]}" ps -q marketplace-db)"
 [[ -n "$container" ]] || { echo 'Marketplace database not running' >&2; exit 2; }
 # Deliberately refuse rerunning bootstrap: never change a live password by accident.
