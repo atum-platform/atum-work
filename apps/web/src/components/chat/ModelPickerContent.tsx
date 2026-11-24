@@ -65,6 +65,8 @@ import { TooltipProvider } from "../ui/tooltip";
 import { Button, InlineButton } from "../ui/button";
 import { isAtumWorkBuild } from "../../atum/surfaceMode";
 import { atumPickerRailOrder } from "../../atum/pickerRail.logic";
+import { atumModelTagline, pickerLabelLocale } from "../../atum/pickerLabels.logic";
+import { getActiveLocale } from "~/i18n/messages";
 import { Badge } from "../ui/badge";
 import {
   isProviderInstancePickerReady,
@@ -1083,6 +1085,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               "flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40",
               showSidebar && "border-l border-border/70",
             )}
+            {...(isAtumWorkBuild ? { "data-model-picker-list": true } : {})}
           >
             <ComboboxSearchInput
               ref={searchInputRef}
@@ -1252,6 +1255,15 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     slug={model.slug}
                     name={model.name}
                     subProvider={model.subProvider}
+                    tagline={
+                      isAtumWorkBuild
+                        ? atumModelTagline(
+                            model.instanceId,
+                            model.slug,
+                            pickerLabelLocale(getActiveLocale()),
+                          )
+                        : undefined
+                    }
                     instanceId={model.instanceId}
                     driverKind={model.driverKind}
                     providerDisplayName={model.instanceDisplayName}

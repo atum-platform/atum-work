@@ -9,6 +9,8 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import { createModelCapabilities, resolveSelectableModel } from "@t3tools/shared/model";
+import { pickerLabelLocale, withAtumThinkingLabels } from "./atum/pickerLabels.logic";
+import { getActiveLocale } from "./i18n/messages";
 
 const EMPTY_CAPABILITIES: ModelCapabilities = createModelCapabilities({
   optionDescriptors: [],
@@ -92,11 +94,18 @@ export function getProviderModelCapabilities(
 ): ModelCapabilities {
   const slug = resolveSelectableModel(provider, model, models);
   const selectedModel = models.find((candidate) => candidate.slug === slug);
-  const caps = selectedModel?.capabilities ?? EMPTY_CAPABILITIES;
+  const caps = atumThinkingWords(selectedModel?.capabilities ?? EMPTY_CAPABILITIES);
   if (includePlanAgent) {
     return caps;
   }
   return withoutPlanAgentOption(caps);
+}
+
+// Atum builds show thinking levels in the words Atum's agent chats use; the ids sent stay the provider's.
+function atumThinkingWords(caps: ModelCapabilities): ModelCapabilities {
+  return import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+    ? withAtumThinkingLabels(caps, pickerLabelLocale(getActiveLocale()))
+    : caps;
 }
 
 function withoutPlanAgentOption(caps: ModelCapabilities): ModelCapabilities {

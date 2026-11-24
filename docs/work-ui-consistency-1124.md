@@ -33,3 +33,29 @@ format clean on touched files; `src/atum` tests and `brand.test.mjs` pass.
 Verification: lint 0 and fmt clean on touched files; web typecheck only the pre-existing
 `providerSettingsVisibility.test.ts` error; picker browser tests 7/7; `src/atum` unit tests pass.
 
+## Round 3
+
+Owner, 2026-11-24: one set of thinking words, and the two pickers match per the Atum Kit. Atum
+builds only (`VITE_ATUM_WORK_BUILD`); upstream T3 is unchanged.
+
+- **Thinking words.** `apps/web/src/atum/pickerLabels.logic.ts` relabels a model's reasoning control
+  (`role: "reasoning"`, or T3's `effort`/`reasoningEffort`/`reasoning`/`variant`) from
+  `atum-work/model-picker-labels.json`: Quick, Balanced, Thorough, Extra thorough, Maximum (and Off,
+  Instant). Option ids, the values sent to providers, are unchanged; an id the file does not name
+  keeps its label. Applied once in `getProviderModelCapabilities` (`providerModels.ts`), which every
+  picker, chip and column reads. UI locales the file lacks (T3 has no Vietnamese) read in English.
+- **Rows.** Atum's own models carry their muted line after the check (`ModelListRow` `tagline`,
+  "Suggested · Good for everyday tasks" on Nguyệt Thực), as the desktop picker writes it.
+- **Surface.** The desktop's generated theme gives the picker the Kit's glass, untinted rail, list
+  (`data-model-picker-list`, Atum builds) and thinking column, no rule under Favorites, and the
+  ⌘1–⌘9 hint as plain text.
+- **Copies.** `atum-work/model-picker-digests.json` records the shared files' sha256;
+  `pickerLabels.logic.test.ts` checks the copies against it and runs in Atum's CI.
+
+Known: with `VITE_ATUM_WORK_BUILD=1`, upstream's `ComposerModelEffort.browser.test.tsx` "draws an
+agent's reasoning as bars" looks for "Medium" and fails, because Atum builds say "Balanced". Atum's CI
+runs browser tests without the flag, where it passes.
+
+Verification: lint 0 and fmt clean on touched files; web typecheck only the pre-existing
+`providerSettingsVisibility.test.ts` error; picker browser tests 8/8 (default build); `src/atum` 10/10.
+

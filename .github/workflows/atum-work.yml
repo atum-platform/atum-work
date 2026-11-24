@@ -60,7 +60,7 @@ jobs:
       - name: Test composer and server defaults
         run: |
           node apps/web/node_modules/playwright/cli.js install --only-shell chromium
-          (cd apps/web && vp test run --project unit src/components/chat/workSubmitAccess.test.ts src/components/chat/composerSubmission.test.ts)
+          (cd apps/web && vp test run --project unit src/components/chat/workSubmitAccess.test.ts src/components/chat/composerSubmission.test.ts src/atum/pickerLabels.logic.test.ts)
           (cd apps/web && vp test run --project browser src/components/chat/workSubmitAccess.browser.test.tsx)
           (cd apps/server && vp test run src/cloud/publicConfig.test.ts src/telemetry/AnalyticsService.test.ts src/serverSettings.test.ts src/mcp/McpHttpServer.test.ts)
       - name: Build and smoke the standalone archive
