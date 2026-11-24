@@ -130,5 +130,5 @@
       "terminalScrollbarHover": "#6e737c"
     }
   },
-  "css": ":root { --radius: 0.625rem; --font-sans: -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Helvetica Neue\", system-ui, sans-serif; --font-mono: \"SF Mono\", ui-monospace, \"JetBrains Mono\", Menlo, monospace; }\n[data-slot=\"alert\"][data-variant] { --alert-glass-tint: transparent; border-color: var(--border); }"
+  "css": ":root { --radius: 0.625rem; --font-sans: -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Helvetica Neue\", system-ui, sans-serif; --font-mono: \"SF Mono\", ui-monospace, \"JetBrains Mono\", Menlo, monospace; }\n[data-slot=\"alert\"][data-variant] { --alert-glass-tint: transparent; border-color: var(--border); }\n[data-slot=\"switch\"][data-size=\"default\"] { --thumb-size: 20px; }"
 }
