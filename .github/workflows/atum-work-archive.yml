@@ -15,7 +15,7 @@ on:
         required: true
       version:
         description: Work runtime version to stamp
-        default: v0.1.13
+        default: v0.1.15
         required: true
 
 permissions:

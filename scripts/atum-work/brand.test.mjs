@@ -24,11 +24,25 @@ NodeTest.test(
     const strings = [{ file: "index.html", from: "T3 Code", to: "Work fixture", count: 1 }];
     const map = { directory: tmp, data: { strings, assets: [] } };
     try {
-      const undo = applyBrand(planBrand(tmp, map));
+      const settings = NodePath.join(tmp, "packages/contracts/src/settings.ts");
+      NodeFS.mkdirSync(NodePath.dirname(settings), { recursive: true });
+      const original =
+        'agentInstructions: AgentInstructions.pipe(Schema.withDecodingDefault(Effect.succeed("")))';
+      NodeFS.writeFileSync(settings, original);
+      NodeFS.writeFileSync(NodePath.join(tmp, "instructions.txt"), "Atum orientation\n");
+      const brandedMap = { ...map, data: { ...map.data, agentInstructions: "instructions.txt" } };
+      // Ordinary upstream maps leave the default untouched.
+      NodeAssert.ok(!planBrand(tmp, map).has(settings));
+      const undo = applyBrand(planBrand(tmp, brandedMap));
+      NodeAssert.ok(
+        NodeFS.readFileSync(settings, "utf8").includes('Effect.succeed("Atum orientation\\n")'),
+      );
+
       NodeAssert.equal(NodeFS.readFileSync(file, "utf8"), "<title>Work fixture</title>");
       assertProviderIdentity(tmp);
       undo();
       NodeAssert.equal(NodeFS.readFileSync(file, "utf8"), "<title>T3 Code</title>");
+      NodeAssert.equal(NodeFS.readFileSync(settings, "utf8"), original);
       const outside = { file: "../server/src/x.ts", from: "T3", to: "Atum", count: 1 };
       NodeAssert.throws(
         () => planBrand(tmp, { directory: tmp, data: { strings: [outside], assets: [] } }),
