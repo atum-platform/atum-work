@@ -59,3 +59,11 @@ runs browser tests without the flag, where it passes.
 Verification: lint 0 and fmt clean on touched files; web typecheck only the pre-existing
 `providerSettingsVisibility.test.ts` error; picker browser tests 8/8 (default build); `src/atum` 10/10.
 
+
+## Kit on T3 (sync, 2026-11-24)
+
+Owner decision 2026-11-24, option B: T3's design system is the Atum Kit base, and Work's theme is
+colours only (atum-desktop `feat/kit-t3-foundation-1124`, 4d59323f). `atum-work/model-picker-spec.json`
+and `model-picker-digests.json` are copied byte for byte from atum-desktop `src/matrix/`: the chip is
+T3's (14 px text on the 8 px control radius) and Work no longer receives picker CSS from the desktop.
+`model-picker-labels.json` was already identical. Verified with `shasum -a 256` against the digests file.
