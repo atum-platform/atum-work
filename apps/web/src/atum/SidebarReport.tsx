@@ -1,3 +1,5 @@
+import { useAtomValue } from "@effect/atom-react";
+import { primaryWorkShellReadyAtom, reportWorkStartupPhase } from "./StartupReport";
 import { useEffect } from "react";
 
 import { useSidebar } from "../components/ui/sidebar";
@@ -8,6 +10,7 @@ import { observeResize } from "../lib/observeResize";
  * chat roster does. The edge is the visible panel's right side in this view's CSS pixels.
  */
 export function AtumSidebarReport() {
+  const shellReady = useAtomValue(primaryWorkShellReadyAtom);
   const { open, isMobile } = useSidebar();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports the sidebar's laid-out edge to the native host
   useEffect(() => {
@@ -26,10 +29,18 @@ export function AtumSidebarReport() {
     // Opening slides the panel in, which resizes nothing: read it again where the slide ends.
     container?.addEventListener("transitionend", report);
     report();
+    // Two frames observe a committed sidebar after the browser has had a paint opportunity.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      if (shellReady)
+        second = requestAnimationFrame(() => reportWorkStartupPhase("threads-painted"));
+    });
     return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
       stopObserving();
       container?.removeEventListener("transitionend", report);
     };
-  }, [open, isMobile]);
+  }, [open, isMobile, shellReady]);
   return null;
 }

@@ -16,6 +16,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { APP_DISPLAY_NAME, APP_VERSION } from "../branding";
+import { AtumStartupReport } from "../atum/StartupReport";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
@@ -226,6 +227,7 @@ function RootRouteBranch() {
 
   return (
     <>
+      {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? <AtumStartupReport /> : null}
       <ChatGptWelcomeCoordinator />
       {isWelcome ? (
         <>

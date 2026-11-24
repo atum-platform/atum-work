@@ -6,6 +6,7 @@ type WorkAccessState = "allowed" | "empty" | "unavailable";
 
 /** The owner view's preload delegates this read to desktop main. */
 export interface WorkSubmitAccessBridge {
+  reportStartupPhase?(phase: "ws-connected" | "providers-ready" | "threads-painted"): Promise<void>;
   reportSurfaceMode?(
     snapshot: import("../../atum/surfaceMode").SurfaceModeSnapshot | null,
   ): Promise<void>;
