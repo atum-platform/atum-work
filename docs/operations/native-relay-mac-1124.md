@@ -11,3 +11,12 @@ Atum toolkit node tests 3/3 pass with `ATUM_WORK_MAC_ID=mac`;
 Rebased onto finished Connect T1 ac9118cf5; runtime 38ace137e5 remains an ancestor.
 Thread reads expose native restart predecessor links and assistant message phase without inferring either.
 Desktop route acceptance remains in progress; this checkpoint is not live.
+
+Assembly verification: server `effect-tsgo tsrs --noEmit` exit 0. Native toolkit
+3/3 passed after session metadata migration. Cold client recognition refreshes
+the host association only during OAuth approval; ordinary clients never fetch
+S2 during tool calls. The checked consent snapshot is reused when issuing the
+native EnvironmentAuth session, preventing a second-read identity race.
+Reverse-tool failures now identify their stage with a fixed diagnostic code;
+no credentials or file contents appear in those messages. `accept_local.sh`
+provides the combined toolkit/startup/chat/fault reproduction entry point.

@@ -4,6 +4,7 @@ import {
   forwardGrantsFile,
   forwardGrant,
   isAtumClient,
+  serializeForwardGrant,
 } from "../mcp/toolkits/atum/forwardAdmission.ts";
 import {
   AuthAccessWriteScope,
@@ -591,6 +592,7 @@ const make = Effect.gen(function* () {
       ) {
         return yield* fail("invalid_grant", "The authorization code is invalid or expired.");
       }
+      let nativeForwardConsent: string | undefined;
       if (forwardGrantsFile && pending.forwardConsent) {
         const currentConsent = yield* Effect.tryPromise({
           try: () => forwardGrant(forwardGrantsFile!, clientId),
@@ -598,13 +600,14 @@ const make = Effect.gen(function* () {
         }).pipe(Effect.mapError(() => fail("invalid_grant", "Owner consent required.")));
         if (consentFingerprint(currentConsent) !== pending.forwardConsent)
           return yield* fail("invalid_grant", "Consent changed since approval.");
+        nativeForwardConsent = serializeForwardGrant(currentConsent);
       }
       const issued = yield* environmentAuth
         .issueMcpClientSession({
           label: pending.clientName,
           access: pending.access,
           peerLink: pending.peerLink,
-          client: { ...deriveAuthClientMetadata({ request }), ...(pending.forwardConsent ? { nativeForwardConsent: JSON.stringify(yield* Effect.promise(() => forwardGrant(forwardGrantsFile!, clientId))) } : {}) },
+          client: { ...deriveAuthClientMetadata({ request }), ...(nativeForwardConsent ? { nativeForwardConsent } : {}) },
         })
         .pipe(
           Effect.catch((cause) =>

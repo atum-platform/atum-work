@@ -10,6 +10,17 @@ import { endpoint, toolsEndpoint, token, grantsFile } from "./config.ts";
 import { askConnector } from "./connector.ts";
 import { boundRegistry } from "./boundRegistry.ts";
 import { AtumToolkit } from "./tools.ts";
+import { OrchestratorMcpFailure } from "@t3tools/contracts";
+
+const nativeFailure = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  const known = ["Native session unavailable", "Agent binding unavailable", "Stale or foreign agent binding",
+    "Native consent revoked", "Hermes session binding unavailable", "Cloud agent registration unavailable",
+    "Binding revoked during call", "Owner consent required", "Native thread identity changed", "Invalid connector"];
+  return new OrchestratorMcpFailure({ code: "orchestration_error",
+    message: known.includes(message) || /^native_registry_[a-z_]+$/.test(message)
+      ? `Native cloud tools: ${message}.` : "Native cloud tools: connector or caller registration unavailable." });
+};
 
 export const layer = McpToolAccess.toLayer(AtumToolkit, {
   ask_my_agent: McpToolAccess.actsAsCaller((question) =>
@@ -74,7 +85,7 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
             admission.close();
           }
         },
-        catch: unavailable,
+        catch: nativeFailure,
       });
     }),
   ),
@@ -132,7 +143,7 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
             current: () => runCheck(check, { signal }),
           });
         },
-        catch: unavailable,
+        catch: nativeFailure,
       });
     }),
   ),

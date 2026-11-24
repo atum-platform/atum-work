@@ -86,7 +86,10 @@ export async function boundRegistry(input: {
   signal?: AbortSignal;
   fetch?: typeof globalThis.fetch;
 }): Promise<unknown> {
+  let stage = "caller_liveness";
+  try {
   if (!(await input.current())) throw new Error("Native session unavailable");
+  stage = "caller_registration";
   if (forwardGrantsFile && input.grantsFile && input.endpoint && input.token) {
     await provisionNativeCaller({
       forwardPath: forwardGrantsFile,
@@ -96,6 +99,7 @@ export async function boundRegistry(input: {
       caller: input.caller,
     });
   }
+  stage = "binding_read";
   const grant = await readGrant(input.grantsFile, input.caller, await input.now());
   if (!input.endpoint || !input.token || !(await input.current())) throw new Error("Unavailable");
   // Reuse the existing private local connector; it carries cloud auth, not the provider.
@@ -111,6 +115,7 @@ export async function boundRegistry(input: {
   )
     throw new Error("Invalid connector");
   url.pathname = "/tools";
+  stage = "cloud_transport";
   const response = await (input.fetch ?? globalThis.fetch)(url, {
     method: "POST",
     redirect: "error",
@@ -129,8 +134,12 @@ export async function boundRegistry(input: {
       ...input.request,
     }),
   });
+  stage = "response_revalidation";
   const fresh = await readGrant(input.grantsFile, input.caller, await input.now());
   if (!response.ok || !(await input.current()) || JSON.stringify(fresh) !== JSON.stringify(grant))
     throw new Error("Binding revoked during call");
   return response.json();
+  } catch (error) {
+    throw new Error(`native_registry_${stage}`, { cause: error });
+  }
 }

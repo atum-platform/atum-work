@@ -28,8 +28,21 @@ const cache = new Map<string, { until: number; stamp: string; rows: unknown }>()
 
 /** Membership comes from the host snapshot, including disabled clients. Never probe S2 for unrelated clients. */
 export async function isAtumClient(path: string, clientId: string): Promise<boolean> {
-  const rows = await privateJson(path);
-  return Array.isArray(rows) && rows.some((g: ForwardGrant) => g.clientId === clientId);
+  const rows = await privateJson(path).catch(() => []);
+  if (Array.isArray(rows) && rows.some((g: ForwardGrant) => g.clientId === clientId)) return true;
+  // Cold bootstrap has just associated the DCR client on S2. Ask the host once
+  // during approval; ordinary client invocations never enter this path.
+  if (!toolsEndpoint || !connectorToken) return false;
+  const url = new URL(toolsEndpoint);
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/ask" || url.username || url.password || url.search || url.hash) return false;
+  url.pathname = "/native-consent";
+  try {
+    const response = await globalThis.fetch(url, { redirect: "error",
+      headers: { authorization: `Bearer ${connectorToken}` }, signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return false;
+    const body = await response.json() as { grants?: ForwardGrant[] };
+    return Array.isArray(body.grants) && body.grants.some(g => g.clientId === clientId);
+  } catch { return false; }
 }
 
 async function privateJson(path: string): Promise<unknown> {
@@ -118,6 +131,8 @@ export const consentFingerprint = (grant: ForwardGrant) =>
     audience: grant.audience,
     hermesSessionId: (grant as ForwardGrant & { hermesSessionId?: string }).hermesSessionId,
   });
+
+export const serializeForwardGrant = (grant: ForwardGrant) => JSON.stringify(grant);
 
 export async function bindNativeThread(path: string, threadId: string, grant: ForwardGrant) {
   const directory = `${path}.threads`;
