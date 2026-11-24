@@ -41,6 +41,7 @@ import {
 } from "../panelAnimations";
 import { BackgroundThreadAnnouncer } from "./BackgroundThreadAnnouncer";
 import { HistorySwipeNavigation } from "./HistorySwipeNavigation";
+import { AtumSidebarReport } from "../atum/SidebarReport";
 import ThreadSidebar from "./Sidebar";
 import { SidebarBrandWidthProbe } from "./sidebar/SidebarChrome";
 import { isAppModalPage } from "./sidebar/mainAppLocation";
@@ -495,6 +496,7 @@ export function AppSidebarLayout({
               <ThreadSidebar routeReveal={sidebarRouteReveal} />
               <SidebarRail onDoubleClick={resetSidebarWidth} />
             </Sidebar>
+            {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? <AtumSidebarReport /> : null}
           </>
         ) : null}
         {children}
