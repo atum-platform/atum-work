@@ -1,6 +1,9 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Read the private startup pipe before providers can start.
 import * as NodeFS from "node:fs";
 
+export const grantsFile = process.env.ATUM_WORK_BINDINGS_FILE;
+delete process.env.ATUM_WORK_BINDINGS_FILE;
+
 export const endpoint = process.env.ATUM_WORK_CONNECTOR_URL;
 const descriptor = process.env.ATUM_WORK_CONNECTOR_FD;
 delete process.env.ATUM_WORK_CONNECTOR_URL;
