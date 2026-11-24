@@ -40,3 +40,17 @@ restart cancellation with no duplicate send, and HTTP 403 mid-turn on revoke.
 The fixture did not create a recovery successor; it proves cancellation rather
 than successful automatic continuation. Connect HTTPS/real subscription logins
 are deliberately outside the local decoy proof.
+
+Final local receipts are in `native-relay-local-acceptance.json`. The packaged
+server bundle also starts successfully, and real ordinary-client/linked-peer
+OAuth passes with native admission configured. Two real servers demonstrate
+that stopping Mac A leaves Mac B reachable. Regenerable Mobile/infra dependency
+trees installed by workspace tooling were pruned after verification; retained
+server dependencies still start the built server, keeping the workspace under
+3 GB. No source, account state or credentials were removed.
+
+The assembled script's newest run reached a new cloud-owned identity-seed
+assertion at `chat_fixture.py:81` after native Work tools succeeded. The earlier
+real chat receipt passes, but the stronger current fixture is not reported
+green. The coordinator has the exact failure and keeps ownership of its
+read-only cloud checkout. Do not interpret source completion as live activation.

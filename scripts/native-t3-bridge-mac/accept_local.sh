@@ -9,6 +9,8 @@ mkdir -p "$output"
 cd "$root"
 ATUM_WORK_MAC_ID=mac "$node_bin" --test apps/server/src/mcp/toolkits/atum/*.test.mjs > "$output/toolkit.log" 2>&1
 WORK_NODE="$node_bin" python3 scripts/native-t3-bridge-mac/start_smoke.py > "$output/startup.log" 2>&1
+WORK_NODE="$node_bin" python3 scripts/native-t3-bridge-mac/two_macs.py > "$output/two-macs.log" 2>&1
+WORK_NODE="$node_bin" python3 scripts/native-t3-bridge-mac/ordinary_clients.py > "$output/outside-clients.log" 2>&1
 PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$proof/scripts/native-t3-bridge/prove_chat.py" \
   --synapse-python "$python_bin" --work "$root" --evidence "$output/chat.json" > "$output/chat.log" 2>&1
 PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$proof/scripts/native-t3-bridge/power_spike.py" \

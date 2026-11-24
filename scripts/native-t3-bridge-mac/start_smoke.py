@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix="native-mac-start-") as tmp:
            "T3CODE_TELEMETRY_ENABLED": "false", "OTEL_SDK_DISABLED": "true"}
     with tempfile.TemporaryFile(mode="w+") as log:
         child = subprocess.Popen([os.environ.get("WORK_NODE", "/opt/homebrew/opt/node@24/bin/node"),
-            "apps/server/src/bin.ts", "serve", "--host", "127.0.0.1", "--port", str(port),
+            os.environ.get("WORK_ENTRY", "apps/server/src/bin.ts"), "serve", "--host", "127.0.0.1", "--port", str(port),
             "--base-dir", tmp], cwd=root, env=env, stdout=log, stderr=log)
         try:
             for _ in range(120):
