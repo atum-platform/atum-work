@@ -35,7 +35,9 @@ export default Alchemy.Stack(
     const managedEndpointZone = yield* ManagedEndpointZone.pipe(Effect.orDie);
     const relayApiZone = yield* RelayApiZone.pipe(Effect.orDie);
     const observability = yield* RelayObservability;
-    const mobileSourceMapsUploadCredentials = yield* MobileSourceMapsUploadCredentials;
+    const mobileSourceMapsUploadCredentials = observability
+      ? yield* MobileSourceMapsUploadCredentials
+      : undefined;
     const api = yield* RelayWorker.Api;
     if (isPreviewStage(stage)) {
       const { managedEndpointZoneName } = yield* RelayDeploymentConfig;
@@ -45,19 +47,20 @@ export default Alchemy.Stack(
         workerName: api.workerName,
       });
     }
-    yield* PublishClientConfig({
-      url: api.url,
-      mobileTracingUrl: observability.traces.otelTracesEndpoint,
-      mobileTracingDataset: observability.traces.name,
-      mobileTracingToken: observability.mobileIngestToken.token,
-      clientTracingUrl: observability.traces.otelTracesEndpoint,
-      clientTracingDataset: observability.traces.name,
-      clientTracingToken: observability.clientIngestToken.token,
-      tokenDigest: Output.map(
-        Output.all(observability.mobileIngestToken.token, observability.clientIngestToken.token),
-        tokenDigest,
-      ),
-    });
+    if (observability)
+      yield* PublishClientConfig({
+        url: api.url,
+        mobileTracingUrl: observability.traces.otelTracesEndpoint,
+        mobileTracingDataset: observability.traces.name,
+        mobileTracingToken: observability.mobileIngestToken.token,
+        clientTracingUrl: observability.traces.otelTracesEndpoint,
+        clientTracingDataset: observability.traces.name,
+        clientTracingToken: observability.clientIngestToken.token,
+        tokenDigest: Output.map(
+          Output.all(observability.mobileIngestToken.token, observability.clientIngestToken.token),
+          tokenDigest,
+        ),
+      });
 
     return {
       databaseName: db.database.name,
@@ -67,16 +70,20 @@ export default Alchemy.Stack(
       url: api.url,
       relayApiZoneId: relayApiZone.zoneId,
       managedEndpointZoneId: managedEndpointZone.zoneId,
-      mobileTracingUrl: observability.traces.otelTracesEndpoint,
-      mobileTracingDataset: observability.traces.name,
-      mobileTracingToken: observability.mobileIngestToken.token,
-      clientTracingUrl: observability.traces.otelTracesEndpoint,
-      clientTracingDataset: observability.traces.name,
-      clientTracingToken: observability.clientIngestToken.token,
-      mobileLogsDataset: observability.mobileLogs.name,
-      mobileMetricsDataset: observability.mobileMetrics.name,
-      mobileSourceMapsBucket: observability.mobileSourceMaps.bucketName,
-      // The MOBILE_SOURCEMAPS_R2 secret for GitHub Actions and EAS Build.
+      ...(observability
+        ? {
+            mobileTracingUrl: observability.traces.otelTracesEndpoint,
+            mobileTracingDataset: observability.traces.name,
+            mobileTracingToken: observability.mobileIngestToken.token,
+            clientTracingUrl: observability.traces.otelTracesEndpoint,
+            clientTracingDataset: observability.traces.name,
+            clientTracingToken: observability.clientIngestToken.token,
+            mobileLogsDataset: observability.mobileLogs.name,
+            mobileMetricsDataset: observability.mobileMetrics.name,
+            mobileSourceMapsBucket: observability.mobileSourceMaps.bucketName,
+            // The MOBILE_SOURCEMAPS_R2 secret for GitHub Actions and EAS Build.
+          }
+        : {}),
       mobileSourceMapsUploadCredentials,
     };
   }).pipe(Effect.provide(RelayWorker.layer)),

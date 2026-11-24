@@ -36,7 +36,9 @@ export const RelayDeploymentConfig = Effect.gen(function* () {
     relayPublicDomainForStage(stage, relayApiZoneName),
   );
 
+  const trial = yield* Config.Boolean("ATUM_CONNECT_TRIAL").pipe(Config.withDefault(false));
   return {
+    trial,
     stage,
     relayPublicDomain,
     relayPublicOrigin: `https://${relayPublicDomain}`,

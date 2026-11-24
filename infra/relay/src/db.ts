@@ -5,6 +5,7 @@ import * as Planetscale from "@alchemy.run/planetscale";
 import * as Alchemy from "alchemy";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -43,15 +44,16 @@ export const PlanetscaleDatabase = Effect.gen(function* () {
     dialect: "postgres",
   });
 
-  const mode = relayDatabaseMode(stage);
+  const trial = yield* Config.Boolean("ATUM_CONNECT_TRIAL").pipe(Config.withDefault(false));
+  const mode = trial ? "shared-database" : relayDatabaseMode(stage);
   const database =
     mode === "shared-database"
       ? yield* Planetscale.PostgresDatabase("RelayPostgresDatabase", {
-          name: "t3coderelay",
-          region: { slug: "us-west" },
-          clusterSize: "PS_160",
+          name: trial ? "atumconnect-trial" : "t3coderelay",
+          region: { slug: trial ? "ap-southeast" : "us-west" },
+          clusterSize: trial ? "PS_5" : "PS_160",
           migrations: { dir: schema.out, table: "relay_migrations" },
-          replicas: 2,
+          replicas: trial ? 0 : 2,
         }).pipe(RemovalPolicy.retain())
       : yield* Planetscale.PostgresDatabase.ref("RelayPostgresDatabase", {
           stage: "prod",
@@ -75,11 +77,12 @@ export const PlanetscaleDatabase = Effect.gen(function* () {
 
 export const RelayHyperdrive = Effect.gen(function* () {
   const { runtimeRole } = yield* PlanetscaleDatabase;
+  const trial = yield* Config.Boolean("ATUM_CONNECT_TRIAL").pipe(Config.withDefault(false));
   return yield* Cloudflare.Hyperdrive.Connection("RelayHyperdrive", {
     origin: runtimeRole.origin,
     caching: {
       disabled: true,
     },
-    originConnectionLimit: 40,
+    originConnectionLimit: trial ? 5 : 40,
   });
 });

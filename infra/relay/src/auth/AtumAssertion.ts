@@ -1,6 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as Jwt from "effect/jose/Jwt";
 import * as Jwks from "effect/jose/Jwks";
+import * as Signature from "effect/crypto/Signature";
+import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 export interface AtumAssertionPolicy {
@@ -11,8 +14,9 @@ export interface AtumAssertionPolicy {
 
 const Claims = Schema.Struct({
   sub: Schema.String,
-  iat: Schema.Number,
-  exp: Schema.Number,
+  iat: Schema.Int,
+  exp: Schema.Int,
+  jti: Schema.NonEmptyString,
 });
 const ownerId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
@@ -29,9 +33,12 @@ export const verifyAtumAssertion = Effect.fn("relay.auth.verify_atum_assertion")
     audience: policy.audience,
     maxTokenAge: "60 seconds",
     clockTolerance: 0,
-    requiredClaims: ["sub", "iat", "exp"],
+    requiredClaims: ["sub", "iat", "exp", "jti"],
     ...(expectedOwner === undefined ? {} : { subject: expectedOwner }),
-  }).pipe(Effect.provide(Jwks.layerLocal(policy.jwks)));
+  }).pipe(
+    Effect.provide(Jwks.layerLocal(policy.jwks)),
+    Effect.provide(Signature.layerWebCrypto.pipe(Layer.provide(SecureRandom.layerWebCrypto))),
+  );
   const claims = verified.claims;
   if (!ownerId.test(claims.sub) || claims.exp <= claims.iat || claims.exp - claims.iat > 60) {
     return yield* Effect.fail(new Error("invalid_atum_owner_assertion"));

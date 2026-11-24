@@ -1051,7 +1051,9 @@ export const layerTokenApi = HttpApiBuilder.group(
           scope: args.payload.scope,
         });
         yield* Effect.annotateCurrentSpan({
-          "relay.auth.mode": config.atumAssertion ? "atum_assertion_exchange" : "clerk_bearer_token_exchange",
+          "relay.auth.mode": config.atumAssertion
+            ? "atum_assertion_exchange"
+            : "clerk_bearer_token_exchange",
           "relay.oauth.client_id": args.payload.client_id,
           "relay.oauth.scopes": args.payload.scope,
         });
@@ -1059,17 +1061,22 @@ export const layerTokenApi = HttpApiBuilder.group(
           return yield* new HttpApiError.Unauthorized({});
         }
 
-        const verified = yield* (config.atumAssertion
-          ? verifyAtumAssertion(config.atumAssertion, args.payload.subject_token)
-          : verifyClerkBearerToken(config, args.payload.subject_token).pipe(
-              Effect.flatMap((verified) =>
-                verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
-                  ? Effect.succeed({ sub: verified.sub })
-                  : Effect.fail(new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" })),
-              ),
-            )).pipe(
-          Effect.catch(() => relayAuthInvalidError("invalid_bearer")),
-        );
+        const verified = yield* (
+          config.atumAssertion
+            ? verifyAtumAssertion(config.atumAssertion, args.payload.subject_token).pipe(
+                Effect.mapError((cause) => new ClerkTokenVerificationFailed({ cause })),
+                Effect.map(({ sub }) => ({ sub })),
+              )
+            : verifyClerkBearerToken(config, args.payload.subject_token).pipe(
+                Effect.flatMap((verified) =>
+                  verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
+                    ? Effect.succeed({ sub: verified.sub })
+                    : Effect.fail(
+                        new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" }),
+                      ),
+                ),
+              )
+        ).pipe(Effect.catch(() => relayAuthInvalidError("invalid_bearer")));
         if (!verified.sub) {
           return yield* relayAuthInvalidError("invalid_bearer");
         }
@@ -1748,17 +1755,20 @@ export function verifyRelayClientBearerToken(
   token: string,
 ) {
   if (config.atumAssertion) {
-    return verifyAtumAssertion(config.atumAssertion, token);
+    return verifyAtumAssertion(config.atumAssertion, token).pipe(
+      Effect.mapError((cause) => new ClerkTokenVerificationFailed({ cause })),
+      Effect.map(({ sub, mode }) => ({ sub, mode: mode as string })),
+    );
   }
   return verifyClerkBearerToken(config, token).pipe(
     Effect.flatMap((verified) =>
       verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
-        ? Effect.succeed({ sub: verified.sub, mode: "clerk_session_bearer" as const })
+        ? Effect.succeed({ sub: verified.sub, mode: "clerk_session_bearer" as string })
         : Effect.fail(new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" })),
     ),
     Effect.catch(() =>
       verifyClerkOAuthBearerToken(config, token).pipe(
-        Effect.map((verified) => ({ ...verified, mode: "clerk_oauth_bearer" as const })),
+        Effect.map((verified) => ({ ...verified, mode: "clerk_oauth_bearer" as string })),
       ),
     ),
   );

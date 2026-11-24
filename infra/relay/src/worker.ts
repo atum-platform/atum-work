@@ -117,7 +117,7 @@ export class Api extends Cloudflare.Worker<Api, {}>()("Api") {}
 
 export const layer = Api.make(
   RelayDeploymentConfig.pipe(
-    Effect.map(({ relayPublicDomain }) => ({
+    Effect.map(({ relayPublicDomain, trial }) => ({
       main: import.meta.filename,
       compatibility: {
         date: "2026-05-22",
@@ -126,7 +126,7 @@ export const layer = Api.make(
       // Requests run several Postgres queries in sequence. At the user's edge
       // each one paid the round trip to the database (~300 ms from JNB); next
       // to PlanetScale `us-west` the request pays that distance once.
-      placement: { region: "aws:us-west-2" },
+      placement: { region: trial ? "aws:ap-southeast-1" : "aws:us-west-2" },
       domain: relayPublicDomain,
       // Workers Logs bills per GB, and every request, queue batch, and DO call is
       // an invocation log. Axiom traces carry the full detail; keep a sample for
@@ -170,13 +170,22 @@ export const layer = Api.make(
     const apnsDeliveryQueueSender = yield* Cloudflare.Queues.WriteQueue(apnsDeliveryQueue);
     const fcmDeliveryQueueSender = yield* Cloudflare.Queues.WriteQueue(fcmDeliveryQueue);
 
-    const atumEnabled = yield* Config.Boolean("ATUM_CONNECT_ENABLED").pipe(Config.withDefault(false));
-    const atumAssertion = atumEnabled ? {
-      issuer: yield* Config.String("ATUM_CONNECT_ASSERTION_ISSUER"),
-      audience: yield* Config.String("ATUM_CONNECT_ASSERTION_AUDIENCE"),
-      jwks: yield* Config.schema(Schema.fromJsonString(AtumJwks.KeySet), "ATUM_CONNECT_ASSERTION_JWKS"),
-    } : undefined;
-    const clerkSecretKey = atumEnabled ? Redacted.make("") : yield* Config.Redacted("CLERK_SECRET_KEY");
+    const atumEnabled = yield* Config.Boolean("ATUM_CONNECT_ENABLED").pipe(
+      Config.withDefault(false),
+    );
+    const atumAssertion = atumEnabled
+      ? {
+          issuer: yield* Config.String("ATUM_CONNECT_ASSERTION_ISSUER"),
+          audience: yield* Config.String("ATUM_CONNECT_ASSERTION_AUDIENCE"),
+          jwks: yield* Config.schema(
+            Schema.fromJsonString(AtumJwks.KeySet),
+            "ATUM_CONNECT_ASSERTION_JWKS",
+          ),
+        }
+      : undefined;
+    const clerkSecretKey = atumEnabled
+      ? Redacted.make("")
+      : yield* Config.Redacted("CLERK_SECRET_KEY");
     const clerkPublishableKey = atumEnabled ? "" : yield* Config.String("CLERK_PUBLISHABLE_KEY");
     const clerkJwtAudience = atumEnabled ? "" : yield* Config.String("CLERK_JWT_AUDIENCE");
     const t3ChatLinkSecret = Option.getOrUndefined(
@@ -231,14 +240,9 @@ export const layer = Api.make(
         period: MobileTelemetry.MOBILE_TELEMETRY_RATE_LIMIT.periodSeconds,
       },
     });
-    const mobileSourceMaps = yield* Cloudflare.R2.ReadBucket(observability.mobileSourceMaps);
-    const mobileTelemetryToken = yield* observability.mobileTelemetryIngestToken.token;
-    const mobileTracesUrl = yield* observability.traces.otelTracesEndpoint;
-    const mobileTracesDataset = yield* observability.traces.name;
-    const mobileLogsUrl = yield* observability.mobileLogs.otelLogsEndpoint;
-    const mobileLogsDataset = yield* observability.mobileLogs.name;
-    const mobileMetricsUrl = yield* observability.mobileMetrics.otelMetricsEndpoint;
-    const mobileMetricsDataset = yield* observability.mobileMetrics.name;
+    const mobileSourceMaps = observability
+      ? yield* Cloudflare.R2.ReadBucket(observability.mobileSourceMaps)
+      : null;
 
     const alchemyRuntimeContext: Alchemy.BaseRuntimeContext = yield* Cloudflare.Worker;
 
@@ -394,7 +398,7 @@ export const layer = Api.make(
       Effect.provide(MobileTelemetry.layerSourceMaps),
       Effect.provideService(MobileTelemetry.SourceMapObjects, {
         get: (key) =>
-          mobileSourceMaps.get(key).pipe(
+          (mobileSourceMaps ? mobileSourceMaps.get(key) : Effect.succeed(null)).pipe(
             Effect.map((object) =>
               object === null
                 ? undefined
@@ -413,32 +417,43 @@ export const layer = Api.make(
           ),
       }),
     );
-    const layerMobileTelemetry = MobileTelemetry.layer.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.effect(
-            MobileTelemetry.MobileTelemetrySettings,
-            Effect.gen(function* () {
-              return MobileTelemetry.MobileTelemetrySettings.of({
-                axiomToken: yield* mobileTelemetryToken,
-                destinations: {
-                  traces: { url: yield* mobileTracesUrl, dataset: yield* mobileTracesDataset },
-                  logs: { url: yield* mobileLogsUrl, dataset: yield* mobileLogsDataset },
-                  metrics: { url: yield* mobileMetricsUrl, dataset: yield* mobileMetricsDataset },
-                },
-              });
-            }),
-          ),
-          Layer.succeed(MobileTelemetry.MobileTelemetryRateLimiter, {
-            allow: allowWith(
-              mobileTelemetryRateLimit,
-              "relay.mobile_telemetry.rate_limiter_failed_open",
+    const layerMobileTelemetry = observability
+      ? MobileTelemetry.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Layer.effect(
+                MobileTelemetry.MobileTelemetrySettings,
+                Effect.gen(function* () {
+                  return MobileTelemetry.MobileTelemetrySettings.of({
+                    axiomToken: yield* yield* observability.mobileTelemetryIngestToken.token,
+                    destinations: {
+                      traces: {
+                        url: yield* yield* observability.traces.otelTracesEndpoint,
+                        dataset: yield* yield* observability.traces.name,
+                      },
+                      logs: {
+                        url: yield* yield* observability.mobileLogs.otelLogsEndpoint,
+                        dataset: yield* yield* observability.mobileLogs.name,
+                      },
+                      metrics: {
+                        url: yield* yield* observability.mobileMetrics.otelMetricsEndpoint,
+                        dataset: yield* yield* observability.mobileMetrics.name,
+                      },
+                    },
+                  });
+                }),
+              ),
+              Layer.succeed(MobileTelemetry.MobileTelemetryRateLimiter, {
+                allow: allowWith(
+                  mobileTelemetryRateLimit,
+                  "relay.mobile_telemetry.rate_limiter_failed_open",
+                ),
+              }),
+              Layer.succeed(MobileTelemetry.SourceMaps, mobileSourceMapLookups),
             ),
-          }),
-          Layer.succeed(MobileTelemetry.SourceMaps, mobileSourceMapLookups),
-        ),
-      ),
-    );
+          ),
+        )
+      : null;
 
     const layerApp = Layer.mergeAll(
       layerRelayApi,
@@ -446,7 +461,9 @@ export const layer = Api.make(
         Layer.provide(HookForwarder.layer),
         Layer.provide(layerHookRateLimiter),
       ),
-      MobileTelemetry.layerApi.pipe(Layer.provide(layerMobileTelemetry)),
+      layerMobileTelemetry
+        ? MobileTelemetry.layerApi.pipe(Layer.provide(layerMobileTelemetry))
+        : Layer.empty,
     ).pipe(
       Layer.provideMerge(RelayHttpApi.layerClientAuth),
       Layer.provideMerge(RelayHttpApi.layerDpopClientAuth),
@@ -583,11 +600,13 @@ export const layer = Api.make(
         Layer.provideMerge(
           Layer.unwrap(
             Effect.map(RelayObservability, (observability) =>
-              Axiom.Telemetry({
-                serviceName: "t3code-relay",
-                token: observability.workerIngestToken,
-                traces: observability.traces,
-              }),
+              observability
+                ? Axiom.Telemetry({
+                    serviceName: "t3code-relay",
+                    token: observability.workerIngestToken,
+                    traces: observability.traces,
+                  })
+                : Layer.empty,
             ),
           ),
         ),
