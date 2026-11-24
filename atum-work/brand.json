@@ -1,4 +1,5 @@
 {
+  "agentInstructions": "docs/user/agent-instructions.txt",
   "strings": [
     {
       "file": "gt.config.json",

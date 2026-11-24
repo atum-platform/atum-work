@@ -67,6 +67,26 @@ export function planBrand(repo, { data, directory }) {
     writes.set(path, { before, after: text.replaceAll(from, () => to) });
   }
 
+  // B1 owns instruction resolution and snapshots. Only the Atum archive build
+  // changes its decoding default; explicit owner/project values (including "") win.
+  if (data.agentInstructions) {
+    const instructions = NodeFS.readFileSync(resolveBelow(repo, data.agentInstructions), "utf8");
+    NodeAssert.ok(Buffer.byteLength(instructions, "utf8") < 4000 && instructions.trim());
+    const path = resolveBrandTarget(repo, "../../packages/contracts/src/settings.ts");
+    const before = writes.get(path)?.before ?? NodeFS.readFileSync(path);
+    const text = writes.get(path)?.after ?? before.toString("utf8");
+    const from =
+      'agentInstructions: AgentInstructions.pipe(Schema.withDecodingDefault(Effect.succeed("")))';
+    NodeAssert.equal(text.split(from).length - 1, 1, "B1 instruction default changed");
+    writes.set(path, {
+      before,
+      after: text.replace(
+        from,
+        `agentInstructions: AgentInstructions.pipe(Schema.withDecodingDefault(Effect.succeed(${JSON.stringify(instructions)})))`,
+      ),
+    });
+  }
+
   for (const { file, source, upstreamSha256 } of data.assets) {
     const path = resolveBrandTarget(repo, file);
     NodeAssert.ok(!writes.has(path), `Duplicate brand target: ${file}`);

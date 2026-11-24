@@ -4,6 +4,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
+  DEFAULT_SERVER_SETTINGS,
   EnvironmentId,
   type ModelSelection,
   type OrchestrationV2AppThread,
@@ -2706,6 +2707,7 @@ it.effect(
         const captured = (yield* Ref.get(mcpConfigs))[0];
         assert.isDefined(captured);
         assert.equal(captured?.browserToolsAvailable, false);
+        assert.equal(captured?.agentInstructions, DEFAULT_SERVER_SETTINGS.agentInstructions);
         const token = captured?.authorizationHeader.replace(/^Bearer\s+/, "");
         const resolved = yield* registry.resolve(token!);
         assert.deepEqual(

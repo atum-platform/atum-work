@@ -1,3 +1,4 @@
+import * as NodeFS from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 import {
@@ -15,9 +16,19 @@ const decodeSettingsPatch = Schema.decodeSync(ServerSettingsPatch);
 const decodeAgentInstructions = Schema.decodeUnknownSync(AgentInstructions);
 
 describe("agent instructions", () => {
-  it("defaults empty, inherits environment and lets a project clear it", () => {
+  it("uses the build default, inherits environment and lets a project clear it", () => {
     const project = ProjectId.make("instructions-project");
-    expect(DEFAULT_SERVER_SETTINGS.agentInstructions).toBe("");
+    expect(DEFAULT_SERVER_SETTINGS.agentInstructions).toBe(
+      process.env.VITE_ATUM_WORK_BUILD === "1"
+        ? NodeFS.readFileSync(
+            new URL("../../../../docs/user/agent-instructions.txt", import.meta.url),
+            "utf8",
+          )
+        : "",
+    );
+    expect(
+      Schema.decodeSync(ServerSettingsPatch)({ agentInstructions: "" }).agentInstructions,
+    ).toBe("");
     const settings = { ...DEFAULT_SERVER_SETTINGS, agentInstructions: "environment" };
     expect(resolveProjectSettings(settings, project).settings.agentInstructions).toBe(
       "environment",

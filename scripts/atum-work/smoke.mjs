@@ -128,6 +128,49 @@ try {
     (await page.title()).includes(expectedName),
     "The document title did not use the brand map",
   );
+  const expectedInstructions = NodeFS.readFileSync(
+    new URL("../../docs/user/agent-instructions.txt", import.meta.url),
+    "utf8",
+  );
+  const instructions = await page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const socket = new WebSocket(
+          `${location.origin.replace(/^http/, "ws")}/ws?orchestrationProtocol=2`,
+        );
+        const timeout = setTimeout(() => {
+          socket.close();
+          reject(new Error("Settings RPC timed out"));
+        }, 10_000);
+        socket.onopen = () =>
+          socket.send(
+            JSON.stringify({
+              _tag: "Request",
+              id: "atum-instructions-smoke",
+              tag: "server.getSettings",
+              payload: {},
+              headers: [],
+            }),
+          );
+        socket.onmessage = ({ data }) => {
+          const messages = JSON.parse(data);
+          for (const message of Array.isArray(messages) ? messages : [messages]) {
+            if (message._tag !== "Exit" || message.requestId !== "atum-instructions-smoke")
+              continue;
+            clearTimeout(timeout);
+            socket.close();
+            if (message.exit?._tag !== "Success") reject(new Error("Settings RPC failed"));
+            else resolve(message.exit.value.agentInstructions);
+          }
+        };
+        socket.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error("Settings RPC socket failed"));
+        };
+      }),
+  );
+  NodeAssert.equal(instructions, expectedInstructions, "Fresh packaged HOME lost Atum orientation");
+  console.log("Fresh packaged HOME resolves automatic B1 orientation exactly.");
   const connectHelp = NodeChildProcess.execFileSync(executable, ["connect", "--help"], {
     cwd,
     env,

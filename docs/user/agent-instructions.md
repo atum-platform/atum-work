@@ -1,8 +1,8 @@
 # Agent instructions
 
-The environment's `userdata/settings.json` accepts `agentInstructions`, an editable string, empty by default. `projectSettingsOverrides[projectId].agentInstructions` replaces it for one project; an empty project string explicitly clears the environment instruction. The existing settings patch API accepts the same field. This slice does not add a settings screen.
+The environment's `userdata/settings.json` accepts `agentInstructions`, an editable string, empty by default in upstream builds. Atum archives automatically default to the orientation in `agent-instructions.txt` when the field is absent; an explicit empty string disables it. `projectSettingsOverrides[projectId].agentInstructions` replaces it for one project; an empty project string explicitly clears the environment instruction. The existing settings patch API accepts the same field. This slice does not add a settings screen.
 
-The text must contain fewer than 4,000 UTF-8 bytes (not characters). Oversized settings are rejected, never silently truncated. [agent-instructions.txt](./agent-instructions.txt) is the small Atum orientation example; it is opt-in and is not a global T3 default.
+The text must contain fewer than 4,000 UTF-8 bytes (not characters). Oversized settings are rejected, never silently truncated. [agent-instructions.txt](./agent-instructions.txt) is the small Atum orientation example; it is the Atum archive default and is not a global T3 default.
 
 T3 snapshots resolved text when it creates a thread's provider MCP session. It reuses the snapshot on subsequent turns and capability credential replacement, preserving the cached prefix. Edit settings for fresh sessions; existing sessions keep their snapshot until their MCP session is cleared. No text is appended to user messages for Codex or Claude.
 
