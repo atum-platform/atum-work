@@ -9,6 +9,8 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import { externalPostgresOrigin } from "./externalPostgres.ts";
 
 import { relayDatabaseMode } from "./dbConfig.ts";
 
@@ -76,10 +78,16 @@ export const PlanetscaleDatabase = Effect.gen(function* () {
 });
 
 export const RelayHyperdrive = Effect.gen(function* () {
-  const { runtimeRole } = yield* PlanetscaleDatabase;
+  const backend = yield* Config.String("RELAY_DATABASE_PROVIDER").pipe(Config.withDefault("external"));
+  const origin = backend === "planetscale"
+    ? (yield* PlanetscaleDatabase).runtimeRole.origin
+    : externalPostgresOrigin(
+        Redacted.value(yield* Config.Redacted("RELAY_ORIGIN_DATABASE_URL")),
+        yield* Config.String("RELAY_POSTGRES_VPC_SERVICE_ID").pipe(Config.withDefault("")),
+      );
   const trial = yield* Config.Boolean("ATUM_CONNECT_TRIAL").pipe(Config.withDefault(false));
   return yield* Cloudflare.Hyperdrive.Connection("RelayHyperdrive", {
-    origin: runtimeRole.origin,
+    origin,
     caching: {
       disabled: true,
     },
