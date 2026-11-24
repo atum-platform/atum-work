@@ -19,6 +19,7 @@ If available, call link_issue for each issue you take on or file, even via CLI; 
 export function buildRuntimeInstructions(runtime: {
   readonly harness: string;
   readonly agentFeedback?: AgentFeedbackMode;
+  readonly agentInstructions?: string | undefined;
   readonly model?: string | undefined;
   readonly modelName?: string | undefined;
   readonly reasoningEffort?: string | undefined;
@@ -44,7 +45,7 @@ export function buildRuntimeInstructions(runtime: {
     runtime.pullRequestLinking === false
       ? runtimeInfo
       : `${runtimeInfo}\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`;
-  return [linked + feedback, ...(workspace === "" ? [] : [workspace])].join("\n\n");
+  return [linked + feedback, ...(runtime.agentInstructions ? [runtime.agentInstructions] : []), ...(workspace === "" ? [] : [workspace])].join("\n\n");
 }
 
 function toSingleLine(value: string): string {

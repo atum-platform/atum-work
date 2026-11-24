@@ -2195,6 +2195,8 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
                     text: buildRuntimeInstructions({
                       agentFeedback: hasT3Mcp ? (turnInput.agentFeedback ?? "off") : "off",
                       harness: "Muse Code",
+                      agentInstructions: (yield* mcpSessions.read(turnInput.threadId))
+                        ?.agentInstructions,
                       model: session.model ?? undefined,
                       reasoningEffort: effort,
                       runtimePolicy: turnInput.runtimePolicy,

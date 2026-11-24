@@ -35,6 +35,7 @@ const toolInstructions = (availability: boolean | T3CodeToolAvailability): strin
 export interface CodexRuntimeInfo {
   readonly agentFeedback?: AgentFeedbackMode;
   readonly model: string;
+  readonly agentInstructions?: string | undefined;
   readonly modelName?: string | undefined;
   readonly reasoningEffort?: string | undefined;
 }
@@ -53,9 +54,22 @@ export function buildCodexAdditionalContext(
         { kind: "application" as const, value: section },
       ]),
     ),
+    ...(runtime.agentInstructions
+      ? {
+          t3_agent_instructions: {
+            kind: "application" as const,
+            value: runtime.agentInstructions,
+          },
+        }
+      : {}),
     t3_code_runtime: {
       kind: "application",
-      value: buildRuntimeInstructions({ harness: "Codex", ...runtime }),
+      value: buildRuntimeInstructions({
+        harness: "Codex",
+        model: runtime.model,
+        modelName: runtime.modelName,
+        reasoningEffort: runtime.reasoningEffort,
+      }),
     },
     ...(tools ? { t3_code_tools: { kind: "application", value: tools } } : {}),
   };

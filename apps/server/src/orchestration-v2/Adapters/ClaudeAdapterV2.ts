@@ -2483,6 +2483,7 @@ export function makeClaudeQueryOptions(input: {
   readonly onStop?: HookCallback;
   readonly supportedDialogKinds?: ClaudeQueryOptions["supportedDialogKinds"];
   readonly allowDangerouslySkipPermissions?: boolean;
+  readonly agentInstructions?: string | undefined;
   readonly appendSystemPromptFileText?: string;
   // Flag settings, because a user's settings.json env beats the process env in Claude Code.
   readonly toolSearchOverride?: "true";
@@ -2630,6 +2631,7 @@ export function makeClaudeQueryOptions(input: {
       type: "preset" as const,
       preset: "claude_code" as const,
       append: [
+        ...(input.agentInstructions ? [input.agentInstructions] : []),
         buildRuntimeInstructions({
           harness: "Claude Code",
           agentFeedback,
@@ -13616,6 +13618,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(mcpOverrides.mcpServers === undefined
               ? {}
               : { mcpServers: mcpOverrides.mcpServers }),
+            agentInstructions: mcpSession?.agentInstructions,
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined

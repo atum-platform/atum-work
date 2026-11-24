@@ -867,6 +867,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     readonly codexInput: ReadonlyArray<CodexSchema.V2TurnStartParams__UserInput>;
     readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
     readonly modelSelection: ModelSelection;
+    readonly agentInstructions?: string | undefined;
     readonly hasT3Mcp?: boolean;
     readonly agentFeedback?: AgentFeedbackMode;
     readonly browserToolsAvailable?: boolean;
@@ -929,6 +930,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
               model: input.modelSelection.model,
               reasoningEffort: effort ?? undefined,
               agentFeedback: input.agentFeedback ?? "off",
+              agentInstructions: input.agentInstructions,
             },
             {
               browser: input.browserToolsAvailable ?? true,
@@ -7806,6 +7808,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               modelSelection: turnInput.modelSelection,
               hasT3Mcp: mcpSession !== undefined,
               agentFeedback: turnInput.agentFeedback ?? "off",
+              agentInstructions: mcpSession?.agentInstructions,
               browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,

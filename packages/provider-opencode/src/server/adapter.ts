@@ -3519,6 +3519,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
                 model: turn.modelSelection.model,
                 agentFeedback: hasT3Mcp ? turn.agentFeedback : "off",
                 runtimePolicy: turn.runtimePolicy,
+                agentInstructions: mcpSession?.agentInstructions,
               }),
             ]
               .filter(Boolean)
