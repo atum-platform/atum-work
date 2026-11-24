@@ -15,6 +15,8 @@ account change or view teardown rejects late replies. The Atum relay origin defa
 `https://relay.atumplatform.com`; `VITE_T3CODE_RELAY_URL` can override it at build time. Atum relay
 telemetry is disabled. The desktop account chrome continues to own sign-out and account switching;
 Clerk profile/avatar UI is omitted in Atum builds.
+Build-specific hooks are selected at module scope so the native account path does not invoke
+Clerk hooks or change hook order across sign-in states.
 
 The local proof also mounts the actual web identity provider without Clerk, tests fresh assertions
 and account teardown, and runs the shared relay session/client/discovery/account tests. Its HTTP

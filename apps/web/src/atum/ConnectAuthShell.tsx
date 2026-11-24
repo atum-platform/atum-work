@@ -5,6 +5,7 @@ import { setAtumConnectAccount } from "../cloud/connectAuth";
 
 export default function AtumConnectAuthShell({ children }: { readonly children: ReactNode; readonly publishableKey: string }) {
   // The desktop destroys the owner view on sign-out/account switch; late reads must not reactivate it.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the native account binding for this view lifetime
   useEffect(() => {
     let active = true;
     void atumConnectIdentity.getAssertion().then(assertion => {

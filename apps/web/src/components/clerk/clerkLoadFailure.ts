@@ -1,7 +1,6 @@
 import { useClerk } from "@clerk/react";
 
-export function useClerkLoadFailed() {
-  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return false;
+function useClerkAccountLoadFailed() {
   return useClerk().status === "error";
 }
 
@@ -10,3 +9,5 @@ export function retryClerkLoad() {
   // retries, so a reload is the only recovery.
   window.location.reload();
 }
+
+export const useClerkLoadFailed = import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? () => false : useClerkAccountLoadFailed;

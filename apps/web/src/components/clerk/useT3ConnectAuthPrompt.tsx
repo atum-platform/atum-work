@@ -4,8 +4,7 @@ import { isElectron } from "../../env";
 import { resolveClerkSignInProps } from "./authRedirect";
 import { retryClerkLoad } from "./clerkLoadFailure";
 
-export function useT3ConnectAuthPrompt() {
-  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return { openAuthPrompt: () => window.location.reload() };
+function useClerkT3ConnectAuthPrompt() {
   const clerk = useClerk();
   const openAuthPrompt = () => {
     if (clerk.status === "error") {
@@ -16,3 +15,7 @@ export function useT3ConnectAuthPrompt() {
   };
   return { openAuthPrompt };
 }
+
+export const useT3ConnectAuthPrompt = import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+  ? () => ({ openAuthPrompt: () => window.location.reload() })
+  : useClerkT3ConnectAuthPrompt;

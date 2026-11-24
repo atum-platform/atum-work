@@ -34,11 +34,10 @@ export type T3ConnectAccountPageUrl = (typeof T3_CONNECT_ACCOUNT_PAGES)[number][
 type PortalTargets = Readonly<Record<string, HTMLDivElement | undefined>>;
 
 /** Keep portals rendered while the modal can open; Clerk owns the custom-page DOM nodes. */
-export function useT3ConnectAccountPage(): {
+function useClerkT3ConnectAccountPage(): {
   readonly open: ((page?: T3ConnectAccountPageUrl) => void) | null;
   readonly portals: ReactNode;
 } {
-  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return { open: null, portals: null };
   const clerk = useClerk();
   const { isSignedIn } = useAuth();
   const m = useMessages();
@@ -71,3 +70,7 @@ export function useT3ConnectAccountPage(): {
 
   return { open: isSignedIn ? open : null, portals };
 }
+
+export const useT3ConnectAccountPage = import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+  ? () => ({ open: null, portals: null })
+  : useClerkT3ConnectAccountPage;
