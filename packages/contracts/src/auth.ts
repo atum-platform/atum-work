@@ -350,6 +350,8 @@ export function connectDeviceVerificationCode(proofKeyThumbprint: string): strin
 }
 
 export const AuthClientMetadata = Schema.Struct({
+  /** Trusted Atum consent snapshot, set only by the local OAuth issuer. */
+  nativeForwardConsent: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(TrimmedNonEmptyString),
   ipAddress: Schema.optionalKey(TrimmedNonEmptyString),
   userAgent: Schema.optionalKey(TrimmedNonEmptyString),

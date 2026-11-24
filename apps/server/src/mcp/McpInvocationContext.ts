@@ -38,6 +38,7 @@ export interface McpThreadCaller {
 }
 
 export interface McpClientCaller {
+  readonly nativeForwardConsent?: string;
   readonly nativeConsent?: ForwardGrant;
   readonly sessionId: string;
   readonly label: string;

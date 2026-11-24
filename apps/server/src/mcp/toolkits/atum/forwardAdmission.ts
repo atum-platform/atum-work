@@ -22,6 +22,15 @@ export interface ForwardGrant {
 }
 export const forwardGrantsFile = process.env.ATUM_WORK_FORWARD_GRANTS_FILE;
 delete process.env.ATUM_WORK_FORWARD_GRANTS_FILE;
+export const localMacId = process.env.ATUM_WORK_MAC_ID;
+delete process.env.ATUM_WORK_MAC_ID;
+const cache = new Map<string, { until: number; stamp: string; rows: unknown }>();
+
+/** Membership comes from the host snapshot, including disabled clients. Never probe S2 for unrelated clients. */
+export async function isAtumClient(path: string, clientId: string): Promise<boolean> {
+  const rows = await privateJson(path);
+  return Array.isArray(rows) && rows.some((g: ForwardGrant) => g.clientId === clientId);
+}
 
 async function privateJson(path: string): Promise<unknown> {
   const stat = await NodeFSP.lstat(path);
@@ -33,8 +42,14 @@ export async function forwardGrant(
   path: string,
   clientId: string,
   now = Date.now(),
+  force = false,
 ): Promise<ForwardGrant> {
+  const stat = await NodeFSP.stat(path);
+  const stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+  const saved = cache.get(path);
   let rows: unknown;
+  if (!force && saved && saved.stamp === stamp && saved.until > now) rows = saved.rows;
+  else {
   if (toolsEndpoint && connectorToken) {
     const url = new URL(toolsEndpoint);
     if (
@@ -56,6 +71,8 @@ export async function forwardGrant(
     if (!response.ok) throw new Error("Consent unavailable");
     rows = ((await response.json()) as { grants: unknown }).grants;
   } else rows = await privateJson(path);
+  cache.set(path, { until: now + 1000, stamp, rows });
+  }
   if (!Array.isArray(rows)) throw new Error("Consent unavailable");
   const matches = rows.filter((g: ForwardGrant) => g.clientId === clientId);
   const g = matches[0] as ForwardGrant | undefined;
@@ -66,6 +83,8 @@ export async function forwardGrant(
     !Number.isFinite(g.expiresAt) ||
     g.expiresAt <= now ||
     !g.binding ||
+    !localMacId ||
+    g.binding.mac !== localMacId ||
     ![g.binding.owner, g.binding.agent, g.binding.generation, g.binding.mac].every(
       (v) => typeof v === "string" && v.length > 0,
     ) ||
@@ -78,22 +97,11 @@ export async function forwardGrant(
   return g;
 }
 const digest = (token: string) => NodeCrypto.createHash("sha256").update(token).digest("hex");
-// Each bearer has its own atomic record. Concurrent sign-ins never overwrite each other.
-export async function bindForwardToken(path: string, token: string, clientId: string) {
-  const grant = await forwardGrant(path, clientId);
-  const directory = `${path}.sessions`;
-  await NodeFSP.mkdir(directory, { recursive: true, mode: 0o700 });
-  await NodeFSP.writeFile(`${directory}/${digest(token)}.json`, JSON.stringify(grant), {
-    mode: 0o600,
-    flag: "wx",
-  });
-}
-export async function admitForwardToken(path: string, token: string): Promise<ForwardGrant> {
-  const saved = (await privateJson(`${path}.sessions/${digest(token)}.json`)) as ForwardGrant;
-  const fresh = await forwardGrant(path, saved.clientId);
-  // Reapproval mints a new bearer; an old bearer cannot acquire a new generation/revision.
-  if (consentFingerprint(saved) !== consentFingerprint(fresh))
-    throw new Error("Consent changed; reapprove");
+/** Consent lives in EnvironmentAuth client metadata, whose expiry/revocation is native. */
+export async function admitForwardSession(path: string, metadata: string, force = false): Promise<ForwardGrant> {
+  const saved = JSON.parse(metadata) as ForwardGrant;
+  const fresh = await forwardGrant(path, saved.clientId, Date.now(), force);
+  if (consentFingerprint(saved) !== consentFingerprint(fresh)) throw new Error("Consent changed; reapprove");
   return fresh;
 }
 

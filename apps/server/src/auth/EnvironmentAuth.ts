@@ -96,6 +96,7 @@ const RENEWABLE_SESSION_WINDOW = Duration.days(30);
 const PAIRING_LINK_SUBJECT = "one-time-token";
 
 export interface McpClientSession {
+  readonly nativeForwardConsent?: string;
   readonly sessionId: AuthSessionId;
   readonly label: string;
   readonly access: AuthMcpClientAccess;
@@ -1625,6 +1626,7 @@ export const make = Effect.gen(function* () {
           const client = {
             sessionId: session.sessionId,
             label: session.client.label ?? "MCP client",
+            ...(session.client.nativeForwardConsent ? { nativeForwardConsent: session.client.nativeForwardConsent } : {}),
             access: session.scopes.includes(AuthOrchestrationOperateScope)
               ? (session.runtimeModeCeiling ?? "approval-required")
               : "read-only",

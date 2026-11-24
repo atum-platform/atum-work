@@ -3,7 +3,7 @@ import {
   ForwardAdmissionError,
   forwardGrantsFile,
   forwardGrant,
-  bindForwardToken,
+  isAtumClient,
 } from "../mcp/toolkits/atum/forwardAdmission.ts";
 import {
   AuthAccessWriteScope,
@@ -456,7 +456,8 @@ const make = Effect.gen(function* () {
   ) {
     const now = yield* Clock.currentTimeMillis;
     const code = Buffer.from(yield* random.randomBytes(32)).toString("base64url");
-    const forwardConsent = forwardGrantsFile
+    const atumClient = forwardGrantsFile && !authorization.client.peerLink && (yield* Effect.promise(() => isAtumClient(forwardGrantsFile!, authorization.client.clientId)));
+    const forwardConsent = atumClient
       ? consentFingerprint(
           yield* Effect.tryPromise({
             try: () => forwardGrant(forwardGrantsFile!, authorization.client.clientId),
@@ -484,7 +485,7 @@ const make = Effect.gen(function* () {
   });
 
   const approve: McpOAuth["Service"]["approve"] = Effect.fn("McpOAuth.approve")(function* (input) {
-    if (forwardGrantsFile) {
+    if (forwardGrantsFile && !input.authorization.client.peerLink && (yield* Effect.promise(() => isAtumClient(forwardGrantsFile!, input.authorization.client.clientId)))) {
       yield* Effect.tryPromise({
         try: () => forwardGrant(forwardGrantsFile!, input.authorization.client.clientId),
         catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
@@ -590,7 +591,7 @@ const make = Effect.gen(function* () {
       ) {
         return yield* fail("invalid_grant", "The authorization code is invalid or expired.");
       }
-      if (forwardGrantsFile) {
+      if (forwardGrantsFile && pending.forwardConsent) {
         const currentConsent = yield* Effect.tryPromise({
           try: () => forwardGrant(forwardGrantsFile!, clientId),
           catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
@@ -603,7 +604,7 @@ const make = Effect.gen(function* () {
           label: pending.clientName,
           access: pending.access,
           peerLink: pending.peerLink,
-          client: deriveAuthClientMetadata({ request }),
+          client: { ...deriveAuthClientMetadata({ request }), ...(pending.forwardConsent ? { nativeForwardConsent: JSON.stringify(yield* Effect.promise(() => forwardGrant(forwardGrantsFile!, clientId))) } : {}) },
         })
         .pipe(
           Effect.catch((cause) =>
@@ -614,16 +615,6 @@ const make = Effect.gen(function* () {
             ),
           ),
         );
-      if (forwardGrantsFile) {
-        yield* Effect.tryPromise({
-          try: () => bindForwardToken(forwardGrantsFile!, issued.token, clientId),
-          catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
-        }).pipe(
-          Effect.mapError(() =>
-            fail("invalid_grant", "Owner consent changed. Reapprove this Mac."),
-          ),
-        );
-      }
       return {
         access_token: issued.token,
         token_type: "Bearer",
@@ -676,6 +667,7 @@ export const layerMcpClientAuthenticator = Layer.effect(
                   thread: undefined,
                   client: {
                     sessionId: client.sessionId,
+                    ...(client.nativeForwardConsent ? { nativeForwardConsent: client.nativeForwardConsent } : {}),
                     label: client.label,
                     access: client.access,
                     linked: client.peerLink,

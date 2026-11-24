@@ -1,7 +1,7 @@
 import {
   ForwardAdmissionError,
   forwardGrantsFile,
-  admitForwardToken,
+  admitForwardSession,
 } from "./toolkits/atum/forwardAdmission.ts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
@@ -376,9 +376,9 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
         offerOAuth: Option.isSome(clients) && !looksLikeProviderToken(token),
       });
     }
-    if (forwardGrantsFile && invocation.client) {
+    if (forwardGrantsFile && invocation.client?.nativeForwardConsent) {
       const nativeConsent = yield* Effect.tryPromise({
-        try: () => admitForwardToken(forwardGrantsFile!, token),
+        try: () => admitForwardSession(forwardGrantsFile!, invocation!.client!.nativeForwardConsent!),
         catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
       }).pipe(Effect.orElseSucceed(() => undefined));
       if (!nativeConsent) return HttpServerResponse.empty({ status: 403 });
@@ -416,9 +416,9 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       Effect.provideService(McpInvocationContext.McpInvocationContext, admitted),
       Effect.flatMap((response) =>
         Effect.gen(function* () {
-          if (forwardGrantsFile && admitted.client) {
+          if (forwardGrantsFile && admitted.client?.nativeForwardConsent) {
             const valid = yield* Effect.tryPromise({
-              try: () => admitForwardToken(forwardGrantsFile!, parseBearerToken(request) ?? ""),
+              try: () => admitForwardSession(forwardGrantsFile!, admitted.client!.nativeForwardConsent!, true),
               catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
             }).pipe(
               Effect.as(true),
