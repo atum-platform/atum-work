@@ -20,6 +20,12 @@
     },
     {
       "file": "index.html",
+      "from": "<img id=\"boot-shell-logo\" src=\"/apple-touch-icon.png\" alt=\"Atum\" />",
+      "to": "<span role=\"status\" aria-label=\"Opening Work\" style=\"width:22px;height:22px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;opacity:.65;animation:atum-loading .8s linear infinite\"></span><style>@keyframes atum-loading{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){[aria-label=\"Opening Work\"]{animation:none!important}}</style>",
+      "count": 1
+    },
+    {
+      "file": "index.html",
       "from": "\"T3 Code",
       "to": "\"Atum",
       "count": 1
