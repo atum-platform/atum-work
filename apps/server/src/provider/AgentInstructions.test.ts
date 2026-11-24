@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Reads the bundled instructions fixture.
 import * as NodeFS from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
@@ -27,7 +28,7 @@ describe("agent instructions", () => {
         : "",
     );
     expect(
-      Schema.decodeSync(ServerSettingsPatch)({ agentInstructions: "" }).agentInstructions,
+      decodeSettingsPatch({ agentInstructions: "" }).agentInstructions,
     ).toBe("");
     const settings = { ...DEFAULT_SERVER_SETTINGS, agentInstructions: "environment" };
     expect(resolveProjectSettings(settings, project).settings.agentInstructions).toBe(
