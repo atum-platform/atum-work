@@ -5,6 +5,10 @@ export const grantsFile = process.env.ATUM_WORK_BINDINGS_FILE;
 delete process.env.ATUM_WORK_BINDINGS_FILE;
 
 export const endpoint = process.env.ATUM_WORK_CONNECTOR_URL;
+// The host may route bound tools directly to the S2 private listener while
+// keeping ask_my_agent on its existing connector.
+export const toolsEndpoint = process.env.ATUM_WORK_TOOLS_CONNECTOR_URL ?? endpoint;
+delete process.env.ATUM_WORK_TOOLS_CONNECTOR_URL;
 const descriptor = process.env.ATUM_WORK_CONNECTOR_FD;
 delete process.env.ATUM_WORK_CONNECTOR_URL;
 delete process.env.ATUM_WORK_CONNECTOR_FD;
@@ -20,4 +24,5 @@ export const token = (() => {
     NodeFS.closeSync(fd);
   }
 })();
-export const configured = () => endpoint !== undefined && token !== undefined;
+export const configured = () =>
+  (endpoint !== undefined || toolsEndpoint !== undefined) && token !== undefined;

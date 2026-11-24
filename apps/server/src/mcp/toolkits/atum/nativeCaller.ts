@@ -1,3 +1,4 @@
+// @effect-diagnostics globalFetch:off
 // @effect-diagnostics nodeBuiltinImport:off -- Native session binding, never model input.
 import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "node:crypto";

@@ -1,5 +1,5 @@
 import { forwardGrantsFile, nativeThreadGrant } from "./forwardAdmission.ts";
-import { callerFile } from "./nativeCaller.ts";
+import { callerFile, provisionNativeCaller } from "./nativeCaller.ts";
 // @effect-diagnostics nodeBuiltinImport:off -- Owner-managed consent snapshot, reread per operation.
 import * as NodeFSP from "node:fs/promises";
 import type { Caller } from "./connector.ts";
@@ -30,9 +30,20 @@ export async function readGrant(
 ): Promise<BoundGrant> {
   if (!path) throw new Error("Agent binding unavailable");
   let grants: BoundGrant[];
-  try { grants = JSON.parse(await NodeFSP.readFile(path, "utf8")) as BoundGrant[]; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; grants = []; }
-  if (!grants.some(g => g.threadId === caller.threadId && g.providerSessionId === caller.providerSessionId && g.providerInstanceId === caller.providerInstanceId)) {
+  try {
+    grants = JSON.parse(await NodeFSP.readFile(path, "utf8")) as BoundGrant[];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    grants = [];
+  }
+  if (
+    !grants.some(
+      (g) =>
+        g.threadId === caller.threadId &&
+        g.providerSessionId === caller.providerSessionId &&
+        g.providerInstanceId === caller.providerInstanceId,
+    )
+  ) {
     grants = [JSON.parse(await NodeFSP.readFile(callerFile(path, caller), "utf8")) as BoundGrant];
   }
   const grant = grants.find(
@@ -58,7 +69,8 @@ export async function readGrant(
     throw new Error("Stale or foreign agent binding");
   if (forwardGrantsFile) {
     const current = await nativeThreadGrant(forwardGrantsFile, caller.threadId);
-    if (!current || JSON.stringify(current.binding) !== JSON.stringify(grant.binding)) throw new Error("Native consent revoked");
+    if (!current || JSON.stringify(current.binding) !== JSON.stringify(grant.binding))
+      throw new Error("Native consent revoked");
   }
   return grant;
 }
@@ -74,6 +86,16 @@ export async function boundRegistry(input: {
   signal?: AbortSignal;
   fetch?: typeof globalThis.fetch;
 }): Promise<unknown> {
+  if (!(await input.current())) throw new Error("Native session unavailable");
+  if (forwardGrantsFile && input.grantsFile && input.endpoint && input.token) {
+    await provisionNativeCaller({
+      forwardPath: forwardGrantsFile,
+      grantsPath: input.grantsFile,
+      endpoint: input.endpoint,
+      token: input.token,
+      caller: input.caller,
+    });
+  }
   const grant = await readGrant(input.grantsFile, input.caller, await input.now());
   if (!input.endpoint || !input.token || !(await input.current())) throw new Error("Unavailable");
   // Reuse the existing private local connector; it carries cloud auth, not the provider.

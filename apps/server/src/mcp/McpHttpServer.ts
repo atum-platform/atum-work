@@ -380,9 +380,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       const nativeConsent = yield* Effect.tryPromise({
         try: () => admitForwardToken(forwardGrantsFile!, token),
         catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
-      }).pipe(
-        Effect.orElseSucceed(() => undefined),
-      );
+      }).pipe(Effect.orElseSucceed(() => undefined));
       if (!nativeConsent) return HttpServerResponse.empty({ status: 403 });
       invocation = { ...invocation, client: { ...invocation.client, nativeConsent } };
     }

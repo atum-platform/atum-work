@@ -6,7 +6,7 @@ import * as McpToolAccess from "../../McpToolAccess.ts";
 import { assertLiveCaller, loadCaller, unavailable } from "../../threadAccess.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import { registerAdmission } from "./admission.ts";
-import { endpoint, token, grantsFile } from "./config.ts";
+import { endpoint, toolsEndpoint, token, grantsFile } from "./config.ts";
 import { askConnector } from "./connector.ts";
 import { boundRegistry } from "./boundRegistry.ts";
 import { AtumToolkit } from "./tools.ts";
@@ -124,7 +124,7 @@ export const layer = McpToolAccess.toLayer(AtumToolkit, {
           return await boundRegistry({
             caller: binding,
             request,
-            endpoint,
+            endpoint: toolsEndpoint,
             token,
             grantsFile,
             signal,

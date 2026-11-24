@@ -1,5 +1,7 @@
+// @effect-diagnostics globalFetch:off
 // @effect-diagnostics globalDate:off
 // @effect-diagnostics nodeBuiltinImport:off -- Private consent adapter state, never model arguments.
+import { toolsEndpoint, token as connectorToken } from "./config.ts";
 import * as Schema from "effect/Schema";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "node:crypto";
@@ -32,7 +34,28 @@ export async function forwardGrant(
   clientId: string,
   now = Date.now(),
 ): Promise<ForwardGrant> {
-  const rows = await privateJson(path);
+  let rows: unknown;
+  if (toolsEndpoint && connectorToken) {
+    const url = new URL(toolsEndpoint);
+    if (
+      url.protocol !== "http:" ||
+      url.hostname !== "127.0.0.1" ||
+      url.pathname !== "/ask" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    )
+      throw new Error("Invalid private connector");
+    url.pathname = "/native-consent";
+    const response = await globalThis.fetch(url, {
+      redirect: "error",
+      headers: { authorization: `Bearer ${connectorToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error("Consent unavailable");
+    rows = ((await response.json()) as { grants: unknown }).grants;
+  } else rows = await privateJson(path);
   if (!Array.isArray(rows)) throw new Error("Consent unavailable");
   const matches = rows.filter((g: ForwardGrant) => g.clientId === clientId);
   const g = matches[0] as ForwardGrant | undefined;
@@ -69,7 +92,7 @@ export async function admitForwardToken(path: string, token: string): Promise<Fo
   const saved = (await privateJson(`${path}.sessions/${digest(token)}.json`)) as ForwardGrant;
   const fresh = await forwardGrant(path, saved.clientId);
   // Reapproval mints a new bearer; an old bearer cannot acquire a new generation/revision.
-  if (JSON.stringify(saved) !== JSON.stringify(fresh))
+  if (consentFingerprint(saved) !== consentFingerprint(fresh))
     throw new Error("Consent changed; reapprove");
   return fresh;
 }
@@ -79,26 +102,52 @@ export class ForwardAdmissionError extends Schema.TaggedError<ForwardAdmissionEr
   { message: Schema.String },
 ) {}
 
-export const consentFingerprint = (grant: ForwardGrant) => JSON.stringify(grant);
+export const consentFingerprint = (grant: ForwardGrant) =>
+  JSON.stringify({
+    clientId: grant.clientId,
+    binding: grant.binding,
+    actor: grant.actor,
+    audience: grant.audience,
+    hermesSessionId: (grant as ForwardGrant & { hermesSessionId?: string }).hermesSessionId,
+  });
 
 export async function bindNativeThread(path: string, threadId: string, grant: ForwardGrant) {
   const directory = `${path}.threads`;
   await NodeFSP.mkdir(directory, { recursive: true, mode: 0o700 });
   const target = `${directory}/${digest(threadId)}.json`;
   const bytes = JSON.stringify(grant);
-  try { await NodeFSP.writeFile(target, bytes, { mode: 0o600, flag: "wx" }); }
-  catch (error) {
+  try {
+    await NodeFSP.writeFile(target, bytes, { mode: 0o600, flag: "wx" });
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    const existing = await privateJson(target) as ForwardGrant;
-    if (existing.clientId !== grant.clientId || JSON.stringify(existing.binding) !== JSON.stringify(grant.binding))
+    const existing = (await privateJson(target)) as ForwardGrant;
+    if (
+      existing.clientId !== grant.clientId ||
+      JSON.stringify(existing.binding) !== JSON.stringify(grant.binding)
+    )
       throw new ForwardAdmissionError({ message: "Native thread binding changed" });
   }
 }
-export async function nativeThreadGrant(path: string, threadId: string): Promise<ForwardGrant | undefined> {
+export async function nativeThreadGrant(
+  path: string,
+  threadId: string,
+): Promise<ForwardGrant | undefined> {
   let saved: ForwardGrant;
-  try { saved = await privateJson(`${path}.threads/${digest(threadId)}.json`) as ForwardGrant; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+  try {
+    saved = (await privateJson(`${path}.threads/${digest(threadId)}.json`)) as ForwardGrant;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
   const fresh = await forwardGrant(path, saved.clientId);
-  if (JSON.stringify(saved.binding) !== JSON.stringify(fresh.binding)) throw new ForwardAdmissionError({ message: "Native thread consent changed" });
+  if (
+    !["owner", "agent", "generation", "mac"].every(
+      (k) =>
+        saved.binding[k as keyof typeof saved.binding] ===
+        fresh.binding[k as keyof typeof fresh.binding],
+    ) ||
+    fresh.binding.consent_revision < saved.binding.consent_revision
+  )
+    throw new ForwardAdmissionError({ message: "Native thread identity changed" });
   return fresh;
 }

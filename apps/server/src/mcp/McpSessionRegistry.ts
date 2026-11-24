@@ -1,5 +1,9 @@
 import { provisionNativeCaller } from "./toolkits/atum/nativeCaller.ts";
-import { endpoint as nativeEndpoint, token as nativeToken, grantsFile as nativeGrantsFile } from "./toolkits/atum/config.ts";
+import {
+  toolsEndpoint as nativeEndpoint,
+  token as nativeToken,
+  grantsFile as nativeGrantsFile,
+} from "./toolkits/atum/config.ts";
 import { forwardGrantsFile, ForwardAdmissionError } from "./toolkits/atum/forwardAdmission.ts";
 import { ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
@@ -151,7 +155,21 @@ const makeWithOptions = Effect.fn("McpSessionRegistry.make")(function* (
         ...(request.toolAllowList === undefined ? {} : { toolAllowList: request.toolAllowList }),
       };
       if (forwardGrantsFile && nativeEndpoint && nativeToken && nativeGrantsFile) {
-        yield* Effect.tryPromise({ try: () => provisionNativeCaller({ forwardPath: forwardGrantsFile!, grantsPath: nativeGrantsFile!, endpoint: nativeEndpoint!, token: nativeToken!, caller: { threadId: scope.thread.threadId, providerSessionId, providerInstanceId: scope.thread.providerInstanceId } }), catch: () => new ForwardAdmissionError({ message: "Native caller provisioning failed" }) }).pipe(Effect.orDie);
+        yield* Effect.tryPromise({
+          try: () =>
+            provisionNativeCaller({
+              forwardPath: forwardGrantsFile!,
+              grantsPath: nativeGrantsFile!,
+              endpoint: nativeEndpoint!,
+              token: nativeToken!,
+              caller: {
+                threadId: scope.thread.threadId,
+                providerSessionId,
+                providerInstanceId: scope.thread.providerInstanceId,
+              },
+            }),
+          catch: () => new ForwardAdmissionError({ message: "Native caller provisioning failed" }),
+        }).pipe(Effect.orDie);
       }
       yield* SynchronizedRef.update(state, ({ records }) => {
         const next = new Map(records);

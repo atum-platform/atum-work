@@ -1,4 +1,8 @@
-import { bindNativeThread, forwardGrantsFile, ForwardAdmissionError } from "../atum/forwardAdmission.ts";
+import {
+  bindNativeThread,
+  forwardGrantsFile,
+  ForwardAdmissionError,
+} from "../atum/forwardAdmission.ts";
 import {
   CommandId,
   MessageId,
@@ -435,8 +439,18 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         }
         if (forwardGrantsFile && scope.client?.nativeConsent) {
           const grant = scope.client.nativeConsent;
-          yield* Effect.tryPromise({ try: () => bindNativeThread(forwardGrantsFile!, threadId, grant), catch: () => new ForwardAdmissionError({ message: "Native thread binding unavailable" }) }).pipe(
-            Effect.mapError(() => new OrchestratorMcpFailure({ code: "invalid_request", message: "Native thread binding unavailable." })),
+          yield* Effect.tryPromise({
+            try: () => bindNativeThread(forwardGrantsFile!, threadId, grant),
+            catch: () =>
+              new ForwardAdmissionError({ message: "Native thread binding unavailable" }),
+          }).pipe(
+            Effect.mapError(
+              () =>
+                new OrchestratorMcpFailure({
+                  code: "invalid_request",
+                  message: "Native thread binding unavailable.",
+                }),
+            ),
           );
         }
         const result = yield* ThreadMessageIntake.launchThread({
