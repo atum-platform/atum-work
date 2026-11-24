@@ -507,6 +507,8 @@ export type OrchestratorMcpThreadDetail = typeof OrchestratorMcpThreadDetail.Typ
 
 export const OrchestratorMcpThreadRun = Schema.Struct({
   runId: RunId,
+  predecessorRunId: Schema.optional(RunId),
+  recoveryOfRunId: Schema.optional(RunId),
   ordinal: PositiveInt,
   status: OrchestrationV2RunStatus,
   providerInstanceId: ProviderInstanceId,
@@ -519,6 +521,7 @@ export const OrchestratorMcpThreadRun = Schema.Struct({
 export type OrchestratorMcpThreadRun = typeof OrchestratorMcpThreadRun.Type;
 
 export const OrchestratorMcpThreadTimelineItem = Schema.Struct({
+  phase: Schema.optional(Schema.Literals(["commentary", "partial_answer", "final_answer"])),
   position: NonNegativeInt,
   visibility: Schema.Literals(["local", "inherited", "synthetic"]),
   sourceThreadId: ThreadId,

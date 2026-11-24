@@ -1107,6 +1107,10 @@ function threadRun(
   return {
     runId: run.id,
     ordinal: run.ordinal,
+    ...(run.restartContinuationOfRunId ? {
+      predecessorRunId: run.restartContinuationOfRunId,
+      recoveryOfRunId: run.restartContinuationOfRunId,
+    } : {}),
     status: run.status,
     providerInstanceId: run.modelSelection.instanceId,
     model: run.modelSelection.model,
@@ -1236,6 +1240,8 @@ function timelineItem(input: {
     creationSource: message?.creationSource ?? null,
     ...(message?.senderThreadId === undefined ? {} : { senderThreadId: message.senderThreadId }),
     type: input.row.item.type,
+    ...(input.row.item.type === "assistant_message" && input.row.item.phase
+      ? { phase: input.row.item.phase } : {}),
     status: input.row.item.status,
     title: input.row.item.title,
     text: text === null ? null : text.slice(offset, end),

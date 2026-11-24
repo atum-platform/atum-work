@@ -3,7 +3,7 @@ import * as NodeAssert from "node:assert/strict";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { forwardGrant, bindForwardToken, admitForwardToken } from "./forwardAdmission.ts";
+import { forwardGrant, admitForwardSession, isAtumClient } from "./forwardAdmission.ts";
 
 NodeTest.test(
   "forward OAuth and dispatch bind exact K2; revoke and renewal invalidate old tokens",
@@ -12,7 +12,7 @@ NodeTest.test(
     const file = NodePath.join(dir, "consent.json");
     const g = {
       clientId: "oauth-client",
-      binding: { owner: "o", agent: "a", generation: "1", mac: "m", consent_revision: 1 },
+      binding: { owner: "o", agent: "a", generation: "1", mac: "mac", consent_revision: 1 },
       actor: "o",
       audience: "owner_dm",
       expiresAt: 9999999999999,
@@ -23,11 +23,13 @@ NodeTest.test(
     };
     try {
       await save([g]);
-      await bindForwardToken(file, "decoy-token", g.clientId);
-      NodeAssert.deepEqual(await admitForwardToken(file, "decoy-token"), g);
-      await NodeAssert.rejects(admitForwardToken(file, "foreign-token"));
+      const saved = JSON.stringify(g);
+      NodeAssert.equal(await isAtumClient(file, "ordinary-client"), false);
+      NodeAssert.equal(await isAtumClient(file, g.clientId), true);
+      NodeAssert.deepEqual(await admitForwardSession(file, saved), g);
+      await NodeAssert.rejects(admitForwardSession(file, "invalid"));
       await save([{ ...g, expiresAt: g.expiresAt + 1000 }]);
-      NodeAssert.equal((await admitForwardToken(file, "decoy-token")).binding.consent_revision, 1);
+      NodeAssert.equal((await admitForwardSession(file, saved)).binding.consent_revision, 1);
       for (const change of [
         { actor: "foreign" },
         { audience: "group" },
@@ -36,15 +38,17 @@ NodeTest.test(
       ]) {
         await save([{ ...g, ...change }]);
         await NodeAssert.rejects(forwardGrant(file, g.clientId));
-        await NodeAssert.rejects(admitForwardToken(file, "decoy-token"));
+        await NodeAssert.rejects(admitForwardSession(file, saved));
       }
       await save([{ ...g, binding: { ...g.binding, consent_revision: 2 } }]);
-      await NodeAssert.rejects(admitForwardToken(file, "decoy-token"));
-      await bindForwardToken(file, "reapproved-token", g.clientId);
+      await NodeAssert.rejects(admitForwardSession(file, saved));
+      const renewed = JSON.stringify({ ...g, binding: { ...g.binding, consent_revision: 2 } });
       NodeAssert.equal(
-        (await admitForwardToken(file, "reapproved-token")).binding.consent_revision,
+        (await admitForwardSession(file, renewed)).binding.consent_revision,
         2,
       );
+      await save([{ ...g, binding: { ...g.binding, mac: "other-mac" } }]);
+      await NodeAssert.rejects(forwardGrant(file, g.clientId));
       await save([g, g]);
       await NodeAssert.rejects(forwardGrant(file, g.clientId));
       await save([g]);
