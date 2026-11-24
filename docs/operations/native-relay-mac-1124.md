@@ -29,3 +29,14 @@ session store is introduced. Real Hermes → real Work → cloud tools → Matri
 chat proof now passes (2026-11-24, exit 0; `/private/tmp/native-mac-chat-fixed.json`).
 An initial broader test run used host Node 23.10 and failed its required SQLite
 API check; the corrected run explicitly uses Node 24.21.
+
+Final ancestry correction: rebasing replayed runtime changes without retaining
+38ace137e5 as an ancestor. Joined the original runtime branch after comparing
+all seven conflicts; the tested current tree already contained every runtime
+change, and the merge changes no source bytes. Both ac9118cf5 and 38ace137e5
+are now explicit ancestors. Broader native Node 24 suite: 54 tests passed.
+Real TCP drop/restart/live revoke fault harness exits 0: same request replay,
+restart cancellation with no duplicate send, and HTTP 403 mid-turn on revoke.
+The fixture did not create a recovery successor; it proves cancellation rather
+than successful automatic continuation. Connect HTTPS/real subscription logins
+are deliberately outside the local decoy proof.
