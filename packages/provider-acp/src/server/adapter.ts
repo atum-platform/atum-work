@@ -8904,6 +8904,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const sessionSetup = yield* Ref.get(activeSessionSetup);
           const runtimeInstructions = buildRuntimeInstructions({
             harness: flavor.runtimeHarness ?? driver,
+            agentInstructions: mcpSession?.agentInstructions,
             model: turnInput.modelSelection.model,
             pullRequestLinking:
               sessionSetup === null ||

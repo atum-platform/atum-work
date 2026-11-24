@@ -1173,7 +1173,19 @@ export type WorktreeCleanup = typeof WorktreeCleanup.Type;
 export const AtumSurfaceMode = Schema.Literals(["work", "code"]);
 export type AtumSurfaceMode = typeof AtumSurfaceMode.Type;
 
+/** One Codex context entry; count UTF-8 bytes, including non-ASCII text. */
+export const AgentInstructions = Schema.String.pipe(
+  Schema.check(
+    Schema.makeFilter(
+      (text) =>
+        new TextEncoder().encode(text).length < 4_000 ||
+        "Agent instructions must be under 4,000 UTF-8 bytes",
+    ),
+  ),
+);
+
 export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
+  "agentInstructions",
   "atumSurfaceMode",
   "worktreeCleanup",
   "defaultModelSelection",
@@ -1213,6 +1225,7 @@ export type ProjectProviderInstanceOverride = typeof ProjectProviderInstanceOver
 /** Absent keys inherit; null is a value for nullable settings.
  * providerInstances overrides fields per instance; other keys replace the whole setting. */
 export const ProjectSettingsOverrides = Schema.Struct({
+  agentInstructions: Schema.optionalKey(AgentInstructions),
   atumSurfaceMode: Schema.optionalKey(AtumSurfaceMode),
   worktreeCleanup: Schema.optionalKey(WorktreeCleanup),
   defaultModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
@@ -1369,6 +1382,7 @@ export const CloudSpeechCredentials = Schema.Struct({
 });
 
 export const ServerSettings = Schema.Struct({
+  agentInstructions: AgentInstructions.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   providerModelPreferences: Schema.NullOr(ProviderModelPreferences).pipe(
@@ -1810,6 +1824,7 @@ const ModelSelectionPatch = Schema.Struct({
 });
 
 export const ServerSettingsPatch = Schema.Struct({
+  agentInstructions: Schema.optionalKey(AgentInstructions),
   setModelFavorites: Schema.optionalKey(
     Schema.Array(Schema.Struct({ ...ModelFavorite.fields, favorite: Schema.Boolean })),
   ),

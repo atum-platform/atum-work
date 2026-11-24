@@ -4,6 +4,7 @@ import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server
 
 export const PI_T3_MCP_EXTENSION_FILENAME = "pi-t3-mcp-extension.ts";
 
+export const T3_AGENT_INSTRUCTIONS_ENV = "T3_AGENT_INSTRUCTIONS";
 export const T3_MCP_URL_ENV = "T3_MCP_URL";
 export const T3_MCP_BEARER_ENV = "T3_MCP_BEARER_TOKEN";
 export const T3_PI_RUNTIME_MODE_ENV = "T3_PI_RUNTIME_MODE";
@@ -20,6 +21,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import { Type } from "typebox";
 
+const AGENT_INSTRUCTIONS = process.env[${JSON.stringify(T3_AGENT_INSTRUCTIONS_ENV)}] ?? "";
 const URL_ENV = ${JSON.stringify(T3_MCP_URL_ENV)};
 const TOKEN_ENV = ${JSON.stringify(T3_MCP_BEARER_ENV)};
 const RUNTIME_MODE_ENV = ${JSON.stringify(T3_PI_RUNTIME_MODE_ENV)};
@@ -529,7 +531,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
   // Keep guidance in the system prompt so leading slash commands still expand.
   pi.on("before_agent_start", (event, ctx) => {
     reconcileDiscovery(ctx);
-    const instructions = ORCHESTRATION_INSTRUCTIONS + "\\n\\n" + PULL_REQUEST_LINKING_INSTRUCTIONS;
+    const instructions = [ORCHESTRATION_INSTRUCTIONS, PULL_REQUEST_LINKING_INSTRUCTIONS, AGENT_INSTRUCTIONS].filter(Boolean).join("\\n\\n");
     const sections = event.systemPromptOptions?.sections;
     if (sections && typeof sections === "object" && event.systemPromptOptions?.forceSystemPrompt === undefined) {
       // A full prompt override bypasses Pi's later section rendering.
