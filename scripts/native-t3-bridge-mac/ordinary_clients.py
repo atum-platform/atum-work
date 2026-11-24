@@ -44,9 +44,14 @@ with tempfile.TemporaryDirectory(prefix='native-outside-clients-') as directory:
                     if child.poll() is not None: log.seek(0); raise RuntimeError(log.read()[-3000:])
                     time.sleep(.25)
             else: raise RuntimeError('Work unavailable')
-            for peer in (False, True):
-                registered = request('/oauth/mcp/register', {'client_name': 'Decoy outside peer' if peer else 'Decoy outside client',
+            for peer in (False, True, None):
+                registered = request('/oauth/mcp/register', {'client_name': 'Decoy native client' if peer is None else 'Decoy outside peer' if peer else 'Decoy outside client',
                     'redirect_uris': ['http://localhost:19233/callback'], **({'software_id': 't3code-peer-link'} if peer else {})})
+                if peer is None:
+                    grant = {'clientId': registered['client_id'], 'binding': {'owner': 'owner', 'agent': 'agent',
+                        'generation': '1', 'mac': 'mac-a', 'consent_revision': 1}, 'actor': 'owner',
+                        'audience': 'owner_dm', 'expiresAt': int(time.time()*1000)+600000, 'enabled': True}
+                    forward.write_text(json.dumps([grant]))
                 pairing = json.loads(subprocess.check_output(cli+['auth', 'pairing', 'create', '--base-dir', directory, '--json'], env=env, cwd=root, text=True))
                 verifier = 'decoy-'+'x'*64
                 authorization = {'response_type': 'code', 'client_id': registered['client_id'],
@@ -62,7 +67,31 @@ with tempfile.TemporaryDirectory(prefix='native-outside-clients-') as directory:
                     'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'decoy', 'version': '1'}}},
                     headers={'authorization': 'Bearer '+token['access_token'], 'accept': 'application/json, text/event-stream'})
                 assert 'result' in result, result
-            print('PASS real ordinary OAuth client and linked peer: no Atum 403, native Full access')
+                if peer is None:
+                    def initialize(bearer):
+                        return request('/mcp', {'jsonrpc': '2.0', 'id': 2, 'method': 'initialize',
+                            'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'decoy', 'version': '1'}}},
+                            headers={'authorization': 'Bearer '+bearer, 'accept': 'application/json, text/event-stream'})
+                    def refused(bearer):
+                        try: initialize(bearer)
+                        except HTTPError as error: assert error.code == 403
+                        else: raise AssertionError('Native consent was not refused')
+                    grant['binding']['generation'] = '2'
+                    grant['binding']['consent_revision'] = 2
+                    forward.write_text(json.dumps([grant]))
+                    refused(token['access_token'])
+                    pairing = json.loads(subprocess.check_output(cli+['auth', 'pairing', 'create', '--base-dir', directory, '--json'], env=env, cwd=root, text=True))
+                    approved = request('/oauth/mcp/decision', {'authorization': authorization,
+                        'decision': {'_tag': 'pairing-code', 'access': 'full-access', 'code': pairing['credential']}})
+                    code = parse_qs(urlparse(approved['redirectTo']).query)['code'][0]
+                    renewed = request('/oauth/mcp/token', {'grant_type': 'authorization_code', 'code': code,
+                        'client_id': registered['client_id'], 'redirect_uri': authorization['redirect_uri'],
+                        'code_verifier': verifier, 'resource': origin+'/mcp'}, form=True)
+                    assert 'result' in initialize(renewed['access_token'])
+                    grant['binding']['mac'] = 'foreign-mac'
+                    forward.write_text(json.dumps([grant]))
+                    refused(renewed['access_token'])
+            print('PASS real outside/peer OAuth; stale native generation refused; fresh approval restored; foreign Mac refused')
         finally:
             child.terminate()
             try: child.wait(timeout=15)

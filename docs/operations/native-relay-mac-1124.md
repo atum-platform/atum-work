@@ -54,3 +54,12 @@ assertion at `chat_fixture.py:81` after native Work tools succeeded. The earlier
 real chat receipt passes, but the stronger current fixture is not reported
 green. The coordinator has the exact failure and keeps ownership of its
 read-only cloud checkout. Do not interpret source completion as live activation.
+
+The cloud owner fixed that assertion and froze source at d6d1dec739a1. Final
+proof now uses the real authenticated host receiver as well as Work, Hermes,
+SOUL and memory, and Synapse. Its exact final command is running before the
+last receipt is recorded. Additional local real OAuth checks prove stale
+generation 403, fresh approval recovery, and foreign-Mac 403. Actual Electron
+`session.fetch` preserves the cookie header used by native CSRF approval.
+Desktop renderer native TypeScript check passes after linking the installed
+streamdown dependency; the stock JS compiler was superseded by the native one.

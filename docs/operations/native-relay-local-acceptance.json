@@ -11,8 +11,10 @@
     "nativeMetadataRegression": {"passed": 1, "exit": 0},
     "desktopTests": {"passed": 107, "exit": 0},
     "desktopElectronTypecheck": 0,
-    "desktopPublicGuard": {"head": "2de11db73d5da7b7563d1742d394b208629470e0", "exit": 0},
-    "ordinaryAndLinkedPeerOAuth": 0,
+    "desktopPublicGuard": {"head": "03a1bccc", "exit": 0},
+    "desktopRendererNativeTypecheck": 0,
+    "realElectronCookieChannel": 0,
+    "ordinaryAndLinkedPeerOAuth": {"exit": 0, "staleGeneration": 403, "freshApprovalRestores": true, "foreignMac": 403},
     "twoRealWorkServers": {"exit": 0, "stoppedALeavesBReachable": true},
     "realHermesWorkMatrixChat": {"exit": 0, "replyCount": 1, "replaySentAgain": false, "deliveryLedger": "delivered"},
     "transportFaults": {"exit": 0, "droppedResponse": "same-ID replay completed once", "restart": "original run cancelled; no duplicate send", "liveRevokeStatus": 403}
@@ -23,7 +25,7 @@
     "13": "real Work HTTP 403 on live revoke; local switch cannot be overridden by stale cloud snapshot",
     "17": "old generation/revision denied by toolkit binding checks; new session metadata persists in native DB",
     "19": "two actual Work servers with independent homes and Mac IDs; A stopped while B remained reachable; foreign-Mac grant denied",
-    "20": "renewal card, session expiry status and one-tap flow tested locally; deployed S2 must supply sessionExpiresAt",
+    "20": "renewal card, native sessionExpiresAt projection and one-tap flow tested locally; intentionally off Macs do not prompt",
     "11_12": "local TCP drop and restart cancellation tested; no live Connect relay or automatic successor completion claimed"
   },
   "latestCombinedRun": {
