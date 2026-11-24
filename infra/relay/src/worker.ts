@@ -77,6 +77,7 @@ import * as HeldHooks from "./hooks/HeldHooks.ts";
 import * as HookInbox from "./hooks/HookInbox.ts";
 import * as HookInboxObject from "./hooks/HookInboxObject.ts";
 import * as MobileTelemetry from "./mobileTelemetry/MobileTelemetry.ts";
+import { logHttpFailure } from "./http/failureDiagnostics.ts";
 
 const layerWebcrypto = Layer.mergeAll(
   Digest.layerWebCrypto,
@@ -463,7 +464,7 @@ export const layer = Api.make(
       ),
       layerMobileTelemetry
         ? MobileTelemetry.layerApi.pipe(Layer.provide(layerMobileTelemetry))
-        : Layer.empty,
+        : MobileTelemetry.layerDisabledApi,
     ).pipe(
       Layer.provideMerge(RelayHttpApi.layerClientAuth),
       Layer.provideMerge(RelayHttpApi.layerDpopClientAuth),
@@ -573,9 +574,11 @@ export const layer = Api.make(
       HttpRouter.toHttpEffect,
       Effect.provideService(HttpRouter.RouterConfig, RELAY_HTTP_ROUTER_CONFIG),
       withoutCapturedParentSpan,
+      Effect.tapCause(logHttpFailure("router-construction")),
       Effect.map((httpEffect) =>
         traceRelayHttpRequestWith(httpEffect, Layer.empty).pipe(
           Observability.withSchemaErrorSpanAttributes,
+          Effect.tapCause(logHttpFailure("request")),
         ),
       ),
     );

@@ -56,6 +56,10 @@ const denied = await fetch(new URL('/api/work/connect/assertion', issuer), {meth
 if (denied.status !== 401) throw new Error('Unsigned assertion request not refused');
 const relay = await fetch(process.env.ATUM_CONNECT_ASSERTION_AUDIENCE, {redirect:'error'});
 if (relay.status >= 500) throw new Error('Relay unavailable');
+const metadata = await fetch(new URL('/.well-known/oauth-authorization-server', process.env.ATUM_CONNECT_ASSERTION_AUDIENCE), {redirect:'error'});
+if (!metadata.ok || (await metadata.json()).issuer !== process.env.ATUM_CONNECT_ASSERTION_AUDIENCE) throw new Error('Relay metadata unavailable');
+const health = await fetch(new URL('/health', process.env.ATUM_CONNECT_ASSERTION_AUDIENCE), {redirect:'error'});
+if (!health.ok || (await health.json()).ok !== true) throw new Error('Relay database health unavailable');
 console.log('VERIFY_OK public JWKS pinned, anonymous issuer refused, relay reachable; authenticated/off-LAN acceptance remains mandatory');
 JS
   exit 0

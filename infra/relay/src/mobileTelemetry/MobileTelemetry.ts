@@ -337,3 +337,10 @@ export const layerApi = HttpApiBuilder.group(
     return handlers.handleRaw("ingest", ({ request, params }) => telemetry.handle(request, params));
   }),
 );
+
+// Every group in RelayApi needs a handler even when trial telemetry is disabled.
+export const layerDisabledApi = layerApi.pipe(
+  Layer.provide(Layer.succeed(MobileTelemetry, {
+    handle: () => Effect.succeed(HttpServerResponse.empty({ status: 404 })),
+  })),
+);

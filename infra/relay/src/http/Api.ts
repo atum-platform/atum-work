@@ -83,6 +83,7 @@ import * as T3ChatAccounts from "../t3chat/T3ChatAccounts.ts";
 import { withSpanAttributes } from "../observability.ts";
 import { isRelayHookPath, redactRelayHookUrl } from "../hooks/HookForwarder.ts";
 import * as RelayDb from "../db.ts";
+import { logHttpFailure } from "./failureDiagnostics.ts";
 
 // Delegated IDs exceed the router's default 100-character limit; match the environment server.
 export const RELAY_HTTP_ROUTER_CONFIG = {
@@ -471,6 +472,7 @@ export const layerHealthApi = HttpApiBuilder.group(
           yield* db.execute(drizzleSql`SELECT 1`);
           return { ok: true, service: "relay" as const };
         },
+        Effect.tapCause(logHttpFailure("health-database")),
         Effect.catch(() => relayInternalErrorResponse("database_unavailable")),
       ),
     );

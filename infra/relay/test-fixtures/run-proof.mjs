@@ -8,6 +8,7 @@ for (const args of [
     "infra/relay/test-fixtures/atum-assertion.mjs",
     "infra/relay/test-fixtures/atum-seam.mjs",
     "infra/relay/test-fixtures/dpop-key-theft.mjs",
+    "infra/relay/test-fixtures/worker-trial.mjs",
   ],
   ["--experimental-strip-types", "infra/relay/test-fixtures/loopback.mjs"],
 ]) {
