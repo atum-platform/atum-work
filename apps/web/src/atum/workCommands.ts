@@ -1,14 +1,18 @@
 import { dispatchMenuAction, runCommand } from "../shortcuts/dispatcher";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { dispatchSnapShotComposerFocus } from "../lib/desktopSnapShot";
+import { canNavigateHistory, navigateHistory } from "../navigationHistory";
 
 /** The commands Atum's title band offers as buttons over the roster column. */
-// Atum's plus menu maps T3's pencil: New thread, New thread in a worktree, Add project.
+// Atum's plus menu maps T3's pencil: New thread, New thread in a worktree, Add project. The window's
+// ← → step T3's own history first (history.back / history.forward), as they step Drive's folders.
 export const ATUM_BAND_COMMANDS = [
   "sidebar.toggle",
   "chat.new",
   "chat.newWorktree",
   "project.add",
+  "history.back",
+  "history.forward",
 ] as const;
 export type AtumBandCommand = (typeof ATUM_BAND_COMMANDS)[number];
 
@@ -19,6 +23,12 @@ declare global {
 }
 
 export function runAtumBandCommand(command: string): boolean {
+  if (command === "history.back" || command === "history.forward") {
+    const direction = command === "history.back" ? "back" : "forward";
+    if (!canNavigateHistory(direction)) return false;
+    navigateHistory(direction);
+    return true;
+  }
   if (command === "sidebar.toggle") {
     dispatchMenuAction(command);
     return true;

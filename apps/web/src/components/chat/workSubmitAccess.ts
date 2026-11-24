@@ -11,7 +11,12 @@ export interface WorkSubmitAccessBridge {
     snapshot: import("../../atum/surfaceMode").SurfaceModeSnapshot | null,
   ): Promise<void>;
   /** The thread list's right edge, so the host's title band can line its bell up with it. */
-  reportSidebar?(snapshot: { open: boolean; edge: number }): Promise<void>;
+  reportSidebar?(snapshot: {
+    open: boolean;
+    edge: number;
+    back?: boolean;
+    forward?: boolean;
+  }): Promise<void>;
   /** Threads asking for the person and threads finished unseen, for the host's rail badge. */
   reportAttention?(snapshot: { waiting: number; finished: number }): Promise<void>;
   readonly readModelAccess: () => Promise<WorkAccessState>;
