@@ -1,33 +1,29 @@
-# Private Atum Connect trial quote
+# Atum Connect private trial quote — 2026-11-24
 
-Public list prices retrieved **2026-11-24 UTC / Asia/Ho_Chi_Minh**, for the owner's 2026-11-24 decision. No accounts/billing inspected, no credentials used, no resources created. The owner has approved the approximately $10–15/month budget; the operator runs provisioning. This remains a public-list-price estimate, not a binding vendor quotation. No resources were created by this worker.
+**$5/month incremental base before tax**, using Workers Paid and a dedicated
+`atum_connect` database/role on the already-running AWS Marketplace Postgres.
+No new PlanetScale account/card, VM, database instance or domain purchase.
+Keep the owner-approved $10–15 envelope as a reserve; it is not a billing cap.
 
-Selected configuration: **US$10/month incremental base; US$10–15/month operating envelope**, before tax, using existing owned domains, with Axiom disabled. The $5 allowance is a planning reserve for metered usage, not a vendor price or automatic cap. Optional paid Axiom makes the base **$35/month**, envelope **$35–40** within its included usage. Do not deploy the stock PS_160/HA/us-west/Axiom stack at this price.
+- Workers Paid: $5/account/month minimum, including Hyperdrive, Queues and DO
+  allowances. [Official pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+  checked 2026-11-24. Existing account usage can consume those allowances.
+- Hyperdrive: $0 incremental within the existing Workers plan.
+  [Official pricing](https://developers.cloudflare.com/hyperdrive/platform/pricing/).
+- Workers VPC private database service: free during open beta as checked
+  2026-11-24; re-quote at general availability.
+  [Official pricing](https://developers.cloudflare.com/workers-vpc/platform/pricing/).
+- Existing AWS PostgreSQL instance: $0 incremental instance base. Marginal AWS
+  storage, backup and traffic costs remain usage-dependent; measure rather than
+  claim free unlimited AWS egress. Five origin connections, trial only.
+- Existing domain/DNS and Cloudflare Tunnel: no new registration; retain account
+  tunnel headroom check. The database uses its existing private tunnel via a VPC
+  service; no inbound database port. Axiom/APNs/FCM remain off.
 
-| Component / proposed quantity | Monthly at stated trial scale | Public evidence |
-|---|---:|---|
-| Cloudflare Workers Paid, one account; relay Worker plus native Alchemy state Worker | $5 | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), updated Nov 18 2026: 10M requests and 30M CPU-ms included; excess $0.30/M requests, $0.02/M CPU-ms |
-| Hyperdrive, one pool | $0 incremental | [Hyperdrive pricing](https://developers.cloudflare.com/hyperdrive/platform/pricing/), updated Jun 18 2026: Paid includes unlimited queries and pooling |
-| Queues, four native push/DLQ queues, no push traffic initially | $0 within allowance | [Queues pricing](https://developers.cloudflare.com/queues/platform/pricing/), updated Oct 30 2026: 1M ops/month included; $0.40/M excess; normally three ops per delivered <=64KB message |
-| SQLite Durable Objects, native inbox namespace + state namespace, holding disabled | $0 within allowance | [DO pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/), updated Nov 13 2026: 1M requests, 400k GB-s, 25B rows read, 50M rows written, 5GB-month included; duration beyond allowance billed in rounded units |
-| PlanetScale Postgres **PS-5 x86-64**, **single node**, **AWS ap-southeast-1**, zero replicas, one production branch | **$5** | [Regional machine-readable pricing](https://planetscale.com/pricing.md?region=ap-southeast), fetched by curl; generated **2026-11-24T14:34:12.453Z**. Header explicitly identifies Singapore; non-HA PS-5 row is 1/16 vCPU, 512 MiB, $5. ARM PS-5 is absent from this regional snapshot; do not substitute ARM or HA |
-| PlanetScale included storage / backups / egress | $0 at trial assumptions | [Postgres pricing](https://planetscale.com/docs/postgres/pricing): 10GB disk; backup allowance 2x disk; PS-5 non-HA public egress 10GB/month. No dedicated PgBouncer, PrivateLink, extra IOPS/throughput or additional branches |
-| Cloudflare Tunnel, **2–10 tunnels**, one per Mac | $0 if total account count remains <=1,000 | [Tunnels for Platforms](https://developers.cloudflare.com/tunnel/features/tunnels-for-platforms/), updated Oct 16 2026: 1,000 included/account; additional $4.50/tunnel/month. Inactive tunnels count. Existing account headroom was deliberately not read |
-| Existing Atum domain and managed-endpoint subdomain | **$0 incremental** | Reuse owned DNS zones; no new registration, paid DNS plan or certificate purchase. Existing domain renewal is an already-owned cost, not a new relay expense |
-| Worker/Tunnel bandwidth | **$0 at trial scale** | [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) has no egress/throughput charge; use ordinary interactive MCP/Work traffic, not bulk media hosting |
-| Axiom | **$0 disabled**; optional **+$25** platform fee before usage | [Axiom pricing](https://axiom.co/pricing), retrieved Nov 23 2026: Cloud $25 plus usage; Personal $0 is not assumed suitable for the Atum team. No account created |
+Optional `RELAY_DATABASE_PROVIDER=planetscale` retains the prior native PS-5
+Singapore non-HA option at the previously quoted +$5/month (recheck vendor price
+before selecting it). It is never the default and requires its own vendor account.
 
-Trial assumptions: <=100k control-plane Worker requests/month, <=10M CPU-ms; <=10k push messages even if later enabled (roughly 30k queue ops without retries); no offline webhook holding; DO usage well below all allowances; <=10GB DB disk, <=20GB compressed backups/WAL, <=10GB DB public egress; two initial Macs; expansion follows measured native limits; existing Atum-managed DNS zone and existing platform auth hosting. Workers/DO quotas are shared at account level; this is not a dedicated entitlement claim. Additional platform API capacity, new domain purchases, Apple/Google push memberships and sustained load are excluded. The host-to-client thread traffic uses Tunnel rather than Worker proxying; DB/DO/Worker control-plane use still needs measurement. Non-HA is acceptable only for a private proof with recoverable data; no SLA or production HA claim.
-
-## Exact operator-run create/configure list
-
-1. One retained PlanetScale Postgres database with one PS-5 x86 Singapore primary, no replica/dev branch/extra pool; native runtime DB role; ordered relay migrations. One Hyperdrive connection, query cache off; five Hyperdrive origin connections; measure PS-5 capacity before expanding.
-2. One relay Worker and API custom hostname in an existing Atum zone; Worker placement `aws:ap-southeast-1`; one SQLite HookInboxObject namespace and five-minute maintenance cron. Four queues: APNs delivery, APNs DLQ, FCM delivery, FCM DLQ; push providers disabled.
-3. Native Alchemy Cloudflare state store bootstrap if absent: one state Worker, its SQLite state namespace and state auth/encryption secrets. No second state store if one already exists; inspect the future dry plan before creation. Cloudflare service credentials/secrets remain with coordinator, not this lane.
-4. Two initial native managed tunnels plus proxied environment CNAMEs. Existing Atum DNS zones are referenced, not created or purchased. No Access app, Tailscale resource, VPN bypass or alternate tunnel relay.
-5. One dedicated platform Ed25519 assertion signing key and key id; public JWKS configuration in relay; native relay broker signing key. Configure assertion issuer/audience and feature flags. No provider/plan credentials copied. No platform DB migration needed.
-6. **Implemented trial profile (`ATUM_CONNECT_TRIAL=true`):** no Axiom resources/client telemetry credentials or source-map R2 bucket/upload token. **Optional +$25 variant:** native three datasets (traces, mobile logs, mobile metrics), their scoped ingest tokens/monitors and one R2 source-map bucket/upload token, within free storage allowances; client telemetry still requires opt-in. This variant needs an exact dry-plan resource count before approval.
-
-**Total: $5 Workers + $5 PS-5 + $0 incremental domains/bandwidth/within-allowance services = $10/month before tax.** Keep a $5/month operating reserve; it is not an automatic vendor cap. The included quotas are account-wide and existing account usage/headroom was not inspected. The operator must stop/re-quote if the selected SKU or quota no longer fits, instead of enabling HA or paid tunnel capacity automatically.
-
-Not created here: every item above. The native Alchemy PS-5 SKU and x86 default were verified in the pinned dependency source; no vendor dry-plan/account call was executed. The implemented pool is five origins, placement Singapore, Axiom absent. Use [the runbook](atum-connect-runbook.md) and its single operator-run provisioning command. A real Mac registration/MCP/reconnect proof passed against a local TLS endpoint fixture; live Cloudflare, SQL capacity, off-network and installed Atum acceptance follow operator provisioning.
+Built-not-live. No billing or cloud account was inspected, no resource created.
+This estimate assumes existing AWS capacity suffices and included Cloudflare
+usage is available. Verify metered use during the private trial before expansion.

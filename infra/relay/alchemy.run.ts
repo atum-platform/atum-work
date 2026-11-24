@@ -6,6 +6,7 @@ import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Drizzle from "@alchemy.run/drizzle";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Config from "effect/Config";
 import * as Planetscale from "@alchemy.run/planetscale";
 
 import { PublishClientConfig, tokenDigest } from "./src/clientConfig.ts";
@@ -30,7 +31,8 @@ export default Alchemy.Stack(
   },
   Effect.gen(function* () {
     const { stage } = yield* Alchemy.Stack;
-    const db = yield* RelayDb.PlanetscaleDatabase;
+    const backend = yield* Config.String("RELAY_DATABASE_PROVIDER").pipe(Config.withDefault("external"));
+    const db = backend === "planetscale" ? yield* RelayDb.PlanetscaleDatabase : undefined;
     const hyperdrive = yield* RelayDb.RelayHyperdrive;
     const managedEndpointZone = yield* ManagedEndpointZone.pipe(Effect.orDie);
     const relayApiZone = yield* RelayApiZone.pipe(Effect.orDie);
@@ -63,8 +65,8 @@ export default Alchemy.Stack(
       });
 
     return {
-      databaseName: db.database.name,
-      databaseBranchName: db.branch?.name ?? "main",
+      databaseName: db?.database.name ?? "atum_connect",
+      databaseBranchName: db?.branch?.name ?? "external",
       hyperdriveName: hyperdrive.name,
       workerName: api.workerName,
       url: api.url,
