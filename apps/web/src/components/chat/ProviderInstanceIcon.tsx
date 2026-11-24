@@ -130,7 +130,11 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       style={accentStyle}
       data-provider-accent-color={accentColor}
     >
-      {isAcpRegistry ? (
+      {import.meta.env.VITE_ATUM_WORK_BUILD === "1" &&
+      isAcpRegistry &&
+      (props.displayName === "Atum" || props.displayName === "Atum (delegated)") ? (
+        <img src="/atum-provider-mark.svg" alt="" className={cn("size-5", iconClassName)} />
+      ) : isAcpRegistry ? (
         <AcpRegistryAgentIcon
           className={cn("size-5 rounded-none bg-transparent", iconClassName)}
           fallbackClassName="size-full"
