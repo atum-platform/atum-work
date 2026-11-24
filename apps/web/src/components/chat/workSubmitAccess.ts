@@ -12,6 +12,8 @@ export interface WorkSubmitAccessBridge {
   ): Promise<void>;
   /** The thread list's right edge, so the host's title band can line its bell up with it. */
   reportSidebar?(snapshot: { open: boolean; edge: number }): Promise<void>;
+  /** Threads asking for the person and threads finished unseen, for the host's rail badge. */
+  reportAttention?(snapshot: { waiting: number; finished: number }): Promise<void>;
   readonly readModelAccess: () => Promise<WorkAccessState>;
   /** Opens the existing Protons top-up page; older preloads do not expose it. */
   readonly openProtons?: () => Promise<boolean>;

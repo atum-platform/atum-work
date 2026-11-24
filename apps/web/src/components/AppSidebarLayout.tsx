@@ -41,6 +41,7 @@ import {
 } from "../panelAnimations";
 import { BackgroundThreadAnnouncer } from "./BackgroundThreadAnnouncer";
 import { HistorySwipeNavigation } from "./HistorySwipeNavigation";
+import { AtumAttentionReport } from "../atum/AttentionReport";
 import { AtumSidebarReport } from "../atum/SidebarReport";
 import ThreadSidebar from "./Sidebar";
 import { SidebarBrandWidthProbe } from "./sidebar/SidebarChrome";
@@ -478,6 +479,9 @@ export function AppSidebarLayout({
             <Sidebar
               side="left"
               collapsible="offcanvas"
+              // Atum hosts Work in its shared panel frame: T3's own inset layout (sidebar on the
+              // chrome ground, the thread a rounded card) matches it.
+              variant={import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? "inset" : "sidebar"}
               data-app-sidebar=""
               {...sidebarArea}
               role="navigation"
@@ -496,7 +500,12 @@ export function AppSidebarLayout({
               <ThreadSidebar routeReveal={sidebarRouteReveal} />
               <SidebarRail onDoubleClick={resetSidebarWidth} />
             </Sidebar>
-            {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? <AtumSidebarReport /> : null}
+            {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? (
+              <>
+                <AtumSidebarReport />
+                <AtumAttentionReport />
+              </>
+            ) : null}
           </>
         ) : null}
         {children}
