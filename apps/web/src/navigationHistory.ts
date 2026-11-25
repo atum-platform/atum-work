@@ -3,12 +3,16 @@ import { useSyncExternalStore } from "react";
 export type HistoryDirection = "back" | "forward";
 
 function subscribeToNavigationHistory(onChange: () => void): () => void {
-  window.navigation.addEventListener("currententrychange", onChange);
-  return () => window.navigation.removeEventListener("currententrychange", onChange);
+  const navigation = window.navigation;
+  if (!navigation) return () => {};
+  navigation.addEventListener("currententrychange", onChange);
+  return () => navigation.removeEventListener("currententrychange", onChange);
 }
 
 export function canNavigateHistory(direction: HistoryDirection): boolean {
-  return direction === "back" ? window.navigation.canGoBack : window.navigation.canGoForward;
+  return direction === "back"
+    ? (window.navigation?.canGoBack ?? false)
+    : (window.navigation?.canGoForward ?? false);
 }
 
 export function navigateHistory(direction: HistoryDirection) {
@@ -16,7 +20,7 @@ export function navigateHistory(direction: HistoryDirection) {
   else window.history.forward();
 }
 
-/** Only for Electron: the Navigation API is Chromium-only. */
+/** The Navigation API is Chromium-only; other browsers report no available history. */
 export function useCanNavigateHistory(direction: HistoryDirection): boolean {
   return useSyncExternalStore(subscribeToNavigationHistory, () => canNavigateHistory(direction));
 }
