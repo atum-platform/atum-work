@@ -1,21 +1,21 @@
-# Host-managed MCP servers
+# Host-managed account MCP
 
-A host embedding the T3 server can place `managed-mcp-servers.json` in the
-server state directory (usually `<T3CODE_HOME>/userdata`). The file is an array
-of records with `name`, `url`, and `authorizationHeader`. Write it atomically
-with owner-only permissions before starting the server. T3 reads it when it
-builds a provider session configuration. Missing or invalid files yield no
-host-managed servers. T3 reserves the names `t3-code` and `t3-code-direct`.
+Atum Desktop embeds Work behind its existing loopback connector. The supervisor
+passes the connector address and delivers the connector token in a one-use
+inherited pipe. Work verifies a fresh proof from the connector before it
+publishes account servers to a provider. A missing, stale, or unavailable
+connector leaves sessions usable without the account tools.
 
-The settings API is shared with clients and provider-specific launch arguments
-cannot cover all drivers. The host file keeps the setting local to one T3
-server and leaves each provider's own MCP configuration in place. Claude and
-Codex register the endpoints over HTTP. ACP providers use HTTP when available,
-or the existing stdio bridge when their negotiated transport requires it.
+Provider MCP credentials authorize only Google and Owner Chats, and cannot
+call the connector's other routes. The connector derives those credentials and
+the names independently from its in-memory token. The names are stable for
+one connector lifetime and keep a repository's configured server names from
+shadowing the account tools. Codex also overrides same-name project config
+with the per-thread registration. Work does not persist an account MCP
+manifest.
 
-Give providers revocable local credentials if the host owns an account token.
-Providers may retain the runtime configuration for an open session. The host
-must revoke access at its endpoint before removing this file on sign-out.
-Replacing the file alone does not revoke tools for a session that is already
-open. Atum Desktop handles token renewal at its forwarding endpoint so the
-provider configuration for a running session can stay stable.
+Claude registers account servers over its control channel. Codex sends them as
+optional per-thread configuration. ACP uses a homogeneous HTTP list only when
+the flavour enables it and the agent advertises HTTP support. Otherwise ACP
+uses its required stdio transport for both the built-in and account servers.
+Sessions without account servers can continue to use ACP-native MCP.

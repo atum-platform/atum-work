@@ -1680,7 +1680,7 @@ function codexThreadRuntimeParams(input: {
       ...Object.fromEntries(
         input.managedMcpServers.map(({ name, url, authorizationHeader }) => [
           `mcp_servers.${name}`,
-          { url, http_headers: { Authorization: authorizationHeader } },
+          { url, required: false, http_headers: { Authorization: authorizationHeader } },
         ]),
       ),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.

@@ -1868,7 +1868,10 @@ export const layerQueryRunner: Layer.Layer<
                     Effect.orElseSucceed(() => Object.keys(mcpServers)),
                     Effect.timeoutOrElse({
                       duration: CLAUDE_MCP_REGISTRATION_TIMEOUT,
-                      orElse: timedOut("setMcpServers"),
+                      orElse: () =>
+                        Object.keys(mcpServers).some((name) => name !== "t3-code")
+                          ? Effect.succeed(Object.keys(mcpServers))
+                          : timedOut("setMcpServers")(),
                     }),
                   );
                   if (failed.length > 0) {

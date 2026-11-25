@@ -2721,7 +2721,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       ),
   );
 
-  it.effect("adds session and managed MCP servers and gives stdio servers the thread id", () =>
+  it.effect("lets managed MCP override a project stdio server of the same name", () =>
     Effect.gen(function* () {
       const scenario = "launch-mcp-servers";
       yield* (yield* McpProviderSessions.McpProviderSessions).set({
@@ -2788,6 +2788,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             "mcp_servers.envprobe.env.T3CODE_THREAD_ID": `thread-${scenario}`,
             "mcp_servers.connection": {
               url: "http://127.0.0.1:43124/connection",
+              required: false,
               http_headers: { Authorization: "Bearer local-fixture" },
             },
             "mcp_servers.t3-code": {

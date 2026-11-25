@@ -1104,7 +1104,11 @@ function acpMcpContext(
     headers: [{ name: "Authorization", value: authorizationHeader }],
   }));
   if (session === undefined) {
-    return { servers: managedStdio, acpServers: [], httpServers: managedHttp };
+    return {
+      servers: managedStdio,
+      acpServers: [],
+      httpServers: mcpOverHttp === true ? managedHttp : [],
+    };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -1121,8 +1125,8 @@ function acpMcpContext(
       },
       ...managedStdio,
     ],
-    // ACP-native MCP serves T3's tools. Independent remote servers still need their own transport.
-    acpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }, ...managedStdio],
+    // Native ACP serves only T3. Use one compatible transport for all servers when adding managed tools.
+    acpServers: managed.length === 0 ? [{ type: "acp", name: "t3-code", serverId: "t3-code" }] : [],
     httpServers:
       mcpOverHttp === true
         ? [
