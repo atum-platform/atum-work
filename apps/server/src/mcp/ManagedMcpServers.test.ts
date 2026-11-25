@@ -52,8 +52,8 @@ it.live(
           `${origin}/mcp/owner-chats`,
         ]);
         expect(initial.map((server) => server.name)).toEqual([
-          expect.stringMatching(/^atum-google-[0-9a-f]{16}$/),
-          expect.stringMatching(/^atum-owner-chats-[0-9a-f]{16}$/),
+          expect.stringMatching(/^atum-account-google-[0-9a-f]{16}$/),
+          expect.stringMatching(/^atum-account-owner-chats-[0-9a-f]{16}$/),
         ]);
         expect(initial[0]?.authorizationHeader).toBe(`Bearer ${mac("atum-work-mcp-bearer-v1")}`);
         expect(initial[0]?.authorizationHeader).not.toContain(token);

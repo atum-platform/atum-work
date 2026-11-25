@@ -1,31 +1,11 @@
-// @effect-diagnostics nodeBuiltinImport:off - Consume the inherited Desktop connector pipe before spawning providers.
+// @effect-diagnostics nodeBuiltinImport:off - Prove the Desktop loopback connector before exposing account tools.
 import * as NodeCrypto from "node:crypto";
-import * as NodeFS from "node:fs";
 import * as NodeHttp from "node:http";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
+import type * as Layer from "effect/Layer";
 
-function readConnectorToken(): string | undefined {
-  const rawFd = process.env.ATUM_WORK_CONNECTOR_FD;
-  delete process.env.ATUM_WORK_CONNECTOR_FD;
-  delete process.env.ATUM_WORK_CONNECTOR_TOKEN;
-  if (rawFd === undefined || !/^\d+$/.test(rawFd)) return undefined;
-  const fd = Number(rawFd);
-  if (fd < 3 || fd > 0x7fff_ffff) return undefined;
-  try {
-    if (!NodeFS.fstatSync(fd).isFIFO()) return undefined;
-    try {
-      // The supervisor writes and closes its end before it launches Work.
-      const token = Buffer.alloc(44);
-      return token.subarray(0, NodeFS.readSync(fd, token)).toString("utf8");
-    } finally {
-      NodeFS.closeSync(fd);
-    }
-  } catch {
-    return undefined;
-  }
-}
+import { endpoint, token } from "./toolkits/atum/config.ts";
 
 function proveConnector(
   connector: URL,
@@ -74,7 +54,7 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
   const tag = mac("atum-work-mcp-names-v1").toString("hex", 0, 8);
   const authorizationHeader = `Bearer ${mac("atum-work-mcp-bearer-v1").toString("base64url")}`;
   const servers = ["google", "owner-chats"].map((route) => ({
-    name: `atum-${route}-${tag}`,
+    name: `atum-account-${route}-${tag}`,
     url: new URL(`/mcp/${route}`, connector).href,
     authorizationHeader,
   }));
@@ -87,17 +67,5 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
   });
 });
 
-function readConnectorConfig() {
-  return {
-    endpoint: process.env.ATUM_WORK_CONNECTOR_URL,
-    token: readConnectorToken(),
-  };
-}
-
-export const layer = Layer.unwrap(
-  Effect.sync(readConnectorConfig).pipe(
-    Effect.map(({ endpoint, token }) =>
-      McpProviderSessions.layerWithManagedServers(readConnectorMcpServers(endpoint, token)),
-    ),
-  ),
-);
+export const layer: Layer.Layer<McpProviderSessions.McpProviderSessions> =
+  McpProviderSessions.layerWithManagedServers(readConnectorMcpServers(endpoint, token));
