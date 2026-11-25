@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import { offerAtumRightPanel } from "./rightPanel";
 import { installAtumWorkCommands, runAtumBandCommand } from "./workCommands";
 
 vi.mock("../shortcuts/dispatcher", () => ({ dispatchMenuAction: vi.fn(), runCommand: vi.fn() }));
@@ -32,6 +33,17 @@ describe("Work window history commands", () => {
       }
     },
   );
+
+  it("toggles the right panel only while the chat view offers one", () => {
+    expect(runAtumBandCommand("rightPanel.toggle")).toBe(false);
+    const toggle = vi.fn();
+    const withdraw = offerAtumRightPanel({ open: false, toggle });
+    expect(runAtumBandCommand("rightPanel.toggle")).toBe(true);
+    expect(toggle).toHaveBeenCalledOnce();
+    withdraw();
+    expect(runAtumBandCommand("rightPanel.toggle")).toBe(false);
+    expect(toggle).toHaveBeenCalledOnce();
+  });
 
   it("leaves history commands unhandled without the Navigation API", () => {
     const history = { back: vi.fn(), forward: vi.fn() };

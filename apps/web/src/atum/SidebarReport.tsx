@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useSidebar } from "../components/ui/sidebar";
 import { observeResize } from "../lib/observeResize";
 import { useCanNavigateHistory } from "../navigationHistory";
+import { useAtumRightPanelState } from "./rightPanel";
 
 /**
  * Tells the Atum host where the thread list ends, so its title band ends the bell at that edge as the
@@ -16,6 +17,7 @@ export function AtumSidebarReport() {
   const { open, isMobile } = useSidebar();
   const back = useCanNavigateHistory("back");
   const forward = useCanNavigateHistory("forward");
+  const rightPanel = useAtumRightPanelState();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports the sidebar's laid-out edge to the native host
   useEffect(() => {
     const report = () => {
@@ -24,7 +26,13 @@ export function AtumSidebarReport() {
       );
       const edge = inner?.getBoundingClientRect().right ?? 0;
       const shown = open && !isMobile && edge > 0;
-      void window.atumWork?.reportSidebar?.({ open: shown, edge: shown ? edge : 0, back, forward });
+      void window.atumWork?.reportSidebar?.({
+        open: shown,
+        edge: shown ? edge : 0,
+        back,
+        forward,
+        ...(rightPanel ? { rightPanel } : {}),
+      });
     };
     const container = document.querySelector<HTMLElement>(
       '[data-app-sidebar] [data-slot="sidebar-container"]',
@@ -45,6 +53,6 @@ export function AtumSidebarReport() {
       stopObserving();
       container?.removeEventListener("transitionend", report);
     };
-  }, [open, isMobile, shellReady, back, forward]);
+  }, [open, isMobile, shellReady, back, forward, rightPanel]);
   return null;
 }

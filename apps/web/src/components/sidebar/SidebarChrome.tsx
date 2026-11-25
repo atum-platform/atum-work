@@ -61,6 +61,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
       ? resolveEnvironmentIdentificationPillLabel(stageLabel)
       : null;
 
+  // Atum's title bar carries the mark, the hide button and ← →; its left panels start with their content.
+  if (isAtumWorkBuild) return null;
+
   return (
     <div
       data-sidebar-brand-row=""
