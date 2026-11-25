@@ -2787,6 +2787,7 @@ export const CLAUDE_T3_MCP_TOOL_TIMEOUT_MS = 65 * 60 * 1_000;
 
 export function claudeMcpQueryOverrides(input: {
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
+  readonly managedMcpServers?: ReadonlyArray<McpProviderSession.ManagedMcpServer>;
   readonly readOnlySandbox: boolean;
   readonly allowedTools?: ReadonlyArray<string>;
 }): {
@@ -2794,8 +2795,17 @@ export function claudeMcpQueryOverrides(input: {
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
 } {
   const session = input.mcpSession;
+  const managed = Object.fromEntries(
+    (input.managedMcpServers ?? []).map(({ name, url, authorizationHeader }) => [
+      name,
+      { type: "http" as const, url, headers: { Authorization: authorizationHeader } },
+    ]),
+  );
   if (session === undefined) {
-    return input.allowedTools === undefined ? {} : { allowedTools: input.allowedTools };
+    return {
+      ...(input.allowedTools === undefined ? {} : { allowedTools: input.allowedTools }),
+      ...(Object.keys(managed).length === 0 ? {} : { mcpServers: managed }),
+    };
   }
   const mcpAllowedTools = input.readOnlySandbox
     ? CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS
@@ -2803,6 +2813,7 @@ export function claudeMcpQueryOverrides(input: {
   return {
     allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
     mcpServers: {
+      ...managed,
       "t3-code": {
         type: "http",
         url: session.endpoint,
@@ -13403,6 +13414,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             );
           const mcpOverrides = claudeMcpQueryOverrides({
             mcpSession,
+            managedMcpServers: yield* mcpSessions.readManagedServers,
             readOnlySandbox:
               sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly",
             ...(queryPolicy.allowedTools === undefined

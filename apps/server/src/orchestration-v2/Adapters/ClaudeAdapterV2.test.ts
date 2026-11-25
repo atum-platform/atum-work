@@ -720,6 +720,24 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
 });
 
 describe("ClaudeAdapterV2 MCP query overrides", () => {
+  it("passes host MCP servers to Claude without pre-approving their tools", () => {
+    const mcpSession = undefined;
+    const url = "http://127.0.0.1:43124/connection";
+    const authorizationHeader = "Bearer local-fixture";
+    const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
+      mcpSession,
+      managedMcpServers: [{ name: "connection", url, authorizationHeader }],
+      readOnlySandbox: true,
+      allowedTools: ["Read"],
+    });
+    assert.deepEqual(overrides, {
+      allowedTools: ["Read"],
+      mcpServers: {
+        connection: { type: "http", url, headers: { Authorization: authorizationHeader } },
+      },
+    });
+  });
+
   const T3_MCP_SERVERS = {
     "t3-code": {
       type: "http",

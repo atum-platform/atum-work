@@ -2721,7 +2721,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       ),
   );
 
-  it.effect("adds the session MCP server and gives stdio servers the thread id", () =>
+  it.effect("adds session and managed MCP servers and gives stdio servers the thread id", () =>
     Effect.gen(function* () {
       const scenario = "launch-mcp-servers";
       yield* (yield* McpProviderSessions.McpProviderSessions).set({
@@ -2759,6 +2759,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
                     mcp_servers: {
                       envprobe: { command: "python3", env: { FOO: "bar" } },
                       remote: { url: "https://example.com/mcp" },
+                      connection: { command: "old-connection" },
                       "dotted.name": { command: "node" },
                     },
                   },
@@ -2785,6 +2786,10 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             "features.concurrent_reasoning_summaries": true,
             "shell_environment_policy.set.T3CODE_THREAD_ID": `thread-${scenario}`,
             "mcp_servers.envprobe.env.T3CODE_THREAD_ID": `thread-${scenario}`,
+            "mcp_servers.connection": {
+              url: "http://127.0.0.1:43124/connection",
+              http_headers: { Authorization: "Bearer local-fixture" },
+            },
             "mcp_servers.t3-code": {
               url: "http://127.0.0.1:43123/mcp",
               tool_timeout_sec: 3_900,
@@ -2806,7 +2811,15 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       Effect.provide(
         Layer.mergeAll(
           IdAllocator.layer,
-          McpProviderSessions.layer,
+          McpProviderSessions.layerWithManagedServers(
+            Effect.succeed([
+              {
+                name: "connection",
+                url: "http://127.0.0.1:43124/connection",
+                authorizationHeader: "Bearer local-fixture",
+              },
+            ]),
+          ),
           NodeServices.layer,
           NodeCrypto.layer,
         ),
