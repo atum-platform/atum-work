@@ -179,7 +179,7 @@ function buildActiveShellSnapshot(input: {
 
 type ShellTrimRow = Pick<
   OrchestrationV2ThreadShell,
-  "id" | "projectId" | "lineage" | "settledOverride" | "settledAt"
+  "id" | "projectId" | "lineage" | "hidden" | "settledOverride" | "settledAt"
 > & { readonly hasRemoteTasks?: boolean };
 
 /**
@@ -209,6 +209,7 @@ function shellTrimFacts(rows: ReadonlyArray<ShellTrimRow>): ShellTrimFacts {
       subagentThreadIds.add(row.id);
       if (row.lineage.parentThreadId) subagentParentIds.add(row.lineage.parentThreadId);
     } else if (
+      row.hidden !== true &&
       isListedThreadLineage(row.lineage) &&
       row.settledOverride === "settled" &&
       row.settledAt !== null

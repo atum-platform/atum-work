@@ -142,6 +142,11 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
       }),
     ),
     title: TrimmedNonEmptyString,
+    hidden: Schema.optional(
+      Schema.Boolean.annotate({
+        description: "Omit this thread from app lists. It remains usable by thread ID.",
+      }),
+    ),
     generateTitle: Schema.optional(Schema.Boolean),
     modelSelection: Schema.optional(ModelSelection),
     runtimeMode: Schema.optional(RuntimeMode),

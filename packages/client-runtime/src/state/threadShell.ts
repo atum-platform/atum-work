@@ -684,11 +684,6 @@ export function createEnvironmentThreadShellAtoms(input: {
         hiddenTags: get(input.hiddenThreadTagsAtom(environmentId)),
       }),
     );
-    // Read shells only while some environment hides tags, so streaming ticks cost nothing otherwise.
-    if (!environments.some((environment) => environment.hiddenTags !== null)) {
-      previousHiddenThreadKeys = NO_HIDDEN_THREADS;
-      return NO_HIDDEN_THREADS;
-    }
     const next = hiddenThreadKeys(
       environments.map((environment) => ({
         ...environment,
@@ -711,7 +706,7 @@ export function createEnvironmentThreadShellAtoms(input: {
     ),
   ).pipe(Atom.withLabel("environment-any-hiding-thread-tags"));
 
-  /** threadShellsAtom without the threads the tag filter hides, for pickers and palettes. */
+  /** threadShellsAtom without hidden threads, for pickers and palettes. */
   let previousVisibleThreadShells: ReadonlyArray<EnvironmentThreadShell> = [];
   const visibleThreadShellsAtom = Atom.make((get) => {
     const threads = get(threadShellsAtom);
@@ -749,13 +744,12 @@ export function createEnvironmentThreadShellAtoms(input: {
     for (const environmentId of environmentIds) {
       for (const thread of get(environmentThreadsAtom(environmentId))) {
         const parent = thread.delegatedFrom;
-        if (
-          parent !== undefined &&
-          environmentIds.has(parent.environmentId) &&
-          // An archived parent leaves navigation; its task there stays listed on its own.
-          get(environmentThreadIndexAtom(parent.environmentId)).get(parent.threadId)?.archivedAt ===
-            null
-        ) {
+        if (parent === undefined || !environmentIds.has(parent.environmentId)) continue;
+        const parentThread = get(environmentThreadIndexAtom(parent.environmentId)).get(
+          parent.threadId,
+        );
+        // A parent outside navigation leaves its delegated task listed on its own.
+        if (parentThread?.archivedAt === null && parentThread.hidden !== true) {
           next.add(threadKey({ environmentId, threadId: thread.id }));
         }
       }

@@ -61,6 +61,41 @@ function makeHarness(environmentIds: ReadonlyArray<EnvironmentId> = [environment
 }
 
 describe("v2 thread shell lists", () => {
+  it("omits hidden relay threads from the sidebar and pickers while keeping point reads", () => {
+    const { registry, threads, snapshotAtom } = makeHarness([environmentId, remoteEnvironmentId]);
+    const hidden = {
+      ...v2ThreadShell,
+      id: ThreadId.make("relay-chat"),
+      createdBy: "agent" as const,
+      creationSource: "mcp" as const,
+      hidden: true,
+    };
+    const task = {
+      ...v2ThreadShell,
+      id: ThreadId.make("delegated-work"),
+      createdBy: "agent" as const,
+      creationSource: "mcp" as const,
+      delegatedFrom: { environmentId, threadId: hidden.id, title: hidden.title },
+    };
+    registry.set(snapshotAtom(environmentId), {
+      ...v2ShellSnapshot,
+      threads: [hidden, v2ThreadShell],
+    });
+    registry.set(snapshotAtom(remoteEnvironmentId), { ...v2ShellSnapshot, threads: [task] });
+
+    for (const list of [
+      threads.quietThreadShellsAtom,
+      threads.visibleThreadShellsAtom,
+      threads.navigationThreadShellsAtom,
+    ]) {
+      expect(registry.get(list).map((thread) => thread.id)).toEqual([v2ThreadShell.id, task.id]);
+    }
+    expect(registry.get(threads.threadShellAtom({ environmentId, threadId: hidden.id }))?.id).toBe(
+      hidden.id,
+    );
+    registry.dispose();
+  });
+
   it("builds no child index while no child asks for input", () => {
     const { registry, threads, snapshotAtom } = makeHarness();
     let parentIdReads = 0;

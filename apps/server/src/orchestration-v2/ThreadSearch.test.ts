@@ -73,6 +73,7 @@ const thread = (
     readonly deletedAt?: DateTime.Utc;
     readonly subagentOf?: ThreadId;
     readonly sideChatOf?: ThreadId;
+    readonly hidden?: boolean;
     readonly title?: string;
     readonly settledAt?: DateTime.Utc;
     readonly linkedPullRequest?: ThreadLinkedPullRequest;
@@ -90,6 +91,7 @@ const thread = (
     id: threadId,
     projectId,
     title: overrides.title ?? threadId,
+    ...(overrides.hidden === true ? { hidden: true } : {}),
     providerInstanceId,
     modelSelection: { instanceId: providerInstanceId, model: "gpt-5" },
     runtimeMode: "full-access",
@@ -493,6 +495,7 @@ it.layer(layerTest)("ThreadSearch", (it) => {
       const parent = ThreadId.make("thread:tokens-parent");
       const subagent = ThreadId.make("thread:tokens-subagent");
       const sideChat = ThreadId.make("thread:tokens-side-chat");
+      const hidden = ThreadId.make("thread:tokens-relay");
       yield* createProject(project);
       yield* Effect.forEach(
         [
@@ -502,6 +505,8 @@ it.layer(layerTest)("ThreadSearch", (it) => {
           message(subagent, "subagent", "assistant", "ThreadSearchService renamed"),
           thread(sideChat, project, { sideChatOf: parent, title: "ThreadSearchService question" }),
           message(sideChat, "side-chat", "user", "Why rename ThreadSearchService?"),
+          thread(hidden, project, { title: "ThreadSearchService relay", hidden: true }),
+          message(hidden, "relay", "user", "ThreadSearchService conversation"),
         ],
         projections.apply,
         { discard: true },
@@ -516,6 +521,11 @@ it.layer(layerTest)("ThreadSearch", (it) => {
       assert.deepEqual((yield* search.search({ query: "ab" })).matches, []);
       assert.lengthOf((yield* search.search({ query: "renam be" })).matches, 1);
       assert.lengthOf((yield* search.search({ query: "renam ab" })).matches, 0);
+      assert.isFalse(
+        (yield* search.searchThreads({ query: "ThreadSearchService" })).matches.some(
+          (match) => match.threadId === hidden,
+        ),
+      );
     }),
   );
 
@@ -1160,6 +1170,7 @@ it.layer(layerTest)("ThreadSearch.searchOlderSettled", (it) => {
           thread(id("child"), project, { title: "Kestrel nest", subagentOf: id("old") }),
           thread(id("elsewhere"), other, { title: "Kestrel nest", settledAt: old }),
           thread(id("note"), project, { title: "Unrelated", settledAt: old }),
+          thread(id("relay"), project, { title: "Kestrel nest", settledAt: old, hidden: true }),
           thread(id("new-note"), project, { title: "Unrelated", settledAt: at(50) }),
           thread(id("archived"), project, {
             title: "Kestrel nest",
@@ -1176,7 +1187,13 @@ it.layer(layerTest)("ThreadSearch.searchOlderSettled", (it) => {
         { discard: true },
       );
       const before = DateTime.formatIso(at(30));
-      const messageThreadIds = [id("new-note"), id("note"), id("archived-note"), id("old")];
+      const messageThreadIds = [
+        id("new-note"),
+        id("note"),
+        id("archived-note"),
+        id("old"),
+        id("relay"),
+      ];
       assert.sameMembers(
         [...(yield* search.searchOlderSettled({ query: "kestrel", before, messageThreadIds }))],
         [id("old"), id("elsewhere"), id("note")],
@@ -1191,6 +1208,12 @@ it.layer(layerTest)("ThreadSearch.searchOlderSettled", (it) => {
         }),
         [id("old"), id("note")],
       );
+      const older = yield* projections.listOlderSettledThreads({
+        before: { settledAt: before },
+        projectIds: [project],
+        limit: 25,
+      });
+      assert.sameMembers([...older.threadIds], [id("old"), id("note")]);
       // A palette also matches the environment's name.
       assert.include(
         yield* search.searchOlderSettled({

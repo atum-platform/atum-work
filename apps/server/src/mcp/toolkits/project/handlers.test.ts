@@ -210,6 +210,7 @@ it.effect(
         defaultRuntimeMode: RuntimeMode,
         params: {
           readonly title: string;
+          readonly hidden?: boolean;
           readonly generateTitle?: boolean;
           readonly message?: string;
           readonly runtimeMode?: RuntimeMode;
@@ -255,6 +256,14 @@ it.effect(
       expect(belowCeiling.launched[0]?.initialMessage?.senderThreadId).toBeUndefined();
       expect(belowCeiling.launched[0]?.generateTitle).toBeUndefined();
       expect(belowCeiling.launched[0]?.titleRenamed).toBe(true);
+      expect(belowCeiling.launched[0]?.hidden).toBeUndefined();
+
+      const background = yield* launchWith("full-access", "approval-required", {
+        title: "Relay chat",
+        message: "Continue the conversation",
+        hidden: true,
+      });
+      expect(background.launched[0]?.hidden).toBe(true);
 
       const titled = yield* launchWith("full-access", "full-access", {
         title: "Fix",
