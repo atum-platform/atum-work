@@ -232,6 +232,7 @@ import {
   normalizeMcpText,
 } from "@t3tools/provider-core/server/mcpToolPresentation";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
+import { readModeBProofAttachment } from "../../mcp/ModeBProofAttachment.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import {
@@ -13417,7 +13418,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             );
           const mcpOverrides = claudeMcpQueryOverrides({
             mcpSession,
-            managedMcpServers: yield* mcpSessions.readManagedServers,
+            managedMcpServers: [
+              ...(yield* mcpSessions.readManagedServers),
+              ...(sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly"
+                ? []
+                : readModeBProofAttachment(turnInput.threadId)),
+            ],
             readOnlySandbox:
               sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly",
             ...(queryPolicy.allowedTools === undefined
