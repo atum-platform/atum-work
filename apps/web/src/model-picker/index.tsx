@@ -21,8 +21,7 @@ import { getCustomModelOptionsByInstance } from "../modelSelection";
 import { getProviderModelCapabilities } from "../providerModels";
 import { deriveProviderInstanceEntries } from "../providerInstances";
 
-export { ComposerEffortColumn, ComposerPickerFooter } from "../components/chat/ComposerModelEffort";
-export { type ModelPickerHost, ModelPickerHostProvider } from "../components/chat/modelPickerHost";
+export { ComposerEffortColumn } from "../components/chat/ComposerModelEffort";
 export { ProviderModelPicker } from "../components/chat/ProviderModelPicker";
 
 export interface ModelPickerProps {
@@ -31,8 +30,8 @@ export interface ModelPickerProps {
   /** The instance, exact model slug and option values in use. */
   readonly selection: ModelSelection;
   /**
-   * A model pick or an option change. A model on another instance starts with no options; the
-   * same instance keeps its options, as Work's composer does.
+   * A model pick or an option change. A different model or instance starts with no options.
+   * A host with saved options can restore them for the destination model.
    */
   readonly onSelect: (selection: ModelSelection) => void;
   /** Asks the host for a fresh catalog; called on every open. */
@@ -67,12 +66,9 @@ function useProps(): ModelPickerProps {
 /** One constant host whose hooks read the latest props, so hook order never changes. */
 const standaloneHost: ModelPickerHost = {
   useRefreshModelCatalog: () => useProps().onRefresh ?? noop,
-  useOpenProviderSettings: () => {
-    const { onOpenSetup, selection } = useProps();
-    return () => onOpenSetup?.(selection.instanceId);
-  },
+  useOpenProviderSettings: () => useProps().onOpenSetup,
   useEnvironmentModelPreferences: () => NO_FAVORITES,
-  useToggleEnvironmentModelFavorite: () => noop,
+  useToggleEnvironmentModelFavorite: () => undefined,
   useProviderWorkspaceSnapshotRefresh: () => NOT_SCANNING,
   useServerKeybindings: () => NO_KEYBINDINGS,
   // Options travel through `onModelOptionsChange`; there is no thread or draft to write.
@@ -129,8 +125,8 @@ export function ModelPicker(props: ModelPickerProps) {
           {...(props.onOpenSetup ? { onOpenProviderSetup: props.onOpenSetup } : {})}
           onInstanceModelChange={(instanceId, model) =>
             onSelect(
-              instanceId === selection.instanceId
-                ? { ...selection, model }
+              instanceId === selection.instanceId && model === selection.model
+                ? selection
                 : { instanceId, model, options: [] },
             )
           }

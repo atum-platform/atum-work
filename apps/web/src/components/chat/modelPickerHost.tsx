@@ -23,13 +23,13 @@ export interface ModelPickerHost {
   /** Asks for newly released models; the picker calls it on every open. */
   readonly useRefreshModelCatalog: (environmentId: EnvironmentId | null) => () => void;
   /** Opens provider settings from an update notice. */
-  readonly useOpenProviderSettings: () => () => void;
+  readonly useOpenProviderSettings: () => ((instanceId: ProviderInstanceId) => void) | undefined;
   readonly useEnvironmentModelPreferences: (environmentId: EnvironmentId | null) => {
     readonly favorites: ModelPreferences["favorites"];
   };
   readonly useToggleEnvironmentModelFavorite: (
     environmentId: EnvironmentId | null,
-  ) => (instanceId: ProviderInstanceId, model: string) => void;
+  ) => ((instanceId: ProviderInstanceId, model: string) => void) | undefined;
   /** Whether the open provider's catalog for this directory is still being scanned. */
   readonly useProviderWorkspaceSnapshotRefresh: (input: {
     readonly environmentId: EnvironmentId | null;

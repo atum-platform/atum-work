@@ -1,6 +1,6 @@
 # Shared model picker
 
-Atum's desktop chat uses the same provider and model picker as Work. The source stays in
+Atum's desktop chat is intended to use the same provider and model picker as Work. The source stays in
 `apps/web/src/components/chat`, where upstream T3 maintains it. Atum adds one host seam and one
 export entry next to it, so upstream merges touch the same files they always did.
 
@@ -44,8 +44,8 @@ search, ordering and pure provider/model helpers. Method: a static import walk o
 
 The seam rows are code the picker runs while it renders, so they have to move behind an
 interface. The tree-shaking rows are static imports whose used exports are pure: a library
-build drops the rest once app source is declared side-effect free for that entry. Routing them
-through the seam would only add edits to upstream files.
+build can drop the rest if it proves the unused modules have no required startup side effects.
+Verify that assumption against the emitted artifact before adding another host adapter.
 
 ### The seam
 
@@ -60,13 +60,13 @@ that carry the original names (`useEnvironmentModelPreferences`, `useToggleEnvir
 `useOpenProviderSettings`, `useServerKeybindings` and `useSetProviderModelOptions` for code that was
 inline. As a result:
 
-- Work changes no behaviour, mounts no provider, and needs no test wrapper. Every existing
-  `ProviderModelPicker` caller (composer, settings, scheduled tasks, voice, text generation) runs
-  the same hooks in the same order as before.
+- Existing Work mounts get the default host when they import `ProviderModelPicker`. A new mount
+  of `TraitsPicker` or `ModelPickerContent` on its own needs an explicit host or an import of the
+  Work adapter. An isolated test that mocks the entire picker module must account for this too.
 - React Compiler (`apps/web/vite.config.ts`, `react({ compiler: true })`) keeps compiling the
   picker. It sees static hook imports. Only the one-line forwarders, whose callee is a value, opt
-  out with `"use no memo"`. Calling `host.useX()` inside the picker would make the compiler skip
-  the whole component.
+  out with `"use no memo"`. The compiler still reports dynamic-hook diagnostics on those
+  forwarders when diagnostics are enabled. Do not replace the host object of a mounted picker.
 - A host that is not Work wraps the picker in `ModelPickerHostProvider` with one constant object.
   The library build aliases `workModelPickerHost.tsx` to an empty module, so Work's atoms, router
   and draft store never enter that bundle. Measured from `src/model-picker/index.tsx` with that
@@ -81,24 +81,31 @@ inline. As a result:
 
 `apps/web/src/model-picker/index.tsx` is the one entry point. It exports:
 
-- `ProviderModelPicker`, `ComposerEffortColumn` and `ModelPickerHostProvider`. Work's composer
-  takes the picker from here, so the export is what Work itself runs.
+- `ProviderModelPicker` and `ComposerEffortColumn` for the Work composer. The consumer bundle
+  should export only `ModelPicker`, so these Work-facing exports remain outside the library API.
 - `ModelPicker`, the narrow component for other hosts. Its props are `providers` (a bounded
   `ServerProvider` projection), `selection` (`{instanceId, model, options}`), `onSelect`,
   `onRefresh`, `onOpenSetup` and `locale`. It always docks the options column. A model without
   options shows **No effort levels**, as in `ComposerModelEffort.tsx:516-561`. The column keeps its
   width on every rail, so the popup geometry does not change when the rail changes.
 
+Work remembers options by instance and model. The standalone picker preserves options when
+reselecting the same model and emits empty options on a different model or instance. Its host can
+restore saved values for the destination selection. Favorites are available in Work. The standalone
+picker hides the rail and stars until a host supplies that capability. Update notices send the
+notice's provider ID to the standalone host when it supplies a setup callback.
+
 ### Shipping (slice 4 inputs, not built in slice 1)
 
-- **Build.** Add a Vite library entry for `src/model-picker/index.tsx` that emits ESM plus one CSS
+- **Build.** Add a Vite library entry that re-exports only `ModelPicker` from
+  `src/model-picker/index.tsx` and emits ESM plus one CSS
   file into the runtime artifact's `client/` tree. `stage-work-runtime.mjs` already checks
   `client/index.html` (atum-desktop `apps/desktop/scripts/stage-work-runtime.mjs:33`). `react`,
   `react-dom` and `react/jsx-runtime` stay external; Desktop runs React 19.2
   (`apps/desktop/package.json:163`) and Work 19.3, and the picker uses only APIs both provide.
-  Alias `workModelPickerHost.tsx` to the stub and set `treeshake.moduleSideEffects` to keep only
-  CSS. Before Desktop adopts the bundle, check it contains no `zustand`, `@clerk`, `@dnd-kit` or
-  `@tanstack/react-router` code.
+  Alias `workModelPickerHost.tsx` to the stub and verify tree-shaking with the actual library
+  build. Before Desktop adopts it, load the emitted bundle in isolation and check it contains no
+  `zustand`, `@clerk`, `@dnd-kit` or `@tanstack/react-router` code.
 - **Consumption.** Desktop resolves the bundle at build time from the same pinned runtime archive.
   An alias in its Vite config points at the extracted file. Its npm tree gains no Work packages,
   and the picker version moves with the runtime pin.
@@ -141,3 +148,8 @@ the picker into `state/`, `hooks/useSettings`, `composerDraftStore` or the route
 - Lint: the repo config cannot load its own `oxlint-plugin-t3code` under linked deps
   (`@oxlint/plugins` not linked). `oxlint` with `rules-of-hooks`, `exhaustive-deps` and
   `no-unused-vars` passes on the touched files.
+- Review verification with the same markdown stubs passed 67 browser tests and 195 unit tests.
+  Both standalone browser tests also passed with the Work host aliased out. The minified Work
+  build passed the chunk-cycle guard, and Chromium imported each chat and relevant settings chunk
+  as the first import in a fresh page. This exercises Work's module initialization order. The
+  Desktop ESM entry and its CSS, portal and translation behavior still need artifact verification.

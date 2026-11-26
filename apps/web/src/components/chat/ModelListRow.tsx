@@ -33,7 +33,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
   unavailable?: boolean;
   jumpLabel?: string | null;
   disabledReason?: string | null;
-  onToggleFavorite: (instanceId: ProviderInstanceId, slug: string) => void;
+  onToggleFavorite: ((instanceId: ProviderInstanceId, slug: string) => void) | undefined;
 }) {
   const gt = useGT();
   const model = {
@@ -103,37 +103,41 @@ export const ModelListRow = memo(function ModelListRow(props: {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                size="icon-xs"
-                variant="ghost-muted"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onToggleFavorite(props.instanceId, props.slug);
-                }}
-                onKeyDown={(event) => {
-                  event.stopPropagation();
-                }}
-                disabled={Boolean(props.disabledReason)}
-                aria-label={props.isFavorite ? gt("Remove from favorites") : gt("Add to favorites")}
-              >
-                <StarIcon
-                  className={cn(
-                    "size-3.5 sm:size-3",
-                    props.isFavorite && "fill-current text-warning",
-                    (!props.isFavorite || props.favoriteStarOnHover) &&
-                      "opacity-0 group-hover:opacity-100 group-data-highlighted:opacity-100 in-focus-visible:opacity-100 pointer-coarse:opacity-100",
-                  )}
-                />
-              </Button>
-            }
-          />
-          <TooltipPopup side="top" align="center">
-            {props.isFavorite ? gt("Remove from favorites") : gt("Add to favorites")}
-          </TooltipPopup>
-        </Tooltip>
+        {props.onToggleFavorite ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon-xs"
+                  variant="ghost-muted"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onToggleFavorite?.(props.instanceId, props.slug);
+                  }}
+                  onKeyDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  disabled={Boolean(props.disabledReason)}
+                  aria-label={
+                    props.isFavorite ? gt("Remove from favorites") : gt("Add to favorites")
+                  }
+                >
+                  <StarIcon
+                    className={cn(
+                      "size-3.5 sm:size-3",
+                      props.isFavorite && "fill-current text-warning",
+                      (!props.isFavorite || props.favoriteStarOnHover) &&
+                        "opacity-0 group-hover:opacity-100 group-data-highlighted:opacity-100 in-focus-visible:opacity-100 pointer-coarse:opacity-100",
+                    )}
+                  />
+                </Button>
+              }
+            />
+            <TooltipPopup side="top" align="center">
+              {props.isFavorite ? gt("Remove from favorites") : gt("Add to favorites")}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
         {props.jumpLabel ? <Kbd>{props.jumpLabel}</Kbd> : null}
       </div>
     </ComboboxItem>

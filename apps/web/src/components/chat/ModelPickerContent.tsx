@@ -147,11 +147,12 @@ function adjacentModelPickerProvider(input: {
   entries: ReadonlyArray<ProviderInstanceEntry>;
   selectedInstanceId: ProviderInstanceId | "favorites";
   direction: 1 | -1;
+  showFavorites: boolean;
   disabledInstanceIds: ReadonlySet<ProviderInstanceId> | undefined;
   selectableUnavailableInstanceIds: ReadonlySet<ProviderInstanceId> | undefined;
 }) {
   const providers: Array<ProviderInstanceId | "favorites"> = [
-    "favorites",
+    ...(input.showFavorites ? (["favorites"] as const) : []),
     ...input.entries
       .filter(
         (entry) =>
@@ -161,6 +162,7 @@ function adjacentModelPickerProvider(input: {
       )
       .map((entry) => entry.instanceId),
   ];
+  if (providers.length === 0) return null;
   const index = providers.indexOf(input.selectedInstanceId);
   return providers[
     index < 0
@@ -254,13 +256,13 @@ function ModelPickerProviderNotices({
           className="shrink-0 border-t border-border/70 px-3 py-2 text-xs leading-snug text-muted-foreground"
         >
           {notice}
-          {canUpdateInSettings ? (
+          {canUpdateInSettings && openProviderSettings ? (
             <>
               {" "}
               <InlineButton
                 onClick={() => {
                   onRequestClose?.();
-                  openProviderSettings();
+                  openProviderSettings(instanceId);
                 }}
               >
                 <T>Provider settings</T>
@@ -490,6 +492,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const keybindings = providedKeybindings ?? serverKeybindings;
   const [searchHeight, setSearchHeight] = useState(0);
   const toggleFavorite = useToggleEnvironmentModelFavorite(props.environmentId);
+  const showFavorites = toggleFavorite !== undefined;
 
   const focusSearchInput = () => {
     searchInputRef.current?.focus({ preventScroll: true });
@@ -913,15 +916,17 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
       context: modelJumpShortcutContext,
     });
     if (command === "modelPicker.previousProvider" || command === "modelPicker.nextProvider") {
-      event.preventDefault();
-      event.stopPropagation();
       const next = adjacentModelPickerProvider({
         entries: sidebarInstanceEntries,
         selectedInstanceId,
         direction: command === "modelPicker.nextProvider" ? 1 : -1,
+        showFavorites,
         disabledInstanceIds: lockedDisabledInstanceIds,
         selectableUnavailableInstanceIds,
       });
+      if (next === null) return;
+      event.preventDefault();
+      event.stopPropagation();
       setSearchQuery("");
       handleSelectInstance(next);
       announce(
@@ -980,7 +985,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             onSelectInstance={handleSelectInstance}
             onFocusSearch={focusSearchInput}
             instanceEntries={sidebarInstanceEntries}
-            showFavorites
+            showFavorites={showFavorites}
             {...(selectableUnavailableInstanceIds ? { selectableUnavailableInstanceIds } : {})}
             {...(lockedDisabledInstanceIds
               ? {

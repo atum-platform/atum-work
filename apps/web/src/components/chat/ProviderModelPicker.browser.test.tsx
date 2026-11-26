@@ -350,7 +350,7 @@ it("keeps the touch keyboard down while choosing a provider", async () => {
 function standaloneProvider(
   name: string,
   driver: string,
-  model: ServerProvider["models"][number],
+  ...models: ServerProvider["models"]
 ): ServerProvider {
   return {
     instanceId: ProviderInstanceId.make(name.toLowerCase()),
@@ -362,7 +362,7 @@ function standaloneProvider(
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
-    models: [model],
+    models,
     slashCommands: [],
     skills: [],
   };
@@ -370,25 +370,35 @@ function standaloneProvider(
 
 it("runs from props alone and keeps its options column, at one width, on every rail", async () => {
   const providers = [
-    standaloneProvider("Codex", "codex", {
-      slug: "gpt",
-      name: "GPT model",
-      isCustom: false,
-      capabilities: createModelCapabilities({
-        optionDescriptors: [
-          {
-            id: "thought_level",
-            label: "Thinking",
-            type: "select",
-            role: "reasoning",
-            options: [
-              { id: "low", label: "Low", isDefault: true },
-              { id: "high", label: "High" },
-            ],
-          },
-        ],
-      }),
-    }),
+    standaloneProvider(
+      "Codex",
+      "codex",
+      {
+        slug: "gpt",
+        name: "GPT model",
+        isCustom: false,
+        capabilities: createModelCapabilities({
+          optionDescriptors: [
+            {
+              id: "thought_level",
+              label: "Thinking",
+              type: "select",
+              role: "reasoning",
+              options: [
+                { id: "low", label: "Low", isDefault: true },
+                { id: "high", label: "High" },
+              ],
+            },
+          ],
+        }),
+      },
+      {
+        slug: "other",
+        name: "Other Codex model",
+        isCustom: false,
+        capabilities: {},
+      },
+    ),
     standaloneProvider("Claude", "claudeAgent", {
       slug: "plain",
       name: "Plain model",
@@ -429,6 +439,10 @@ it("runs from props alone and keeps its options column, at one width, on every r
   expect(onRefresh).toHaveBeenCalledTimes(1);
   const search = page.getByPlaceholder("Search models...");
   await expect.element(search).toHaveFocus();
+  await expect.element(page.getByRole("button", { name: "Favorites" })).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("button", { name: "Add to favorites" }))
+    .not.toBeInTheDocument();
   // Layout width: the open animation scales the popup, which a bounding box would include.
   const popupWidth = () =>
     search.element().closest<HTMLElement>('[data-slot="popover-popup"]')!.offsetWidth;
@@ -463,6 +477,11 @@ it("runs from props alone and keeps its options column, at one width, on every r
     }),
   );
   expect(popupWidth()).toBe(codexWidth);
+  await page.getByRole("option", { name: /Other Codex model/ }).click();
+  await expect
+    .element(selection)
+    .toHaveTextContent(JSON.stringify({ instanceId: "codex", model: "other", options: [] }));
+  await page.getByRole("option", { name: /GPT model/ }).click();
   await userEvent.keyboard("{Escape}");
   await expect.element(search).not.toBeInTheDocument();
 
@@ -473,4 +492,35 @@ it("runs from props alone and keeps its options column, at one width, on every r
   const list = document.querySelector("[data-model-picker-content]")!.getBoundingClientRect();
   expect(column()!.getBoundingClientRect().top).toBeGreaterThanOrEqual(list.bottom - 1);
   await userEvent.keyboard("{Escape}");
+});
+
+it("opens setup for the provider named in an update notice", async () => {
+  const codex = standaloneProvider("Codex", "codex", {
+    slug: "gpt",
+    name: "GPT model",
+    isCustom: false,
+    capabilities: {},
+  });
+  const claude = {
+    ...standaloneProvider("Claude", "claudeAgent"),
+    updateRequiredModels: [{ slug: "upcoming", name: "Upcoming model", minVersion: "2.1.321" }],
+  };
+  const onOpenSetup = vi.fn();
+  const props = {
+    providers: [codex, claude],
+    selection: { instanceId: codex.instanceId, model: "gpt" },
+    onSelect: vi.fn(),
+  };
+  // No router, so the link can only open the setup the host supplies.
+  await using screen = await render(<ModelPicker {...props} />, { router: false });
+  await screen.getByRole("button", { name: "GPT model" }).click();
+  await page.getByPlaceholder("Search models...").fill("Upcoming model");
+  await expect.element(page.getByText(/Update Claude Code/)).toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: "Provider settings" }))
+    .not.toBeInTheDocument();
+
+  await screen.rerender(<ModelPicker {...props} onOpenSetup={onOpenSetup} />);
+  await page.getByRole("button", { name: "Provider settings" }).click();
+  expect(onOpenSetup).toHaveBeenCalledExactlyOnceWith(claude.instanceId);
 });
