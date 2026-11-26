@@ -3,8 +3,10 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   type ModelSelection,
+  type ServerProvider,
 } from "@t3tools/contracts";
 import { compileResolvedKeybindingsConfig } from "@t3tools/shared/keybindings";
+import { createModelCapabilities } from "@t3tools/shared/model";
 import { useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
@@ -14,6 +16,7 @@ import "~/index.css";
 import { render } from "../../../test/render";
 import { __setClientSettingsForTests } from "../../hooks/useSettings";
 import { deriveProviderInstanceEntries } from "../../providerInstances";
+import { ModelPicker } from "../../model-picker";
 import { ProviderModelPicker } from "./ProviderModelPicker";
 
 it("keeps each registry image when adding a model from another ACP agent", async () => {
@@ -342,4 +345,119 @@ it("keeps the touch keyboard down while choosing a provider", async () => {
   await page.getByRole("button", { name: /^Claude/ }).click();
   await expect.element(page.getByRole("option", { name: /Claude model/ })).toBeVisible();
   await expect.element(search).not.toHaveFocus();
+});
+
+function standaloneProvider(
+  name: string,
+  driver: string,
+  model: ServerProvider["models"][number],
+): ServerProvider {
+  return {
+    instanceId: ProviderInstanceId.make(name.toLowerCase()),
+    driver: ProviderDriverKind.make(driver),
+    displayName: name,
+    enabled: true,
+    installed: true,
+    version: null,
+    status: "ready",
+    auth: { status: "authenticated" },
+    checkedAt: "2026-01-01T00:00:00.000Z",
+    models: [model],
+    slashCommands: [],
+    skills: [],
+  };
+}
+
+it("runs from props alone and keeps its options column, at one width, on every rail", async () => {
+  const providers = [
+    standaloneProvider("Codex", "codex", {
+      slug: "gpt",
+      name: "GPT model",
+      isCustom: false,
+      capabilities: createModelCapabilities({
+        optionDescriptors: [
+          {
+            id: "thought_level",
+            label: "Thinking",
+            type: "select",
+            role: "reasoning",
+            options: [
+              { id: "low", label: "Low", isDefault: true },
+              { id: "high", label: "High" },
+            ],
+          },
+        ],
+      }),
+    }),
+    standaloneProvider("Claude", "claudeAgent", {
+      slug: "plain",
+      name: "Plain model",
+      isCustom: false,
+      capabilities: {},
+    }),
+  ];
+  const onRefresh = vi.fn();
+
+  function Host() {
+    const [selection, setSelection] = useState<ModelSelection>({
+      instanceId: providers[0]!.instanceId,
+      model: "gpt",
+    });
+    return (
+      <>
+        <output aria-label="Selection">{JSON.stringify(selection)}</output>
+        <ModelPicker
+          providers={providers}
+          selection={selection}
+          onSelect={setSelection}
+          onRefresh={onRefresh}
+        />
+      </>
+    );
+  }
+
+  // No router and no Work environment: everything the picker reads comes through its props.
+  await using screen = await render(<Host />, { router: false });
+  const selection = screen.getByRole("status", { name: "Selection" });
+  await screen.getByRole("button", { name: "GPT model" }).click();
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  const search = page.getByPlaceholder("Search models...");
+  await expect.element(search).toHaveFocus();
+  const popupWidth = () =>
+    search.element().closest('[data-slot="popover-popup"]')!.getBoundingClientRect().width;
+  const column = () => document.querySelector("[data-model-picker-effort]");
+  await expect.element(page.getByRole("radiogroup", { name: "Thinking" })).toBeVisible();
+  const codexWidth = popupWidth();
+
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.element(page.getByRole("radio", { name: "Low" })).toHaveFocus();
+  await userEvent.keyboard("{ArrowLeft}");
+  await expect.element(search).toHaveFocus();
+
+  // A model without options keeps the column and the popup's width.
+  await page.getByRole("button", { name: /^Claude/ }).click();
+  await page.getByRole("option", { name: /Plain model/ }).click();
+  await expect.element(page.getByText("No effort levels")).toBeVisible();
+  expect(column()).not.toBeNull();
+  expect(popupWidth()).toBe(codexWidth);
+  await expect
+    .element(selection)
+    .toHaveTextContent(JSON.stringify({ instanceId: "claude", model: "plain", options: [] }));
+
+  // Back on the first rail, a level is the option value handed to the host.
+  await page.getByRole("button", { name: /^Codex/ }).click();
+  await page.getByRole("option", { name: /GPT model/ }).click();
+  await page.getByRole("radio", { name: "High" }).click();
+  await expect
+    .element(selection)
+    .toHaveTextContent(
+      JSON.stringify({
+        instanceId: "codex",
+        model: "gpt",
+        options: [{ id: "thought_level", value: "high" }],
+      }),
+    );
+  expect(popupWidth()).toBe(codexWidth);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(search).not.toBeInTheDocument();
 });

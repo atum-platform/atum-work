@@ -34,7 +34,7 @@ import {
   MenuSeparator as MenuDivider,
   MenuTrigger,
 } from "../ui/menu";
-import { useComposerDraftStore, DraftId } from "../../composerDraftStore";
+import type { DraftId } from "../../composerDraftStore";
 import { getProviderModelCapabilities, keepsUnavailableModelOptions } from "../../providerModels";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
@@ -42,6 +42,7 @@ import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ComposerControl, ComposerControlIcon, type ComposerControlSize } from "./ComposerControl";
 import { useComposerMenuState } from "./useComposerMenuState";
+import { useSetProviderModelOptions } from "./modelPickerHost";
 
 type ProviderOptions = ReadonlyArray<ProviderOptionSelection>;
 
@@ -325,7 +326,7 @@ export function useTraitsSelection({
 }: TraitsSelectionInput) {
   const modelSelection =
     instanceId && model ? { instanceId, model, options: modelOptions ?? [] } : null;
-  const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
+  const setProviderModelOptions = useSetProviderModelOptions();
   const resolve = useMessages();
   const updateModelOptions = (nextOptions: ProviderOptions | undefined) => {
     if ("onModelOptionsChange" in persistence) {

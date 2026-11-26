@@ -9,13 +9,11 @@ import {
   MODEL_PICKER_JUMP_KEYBINDING_COMMANDS,
 } from "@t3tools/contracts";
 import { resolveSelectableModel } from "@t3tools/shared/model";
-import { useAtomValue } from "@effect/atom-react";
 import {
   formatProviderUpdateRequiredNotice,
   providerUpdateChannelLags,
 } from "@t3tools/client-runtime/providerUpdateRequiredModels";
 import { groupModelsBySubProvider } from "@t3tools/client-runtime/providerSubProviders";
-import { useNavigate } from "@tanstack/react-router";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import {
   memo,
@@ -30,7 +28,13 @@ import {
 import { ChevronRightIcon } from "lucide-react";
 import { ModelListRow } from "./ModelListRow";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
-import { useProviderWorkspaceSnapshotRefresh } from "./useProviderWorkspaceSnapshotRefresh";
+import {
+  useEnvironmentModelPreferences,
+  useOpenProviderSettings,
+  useProviderWorkspaceSnapshotRefresh,
+  useServerKeybindings,
+  useToggleEnvironmentModelFavorite,
+} from "./modelPickerHost";
 import { getProviderStatusMessage, hasProviderSetup } from "./ProviderStatusBanner";
 import {
   modelPickerLegacySectionKey,
@@ -50,17 +54,12 @@ import {
 import { ModelEsque } from "./providerIconUtils";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { registerModelPickerContent } from "../../modelPickerVisibility";
-import { primaryServerKeybindingsAtom } from "../../state/server";
 import {
   modelPickerJumpCommandForIndex,
   modelPickerJumpIndexFromCommand,
   resolveShortcutCommand,
   shortcutLabelForCommand,
 } from "../../keybindings";
-import {
-  useEnvironmentModelPreferences,
-  useToggleEnvironmentModelFavorite,
-} from "~/hooks/useSettings";
 import { announce } from "~/lib/announce";
 import { cn } from "~/lib/utils";
 import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
@@ -222,7 +221,7 @@ function ModelPickerProviderNotices({
 }) {
   const gt = useGT();
   const messages = useMessages();
-  const navigate = useNavigate();
+  const openProviderSettings = useOpenProviderSettings();
   return (
     <>
       {setupEntries.length > 0 ? (
@@ -261,7 +260,7 @@ function ModelPickerProviderNotices({
               <InlineButton
                 onClick={() => {
                   onRequestClose?.();
-                  void navigate({ to: "/settings/providers" });
+                  openProviderSettings();
                 }}
               >
                 <T>Provider settings</T>
@@ -487,7 +486,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           : [],
       ),
   );
-  const serverKeybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const serverKeybindings = useServerKeybindings();
   const keybindings = providedKeybindings ?? serverKeybindings;
   const [searchHeight, setSearchHeight] = useState(0);
   const toggleFavorite = useToggleEnvironmentModelFavorite(props.environmentId);
