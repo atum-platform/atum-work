@@ -11,7 +11,8 @@ export const MCP_TOOL_EXPOSURE_HEADER = "t3-tool-exposure";
 export interface ManagedMcpServer {
   readonly name: string;
   readonly url: string;
-  readonly authorizationHeader: string;
+  readonly authorizationHeader?: string;
+  readonly toolTimeoutMs?: number;
 }
 
 export interface McpProviderSessionConfig {

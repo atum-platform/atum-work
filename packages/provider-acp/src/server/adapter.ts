@@ -1094,14 +1094,17 @@ function acpMcpContext(
     env: [
       { name: "ELECTRON_RUN_AS_NODE", value: "1" },
       { name: "T3_ACP_MCP_ENDPOINT", value: url },
-      { name: "T3_ACP_MCP_AUTHORIZATION", value: authorizationHeader },
+      { name: "T3_ACP_MCP_AUTHORIZATION", value: authorizationHeader ?? "" },
     ],
   }));
   const managedHttp = managed.map(({ name, url, authorizationHeader }) => ({
     type: "http" as const,
     name,
     url,
-    headers: [{ name: "Authorization", value: authorizationHeader }],
+    headers:
+      authorizationHeader === undefined
+        ? []
+        : [{ name: "Authorization", value: authorizationHeader }],
   }));
   if (session === undefined) {
     return {
@@ -2100,7 +2103,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const readMcpContext = (threadId: ThreadId | null) =>
     Effect.all([
       threadId === null ? Effect.undefined : mcpSessions.read(threadId),
-      mcpSessions.readManagedServers,
+      mcpSessions.readManagedServersForThread(threadId),
     ]).pipe(
       Effect.map(([session, managed]) =>
         acpMcpContext(

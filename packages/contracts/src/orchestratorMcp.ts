@@ -553,6 +553,18 @@ export const OrchestratorMcpThreadReadResult = Schema.Struct({
 });
 export type OrchestratorMcpThreadReadResult = typeof OrchestratorMcpThreadReadResult.Type;
 
+export const OrchestratorMcpThreadServers = Schema.Array(
+  Schema.Struct({
+    name: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,47}$/)),
+    url: Schema.String.check(Schema.isMaxLength(2048)),
+    headersRef: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,48}$/)),
+    toolTimeoutMs: Schema.optional(
+      Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 3_900_000 })),
+    ),
+  }),
+).check(Schema.isMaxLength(4));
+export type OrchestratorMcpThreadServers = typeof OrchestratorMcpThreadServers.Type;
+
 export const OrchestratorMcpThreadSendInput = Schema.Struct({
   environmentId: OrchestratorMcpEnvironmentTarget,
   threadId: ThreadId,
@@ -571,6 +583,7 @@ export const OrchestratorMcpThreadSendInput = Schema.Struct({
     }),
   ),
   clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
+  mcpServers: Schema.optional(OrchestratorMcpThreadServers),
 });
 export type OrchestratorMcpThreadSendInput = typeof OrchestratorMcpThreadSendInput.Type;
 

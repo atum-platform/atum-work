@@ -186,7 +186,7 @@ it.live(
             if (resumed) expect((yield* previous!("tools/list", {})).status).toBe(401);
             const rpc = yield* open(config.authorizationHeader);
             expect(yield* (yield* rpc("tools/list", {})).json).toMatchObject({
-              result: { tools: [{ name: "ask_my_agent" }, { name: "agent_tools" }] },
+              result: { tools: [{ name: "ask_my_agent" }] },
             });
             expect(yield* (yield* rpc("tools/call", call)).json).toMatchObject({
               result: { structuredContent: { state: "answered", answer: "fixture answer" } },

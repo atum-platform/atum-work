@@ -2791,6 +2791,11 @@ describe("CodexAdapterV2 post-settle continuation", () => {
               required: false,
               http_headers: { Authorization: "Bearer local-fixture" },
             },
+            "mcp_servers.relay": {
+              url: "http://127.0.0.1:43124/relay",
+              required: false,
+              tool_timeout_sec: 180,
+            },
             "mcp_servers.t3-code": {
               url: "http://127.0.0.1:43123/mcp",
               tool_timeout_sec: 3_900,
@@ -2820,6 +2825,12 @@ describe("CodexAdapterV2 post-settle continuation", () => {
                 authorizationHeader: "Bearer local-fixture",
               },
             ]),
+            (threadId) =>
+              Effect.succeed(
+                threadId === `thread-launch-mcp-servers`
+                  ? [{ name: "relay", url: "http://127.0.0.1:43124/relay", toolTimeoutMs: 180_000 }]
+                  : [],
+              ),
           ),
           NodeServices.layer,
           NodeCrypto.layer,

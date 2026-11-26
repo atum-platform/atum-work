@@ -32,3 +32,48 @@ failure leaves provider sessions usable with their usual tools.
 A local Node 26.13.1 smoke test read the same cached config twice from a real
 inherited FIFO, confirmed the environment fields were cleared, and verified
 that an invalid descriptor leaves the toolkit unconfigured.
+
+## Relay-supplied thread MCP
+
+An operator enables this path with `T3CODE_THREAD_MCP_ORIGIN` (an exact HTTPS
+origin, or IPv4 loopback HTTP for a local fixture) and
+`T3CODE_THREAD_MCP_CLIENT_SESSION` (the relay's authenticated Work MCP client
+session ID). The relay attaches servers to threads it launches on this Work
+environment. Work uses the authenticated session ID for admission. A label or
+a provider thread credential cannot grant attachment access.
+
+The relay supplies `mcpServers` on `t3_thread_launch` and between turns on
+`t3_thread_send`. Each entry names a server, gives its MCP URL and
+`headersRef`, and can set `toolTimeoutMs`. The relay sends a JSON object
+mapping references to full Authorization values in the request's `X-API-Key`
+header, which the HTTP tracer redacts. Keep that header out of relay logs
+and persisted retry payloads. The relay can omit the list to keep the
+existing registration, or pass an empty list to clear it. A send with an
+attachment update needs an idle thread. Requests with the same accepted
+`clientRequestId` replay the original dispatch without resetting its credentials.
+
+Work keeps the registry and upstream credentials in process memory. Providers
+get an opaque URL on a separate IPv4 loopback socket. The listener forwards
+Streamable HTTP requests only to the configured origin, supplies Authorization
+at request time, and refuses redirects. Rotating a bearer keeps the provider
+URL byte-stable. Restarting Work requires replaying the authenticated launch
+with its original request ID to re-establish the attachment before sending.
+On send, Codex and ACP require `freshContext` for structural changes to the
+server list. Credential rotation needs neither a new registration nor a fresh
+provider session. Claude applies structural changes through the native
+`setMcpServers` control request on its live query. ACP registrations follow
+the existing HTTP and stdio paths. ACP agents can enforce their own shorter
+tool deadlines.
+
+The isolated rotation fixture used the pinned Agent SDK 0.3.321 and its
+bundled macOS ARM64 Claude executable. A single live query performed two
+`setMcpServers` registrations for the same server name and URL. Both
+reported the server connected. The fixture received `initialize` and
+`tools/list` with each successive synthetic bearer. The test used a fresh
+home and a loopback endpoint for all requests and sent no model prompt.
+
+A second run registered Work's loopback URL once and invoked a fixture tool
+through the same Claude query before and after replacing the Work credential.
+The upstream recorded first the old bearer and then the new one. The second
+call returned in 150.27 seconds under a 180-second budget. A scan of the four
+files created in the isolated Claude home found neither synthetic bearer.

@@ -76,6 +76,7 @@ import * as RemoteDelegation from "../peer/RemoteDelegation.ts";
 import type { McpInvocationScope } from "./McpInvocationContext.ts";
 import { idleThreadProjection, liveThreadShell } from "./McpToolAccess.testkit.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
+import * as ThreadMcpServers from "./ThreadMcpServers.ts";
 import { resolveRuntimeMode } from "./delegatedTaskModes.ts";
 import type { ProjectionRecordFilter } from "../orchestration-v2/ProjectionStore.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -5089,6 +5090,60 @@ describe("OrchestratorMcpService thread lookup", () => {
         assert.include(error.message, `mcp:${bareId}`);
       }
       assert.equal(sends, 0);
+    }),
+  );
+
+  it.live("rotates a relay attachment before sending without dispatching the credential", () =>
+    Effect.gen(function* () {
+      const origin = new URL("https://example.test");
+      const thread = { ...launched, activeRunId: null };
+      const servers = [{ name: "relay", url: new URL("/tools", origin).href, headersRef: "relay" }];
+      const scope = (value: string): McpInvocationScope => ({
+        ...client,
+        threadMcpAuthorization: ThreadMcpServers.authorizationReferences(
+          `{"relay":"Bearer ${value}"}`,
+        )!,
+      });
+      yield* Effect.gen(function* () {
+        const relay = yield* ThreadMcpServers.ThreadMcpServers;
+        const sent = yield* Ref.make(0);
+        const initial = yield* relay.around(
+          {
+            scope: scope("synthetic-launch"),
+            commandId: CommandId.make("fixture-launch"),
+            threadId: thread.id,
+            launch: true,
+            servers,
+          },
+          relay.read(thread.id),
+        );
+        yield* Effect.gen(function* () {
+          const mcp = yield* OrchestratorMcpService.OrchestratorMcpService;
+          const result = yield* mcp.sendToThread(scope("synthetic-send"), {
+            threadId: thread.id,
+            message: "Follow up",
+            clientRequestId: "turn-2",
+            mcpServers: servers,
+          });
+          assert.equal(result.runId, "fixture-run");
+          assert.deepEqual(yield* relay.read(thread.id), initial);
+        }).pipe(
+          Effect.provide(
+            service([thread], sent, {
+              getProjectThreadRecords: () => Effect.succeed(idleThreadProjection(thread)),
+              sendToThread: (input) =>
+                Effect.sync(() => {
+                  assert.notProperty(input, "mcpServers");
+                  assert.notInclude(JSON.stringify(input), "synthetic-send");
+                  return {
+                    run: { id: RunId.make("fixture-run"), status: "queued" },
+                    delivery: "queued",
+                  } as unknown as ThreadManagementService.ThreadManagementSendResult;
+                }),
+            }),
+          ),
+        );
+      }).pipe(Effect.provide(ThreadMcpServers.layer({ origin, clientSessionId: "thread-lookup" })));
     }),
   );
 

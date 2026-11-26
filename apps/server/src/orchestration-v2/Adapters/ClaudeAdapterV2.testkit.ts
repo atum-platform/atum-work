@@ -849,6 +849,7 @@ function makeReplayQueryRunner(
             assertNextOutboundFrame({ type: "query.background_tasks", toolUseId });
           }).pipe(Effect.as(true)),
         // A result looks for servers that need a sign-in; the replay reports none.
+        setMcpServers: () => Effect.succeed(true),
         mcpServerStatus: Effect.succeed([]),
         // Recorded CLIs predate MCP Apps capabilities, so replays never reach these.
         readMcpResource: () => Effect.die("unexpected MCP resource read in replay"),

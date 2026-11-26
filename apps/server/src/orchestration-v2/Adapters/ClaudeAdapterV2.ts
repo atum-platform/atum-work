@@ -784,6 +784,9 @@ export interface ClaudeAgentSdkQuerySession {
     onQueued?: () => void,
   ) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly setModel: (model: string) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
+  readonly setMcpServers: (
+    servers: NonNullable<ClaudeQueryOptions["mcpServers"]>,
+  ) => Effect.Effect<boolean>;
   readonly applyFlagSettings: (
     settings: ClaudeFlagSettings,
   ) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
@@ -2029,6 +2032,18 @@ export const layerQueryRunner: Layer.Layer<
               }),
             ),
           ),
+        setMcpServers: (servers) =>
+          Effect.tryPromise({
+            try: () => queryRuntime.setMcpServers(servers),
+            catch: () => undefined,
+          }).pipe(
+            Effect.map((result) => Object.keys(result.errors).length === 0),
+            Effect.orElseSucceed(() => false),
+            Effect.timeoutOrElse({
+              duration: CLAUDE_MCP_REGISTRATION_TIMEOUT,
+              orElse: () => Effect.succeed(false),
+            }),
+          ),
         applyFlagSettings: (settings) =>
           Effect.tryPromise({
             try: () => queryRuntime.applyFlagSettings(settings),
@@ -2799,9 +2814,16 @@ export function claudeMcpQueryOverrides(input: {
 } {
   const session = input.mcpSession;
   const managed = Object.fromEntries(
-    (input.managedMcpServers ?? []).map(({ name, url, authorizationHeader }) => [
+    (input.managedMcpServers ?? []).map(({ name, url, authorizationHeader, toolTimeoutMs }) => [
       name,
-      { type: "http" as const, url, headers: { Authorization: authorizationHeader } },
+      {
+        type: "http" as const,
+        url,
+        ...(authorizationHeader === undefined
+          ? {}
+          : { headers: { Authorization: authorizationHeader } }),
+        ...(toolTimeoutMs === undefined ? {} : { timeout: toolTimeoutMs }),
+      },
     ]),
   );
   if (session === undefined) {
@@ -5492,6 +5514,7 @@ interface ClaudeLiveQueryContext {
   readonly launchArgSettings: ClaudeSdkSettings | undefined;
   readonly query: ClaudeAgentSdkQuerySession;
   readonly queryPolicyKey: string;
+  threadMcpKey: string;
   selection: CompiledClaudeModelSelection;
   readonly program: string | undefined;
   readonly startedWithApiModelId: string;
@@ -13429,6 +13452,19 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             mcpOverrides,
             turnInput.runtimePolicy.workspace,
           );
+          const threadServers =
+            sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly"
+              ? []
+              : yield* mcpSessions.readThreadServers(turnInput.threadId);
+          const threadMcpKey = threadServers.map(({ url }) => url).join(" ");
+          const mcpServers = {
+            ...claudeMcpQueryOverrides({
+              mcpSession: undefined,
+              readOnlySandbox: false,
+              managedMcpServers: threadServers,
+            }).mcpServers,
+            ...mcpOverrides.mcpServers,
+          };
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
           const existing = yield* Ref.get(queryContext);
           // Continuations drain existing output without prompting; retain the live process regardless of selection.
@@ -13542,6 +13578,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   }),
                 );
             }
+            if (existing.threadMcpKey !== threadMcpKey) {
+              if (yield* existing.query.setMcpServers(mcpServers)) {
+                existing.threadMcpKey = threadMcpKey;
+              } else {
+                yield* Effect.logWarning("orchestration-v2.claude-thread-mcp-update-failed", {
+                  threadId: turnInput.threadId,
+                });
+              }
+            }
             return existing;
           }
 
@@ -13630,9 +13675,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(mcpOverrides.allowedTools === undefined
               ? {}
               : { allowedTools: mcpOverrides.allowedTools }),
-            ...(mcpOverrides.mcpServers === undefined
-              ? {}
-              : { mcpServers: mcpOverrides.mcpServers }),
+            ...(Object.keys(mcpServers).length === 0 ? {} : { mcpServers }),
             agentInstructions: mcpSession?.agentInstructions,
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
@@ -13707,6 +13750,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             launchArgSettings,
             query: querySession,
             queryPolicyKey,
+            threadMcpKey,
             selection: compiledSelection,
             program,
             startedWithApiModelId: compiledSelection.apiModelId,

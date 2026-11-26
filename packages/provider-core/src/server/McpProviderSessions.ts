@@ -34,6 +34,12 @@ export class McpProviderSessions extends Context.Service<
     readonly set: (config: McpProviderSessionConfig) => Effect.Effect<void>;
     readonly read: (threadId: ThreadId) => Effect.Effect<McpProviderSessionConfig | undefined>;
     readonly readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
+    readonly readThreadServers: (
+      threadId: ThreadId,
+    ) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
+    readonly readManagedServersForThread: (
+      threadId: ThreadId | null,
+    ) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
     readonly clear: (threadId: ThreadId) => Effect.Effect<void>;
     readonly recordHtmlRender: (
       threadId: ThreadId,
@@ -106,11 +112,24 @@ const matchingPageIndex = (kept: ReadonlyArray<KeptHtmlRender>, input: PageInput
 
 const make = Effect.fnUntraced(function* (
   readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
+  readThreadServers: McpProviderSessions["Service"]["readThreadServers"],
 ) {
   const sessions = yield* Ref.make(new Map<ThreadId, McpProviderSessionConfig>());
   const htmlRenders = yield* Ref.make(new Map<ThreadId, ReadonlyArray<KeptHtmlRender>>());
   return McpProviderSessions.of({
     readManagedServers,
+    readThreadServers,
+    readManagedServersForThread: Effect.fn("McpProviderSessions.readManagedServersForThread")(
+      (threadId: ThreadId | null) =>
+        threadId === null
+          ? readManagedServers
+          : Effect.all([readManagedServers, readThreadServers(threadId)]).pipe(
+              Effect.map(([account, thread]) => [
+                ...account,
+                ...thread.filter((entry) => !account.some(({ name }) => name === entry.name)),
+              ]),
+            ),
+    ),
     set: Effect.fn("McpProviderSessions.set")(function* (config) {
       const current = yield* Ref.get(sessions);
       if (current.get(config.threadId)?.providerSessionId !== config.providerSessionId) {
@@ -191,6 +210,7 @@ const make = Effect.fnUntraced(function* (
 
 export const layerWithManagedServers = (
   readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
-) => Layer.effect(McpProviderSessions, make(readManagedServers));
+  readThreadServers: McpProviderSessions["Service"]["readThreadServers"] = () => Effect.succeed([]),
+) => Layer.effect(McpProviderSessions, make(readManagedServers, readThreadServers));
 
 export const layer = layerWithManagedServers(Effect.succeed([]));
