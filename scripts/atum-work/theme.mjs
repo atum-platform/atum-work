@@ -37,12 +37,14 @@ export function atumThemeColors(theme, mode) {
     return value;
   };
   const surface = t("surface");
-  const ground = t("ground");
+  const frame = t("chrome");
+  // The left panel is Kit's roster panel over the frame, the shade every Atum screen's left panel wears.
+  const ground = solid(t("panel"), frame);
   const on = (name, base = surface) => solid(t(name), base);
   return {
-    // Main card: opaque surface. Frame and sidebar: the ground behind it (STYLE.md section 2).
+    // Main card: opaque surface. Frame: Kit's chrome; the sidebar card sits on it (STYLE.md section 2).
     canvas: surface,
-    chrome: ground,
+    chrome: frame,
     toolbar: surface,
     toolbarForeground: t("ink"),
     toolbarBorder: on("line"),
@@ -117,6 +119,26 @@ export function atumTheme(tokens) {
     `[data-slot="alert"][data-variant] { --alert-glass-tint: transparent; border-color: var(--border); }`,
     // Switches take Kit's proportions (.ak-switch is 22 by 38): a 20px thumb gives exactly that.
     `[data-slot="switch"][data-size="default"] { --thumb-size: 20px; }`,
+    // The thread list wears Chat's roster head: a filled search field. The host's title bar owns
+    // "new thread" (its + menu), so the list's own pencil, a second way to do one thing, is hidden.
+    `[data-slot="sidebar-inner"] div:has(> [data-slot="input-control"]) { background: var(--sidebar-control-surface); border-radius: ${px(tokens.radius.sm)}; }`,
+    `[data-sidebar-new-thread] { display: none; }`,
+    // A notice sits above the empty thread's greeting, never over it: the overlay starts under the
+    // banner lane (empty lane: zero height, so nothing moves).
+    `.chat-banner-lane { anchor-name: --atum-banner-lane; }`,
+    `[data-chat-composer-overlay] { top: anchor(--atum-banner-lane bottom, 0px); }`,
+    // Work mode shows one folder of files, so the folder chip on every row, the folder filter and the
+    // folder crumb repeat it. A row reads as Chat's: title and time, then where it runs.
+    `:root[data-atum-mode="work"] [data-slot="sidebar-inner"] [data-slot="combobox-trigger"] { display: none; }`,
+    // Work mode's footer holds only Settings; it sits at the foot's right end, as on Chat's roster.
+    `:root[data-atum-mode="work"] [data-sidebar="footer"] > [data-sidebar="menu"] { justify-content: flex-end; }`,
+    `:root[data-atum-mode="work"] [data-chat-header] nav ol:has(> li:nth-child(3)) > li:nth-child(-n + 2) { display: none; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; column-gap: 0.375rem; height: auto; min-height: 3.75rem; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div > div:first-child { display: contents; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div > div:first-child > :not(:last-child) { display: none; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div > div:first-child > :last-child { grid-area: 1 / 2; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div > div:nth-child(2) { grid-area: 1 / 1; margin-top: 0; }`,
+    `:root[data-atum-mode="work"] [data-sidebar-row] > div > div:nth-child(n + 3) { grid-column: 1 / -1; }`,
   ].join("\n");
   return {
     version: 1,

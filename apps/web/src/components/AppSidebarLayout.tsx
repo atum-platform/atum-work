@@ -392,7 +392,8 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
       )}
       data-sidebar-control=""
     >
-      {showSidebar ? (
+      {/* Atum's title bar carries the one hide button (it runs sidebar.toggle); the shortcut stays. */}
+      {showSidebar && import.meta.env.VITE_ATUM_WORK_BUILD !== "1" ? (
         <Tooltip>
           <TooltipTrigger
             render={
@@ -479,9 +480,8 @@ export function AppSidebarLayout({
             <Sidebar
               side="left"
               collapsible="offcanvas"
-              // Atum hosts Work in its shared panel frame: T3's own inset layout (sidebar on the
-              // chrome ground, the thread a rounded card) matches it.
-              variant={import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? "inset" : "sidebar"}
+              // Atum's screens set the left panel and the main card apart on the window's frame.
+              variant={import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? "panels" : "sidebar"}
               data-app-sidebar=""
               {...sidebarArea}
               role="navigation"
