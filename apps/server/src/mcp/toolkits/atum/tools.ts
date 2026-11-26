@@ -31,23 +31,4 @@ const AskMyAgentTool = Tool.make("ask_my_agent", {
     McpSessionRegistry.McpSessionRegistry,
   ],
 }).annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
-const BoundTools = Tool.make("agent_tools", {
-  description:
-    "List or call the cloud tools of the agent bound to this thread. List first to discover exact names and JSON schemas. Binding is supplied by Work, never by model arguments.",
-  parameters: Schema.Struct({
-    operation: Schema.Literals(["list", "call"]),
-    name: Schema.optionalKey(Schema.String),
-    arguments: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  }),
-  success: Schema.Unknown,
-  failure: OrchestratorMcpFailure,
-  failureMode: "return" as const,
-  dependencies: [
-    McpInvocationContext.McpInvocationContext,
-    ThreadManagementService.ThreadManagementService,
-    ThreadCommandExecutor.ThreadCommandExecutor,
-    McpProviderSessions.McpProviderSessions,
-    McpSessionRegistry.McpSessionRegistry,
-  ],
-}).annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
-export const AtumToolkit = Toolkit.make(AskMyAgentTool, BoundTools);
+export const AtumToolkit = Toolkit.make(AskMyAgentTool);

@@ -4,9 +4,10 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeHttp from "node:http";
-import { bindNativeThread, nativeThreadGrant } from "./forwardAdmission.ts";
-import { provisionNativeCaller } from "./nativeCaller.ts";
-import { readGrant } from "./boundRegistry.ts";
+
+process.env.ATUM_WORK_MAC_ID = "mac";
+const { bindNativeThread, nativeThreadGrant } = await import("./forwardAdmission.ts");
+const { callerFile, provisionNativeCaller } = await import("./nativeCaller.ts");
 
 NodeTest.test(
   "native session producer registers and persists exact caller over private HTTP",
@@ -51,7 +52,15 @@ NodeTest.test(
       });
       NodeAssert.deepEqual(received.caller, caller);
       NodeAssert.equal(received.hermesSessionId, "hermes");
-      NodeAssert.deepEqual((await readGrant(reverse, caller, 1)).binding, grant.binding);
+      const persisted = JSON.parse(await NodeFSP.readFile(callerFile(reverse, caller), "utf8"));
+      NodeAssert.deepEqual(persisted, {
+        ...caller,
+        binding: grant.binding,
+        actor: grant.actor,
+        audience: grant.audience,
+        expiresAt: grant.expiresAt,
+        enabled: grant.enabled,
+      });
       await NodeFSP.writeFile(forward, JSON.stringify([{ ...grant, enabled: false }]));
       await NodeAssert.rejects(nativeThreadGrant(forward, "thread"));
     } finally {

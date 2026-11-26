@@ -138,6 +138,7 @@ import {
   taskPrompt,
 } from "./delegatedTaskModes.ts";
 import { assertTargetWithinLimits, isLiveCallerShell, threadNotFound } from "./threadAccess.ts";
+import * as ThreadMcpServers from "./ThreadMcpServers.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as PeerForwarding from "../peer/PeerForwarding.ts";
 import * as RemoteDelegation from "../peer/RemoteDelegation.ts";
@@ -1107,10 +1108,12 @@ function threadRun(
   return {
     runId: run.id,
     ordinal: run.ordinal,
-    ...(run.restartContinuationOfRunId ? {
-      predecessorRunId: run.restartContinuationOfRunId,
-      recoveryOfRunId: run.restartContinuationOfRunId,
-    } : {}),
+    ...(run.restartContinuationOfRunId
+      ? {
+          predecessorRunId: run.restartContinuationOfRunId,
+          recoveryOfRunId: run.restartContinuationOfRunId,
+        }
+      : {}),
     status: run.status,
     providerInstanceId: run.modelSelection.instanceId,
     model: run.modelSelection.model,
@@ -1241,7 +1244,8 @@ function timelineItem(input: {
     ...(message?.senderThreadId === undefined ? {} : { senderThreadId: message.senderThreadId }),
     type: input.row.item.type,
     ...(input.row.item.type === "assistant_message" && input.row.item.phase
-      ? { phase: input.row.item.phase } : {}),
+      ? { phase: input.row.item.phase }
+      : {}),
     status: input.row.item.status,
     title: input.row.item.title,
     text: text === null ? null : text.slice(offset, end),
@@ -3683,39 +3687,67 @@ const make = Effect.gen(function* () {
         requestKey: key,
         operation: "thread-send",
       });
-      const result = yield* threadManagement
-        .sendToThread({
-          projectId: target.thread.projectId,
-          commandId: stableCommandId({
-            scope,
-            requestKey: key,
-            operation: "thread-send",
-          }),
+      const commandId = stableCommandId({ scope, requestKey: key, operation: "thread-send" });
+      const result = yield* ThreadMcpServers.aroundDispatch(
+        {
+          scope,
           threadId: input.threadId,
-          ...(parent === undefined ? {} : { senderThreadId: parent.thread.id }),
-          // A linked environment's agent has no thread here; the link names it.
-          ...(parent === undefined && scope.client?.senderThread !== undefined
-            ? { linkedSender: scope.client.senderThread }
-            : {}),
-          messageId,
-          text: input.message,
-          attachments: [],
-          mode,
-          ...(input.freshContext ? { freshContext: true } : {}),
-          ...(input.outputSchema === undefined ? {} : { outputSchema: input.outputSchema }),
-          createdBy: "agent",
-          creationSource: "mcp",
-        })
-        .pipe(
-          Effect.mapError((error) =>
-            isThreadManagementError(error)
-              ? threadManagementFailure(error)
-              : failure(
-                  "orchestration_error",
-                  `Unable to send to thread ${input.threadId}: ${userFacingDispatchErrorMessage(error) ?? errorMessage(error)}`,
-                ),
+          commandId,
+          servers: input.mcpServers,
+        },
+        threadManagement
+          .sendToThread({
+            projectId: target.thread.projectId,
+            commandId,
+            threadId: input.threadId,
+            ...(parent === undefined ? {} : { senderThreadId: parent.thread.id }),
+            // A linked environment's agent has no thread here; the link names it.
+            ...(parent === undefined && scope.client?.senderThread !== undefined
+              ? { linkedSender: scope.client.senderThread }
+              : {}),
+            messageId,
+            text: input.message,
+            attachments: [],
+            mode,
+            ...(input.freshContext ? { freshContext: true } : {}),
+            ...(input.outputSchema === undefined ? {} : { outputSchema: input.outputSchema }),
+            createdBy: "agent",
+            creationSource: "mcp",
+          })
+          .pipe(
+            Effect.mapError((error) =>
+              isThreadManagementError(error)
+                ? threadManagementFailure(error)
+                : failure(
+                    "orchestration_error",
+                    `Unable to send to thread ${input.threadId}: ${userFacingDispatchErrorMessage(error) ?? errorMessage(error)}`,
+                  ),
+            ),
           ),
-        );
+        (topologyChanged) =>
+          Effect.gen(function* () {
+            const shell = yield* threadManagement
+              .getThreadShell(input.threadId)
+              .pipe(Effect.mapError(threadManagementFailure));
+            if (shell === null)
+              return yield* failure("thread_not_found", `Thread ${input.threadId} was not found.`);
+            if (shell.activeRunId !== null || mode === "steer" || mode === "restart")
+              return yield* failure(
+                "thread_mcp_update_busy",
+                "Update thread MCP servers between turns.",
+              );
+            if (topologyChanged && !input.freshContext) {
+              const provider = (yield* providerRegistry.getProviders).find(
+                (provider) => provider.instanceId === shell.modelSelection.instanceId,
+              );
+              if (provider?.driver !== "claude")
+                return yield* failure(
+                  "thread_mcp_fresh_context_required",
+                  "Changing this provider's MCP server list requires freshContext.",
+                );
+            }
+          }),
+      );
       return {
         threadId: input.threadId,
         link: threadLinkFor(scope, input.threadId, target.thread.title),

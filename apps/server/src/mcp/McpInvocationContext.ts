@@ -14,6 +14,7 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import type * as DateTime from "effect/DateTime";
+import type * as Redacted from "effect/Redacted";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import { formatThreadLink, hostedThreadLink } from "@t3tools/shared/threadLinks";
@@ -154,6 +155,7 @@ export interface McpInvocationScope {
   readonly requestNamespace: string;
   readonly thread: McpThreadCaller | undefined;
   readonly client: McpClientCaller | undefined;
+  readonly threadMcpAuthorization?: ReadonlyMap<string, Redacted.Redacted<string>>;
   /** False while the Linked environments beta is off here; `/mcp` reads it per request. */
   readonly linkedEnvironments?: boolean;
   /** The Agent feedback mode here; `/mcp` reads it per request. Unset is off. */

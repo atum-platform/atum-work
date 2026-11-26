@@ -326,7 +326,7 @@ describe("AntigravityAdapterV2 compaction", () => {
           ?.mcpServers as ReadonlyArray<EffectAcpSchema.McpServer>;
         assert.deepEqual(
           servers.map((server) => server.name),
-          ["t3-code", "connection"],
+          ["t3-code", "connection", "relay"],
         );
         if (httpMcp) {
           assert.isTrue(servers.every((server) => "type" in server && server.type === "http"));
@@ -336,11 +336,21 @@ describe("AntigravityAdapterV2 compaction", () => {
             url: "http://127.0.0.1:43124/connection",
             headers: [{ name: "Authorization", value: "Bearer local-fixture" }],
           });
+          assert.deepEqual(servers[2], {
+            type: "http",
+            name: "relay",
+            url: "http://127.0.0.1:43124/relay",
+            headers: [],
+          });
         } else {
           assert.isTrue(servers.every((server) => "command" in server));
           assert.deepInclude("env" in servers[1]! ? servers[1].env : [], {
             name: "T3_ACP_MCP_ENDPOINT",
             value: "http://127.0.0.1:43124/connection",
+          });
+          assert.deepInclude("env" in servers[2]! ? servers[2].env : [], {
+            name: "T3_ACP_MCP_ENDPOINT",
+            value: "http://127.0.0.1:43124/relay",
           });
         }
         const prompts = requests
@@ -359,6 +369,18 @@ describe("AntigravityAdapterV2 compaction", () => {
                   authorizationHeader: "Bearer local-fixture",
                 },
               ]),
+              (threadId) =>
+                Effect.succeed(
+                  threadId === "thread-antigravity-compaction"
+                    ? [
+                        {
+                          name: "relay",
+                          url: "http://127.0.0.1:43124/relay",
+                          toolTimeoutMs: 180_000,
+                        },
+                      ]
+                    : [],
+                ),
             ),
           ),
         ),

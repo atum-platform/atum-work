@@ -45,11 +45,13 @@ import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../../../vcs/VcsProcess.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
+import * as ThreadMcpServers from "../../ThreadMcpServers.ts";
 import * as ProjectHandlers from "./handlers.ts";
 import { ProjectToolkit } from "./tools.ts";
 
 const clientLaunchHarness = (input: {
   readonly runtimeModeCeiling: RuntimeMode;
+  readonly sessionId?: string;
   readonly defaultRuntimeMode?: RuntimeMode;
   readonly newWorktreesStartFromOrigin?: boolean;
   readonly defaultThreadEnvMode?: "local" | "worktree";
@@ -62,10 +64,14 @@ const clientLaunchHarness = (input: {
   readonly workspaceRoot?: string;
   readonly checkWorktreeBase?: ThreadLaunch.ThreadLaunchService["Service"]["checkWorktreeBase"];
   readonly hostedAppUrl?: string;
+  readonly relayAuthorization?: NonNullable<
+    McpInvocationContext.McpInvocationScope["threadMcpAuthorization"]
+  >;
   /** The orchestrator refuses the new thread's mode, as under a managed ceiling. */
   readonly refusedByCeiling?: true;
 }) => {
   const projectId = ProjectId.make("project:client-target");
+  const sessionId = input.sessionId ?? "session-1";
   const modelSelection = {
     instanceId: ProviderInstanceId.make("claudeAgent"),
     model: "claude-opus",
@@ -106,15 +112,18 @@ const clientLaunchHarness = (input: {
     }),
     Layer.succeed(McpInvocationContext.McpInvocationContext, {
       environmentId: EnvironmentId.make("environment"),
-      requestNamespace: "client:session-1",
+      requestNamespace: `client:${sessionId}`,
       thread: undefined,
       client: {
-        sessionId: "session-1",
+        sessionId,
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
       },
       issuedAt: 0,
+      ...(input.relayAuthorization === undefined
+        ? {}
+        : { threadMcpAuthorization: input.relayAuthorization }),
       capabilities: new Set(["orchestration" as const]),
     }),
     Layer.mock(ThreadManagement.ThreadManagementService)({
@@ -513,6 +522,60 @@ it.effect("a launch retried with the same clientRequestId replays the first one"
     expect(ids[2]).not.toEqual(ids[0]);
     // Without a key every launch is new.
     expect(ids[3]).not.toEqual(ids[4]);
+  }),
+);
+
+it.live("scopes relay launches and their attachment registries by OAuth session", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const origin = new URL("https://example.test");
+    const relayAuthorization = ThreadMcpServers.authorizationReferences(
+      '{"relay":"Bearer synthetic-launch"}',
+    )!;
+    yield* Effect.gen(function* () {
+      const relay = yield* ThreadMcpServers.ThreadMcpServers;
+      const launch = Effect.fnUntraced(function* (sessionId: string) {
+        const { projectId, dependencies } = clientLaunchHarness({
+          runtimeModeCeiling: "auto",
+          sessionId,
+          launched,
+          relayAuthorization,
+        });
+        const toolkit = yield* ProjectToolkit.pipe(
+          Effect.provide(
+            McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+              Layer.provide(dependencies),
+            ),
+          ),
+        );
+        const result = (yield* toolkit
+          .handle("t3_thread_launch", {
+            title: "Relay",
+            projectId,
+            clientRequestId: "same-key",
+            mcpServers: [
+              { name: "relay", url: new URL("/tools", origin).href, headersRef: "relay" },
+            ],
+          })
+          .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies))).at(-1)?.result;
+        const threadId = launched.at(-1)!.threadId!;
+        expect(result).toMatchObject({ threadId });
+        expect(launched.at(-1)).not.toHaveProperty("mcpServers");
+        expect(yield* relay.read(threadId)).toEqual([
+          {
+            name: "relay",
+            url: expect.stringMatching(/^http:\/\/127\.0\.0\.1:/),
+            toolTimeoutMs: 180_000,
+          },
+        ]);
+        return threadId;
+      });
+      const first = yield* launch("relay-1");
+      const second = yield* launch("relay-2");
+      expect(first).not.toBe(second);
+      expect(launched).toHaveLength(2);
+      expect(JSON.stringify(launched)).not.toContain("synthetic-launch");
+    }).pipe(Effect.provide(ThreadMcpServers.layer(new Set([origin.origin]))));
   }),
 );
 

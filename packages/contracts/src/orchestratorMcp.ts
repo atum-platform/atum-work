@@ -553,6 +553,18 @@ export const OrchestratorMcpThreadReadResult = Schema.Struct({
 });
 export type OrchestratorMcpThreadReadResult = typeof OrchestratorMcpThreadReadResult.Type;
 
+export const OrchestratorMcpThreadServers = Schema.Array(
+  Schema.Struct({
+    name: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,47}$/)),
+    url: Schema.String.check(Schema.isMaxLength(2048)),
+    headersRef: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,48}$/)),
+    toolTimeoutMs: Schema.optional(
+      Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 7_200_000 })),
+    ),
+  }),
+).check(Schema.isMaxLength(4));
+export type OrchestratorMcpThreadServers = typeof OrchestratorMcpThreadServers.Type;
+
 export const OrchestratorMcpThreadSendInput = Schema.Struct({
   environmentId: OrchestratorMcpEnvironmentTarget,
   threadId: ThreadId,
@@ -571,6 +583,7 @@ export const OrchestratorMcpThreadSendInput = Schema.Struct({
     }),
   ),
   clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
+  mcpServers: Schema.optional(OrchestratorMcpThreadServers),
 });
 export type OrchestratorMcpThreadSendInput = typeof OrchestratorMcpThreadSendInput.Type;
 
@@ -1003,6 +1016,9 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
       "run_not_found",
       "thread_not_sendable",
       "thread_not_interruptible",
+      "thread_mcp_attachment_denied",
+      "thread_mcp_update_busy",
+      "thread_mcp_fresh_context_required",
       "invalid_request",
       "orchestration_error",
       "thread_credential_required",

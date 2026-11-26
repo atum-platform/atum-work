@@ -3,8 +3,9 @@ import * as NodeCrypto from "node:crypto";
 import * as NodeHttp from "node:http";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as Effect from "effect/Effect";
-import type * as Layer from "effect/Layer";
+import * as Layer from "effect/Layer";
 
+import * as ThreadMcpServers from "./ThreadMcpServers.ts";
 import { endpoint, token } from "./toolkits/atum/config.ts";
 
 function proveConnector(
@@ -57,6 +58,7 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
     name: `atum-account-${route}-${tag}`,
     url: new URL(`/mcp/${route}`, connector).href,
     authorizationHeader,
+    omitWhenRelayAttached: true as const,
   }));
 
   // Prove connector ownership without sending a bearer or a query to a recycled port.
@@ -67,5 +69,16 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
   });
 });
 
-export const layer: Layer.Layer<McpProviderSessions.McpProviderSessions> =
-  McpProviderSessions.layerWithManagedServers(readConnectorMcpServers(endpoint, token));
+const readAccountServers = readConnectorMcpServers(endpoint, token);
+const threadServers = ThreadMcpServers.configure(process.env.T3CODE_THREAD_MCP_ORIGIN);
+
+export const layer =
+  threadServers === undefined
+    ? McpProviderSessions.layerWithManagedServers(readAccountServers)
+    : Layer.unwrap(
+        ThreadMcpServers.ThreadMcpServers.pipe(
+          Effect.map((relay) =>
+            McpProviderSessions.layerWithManagedServers(readAccountServers, relay.read),
+          ),
+        ),
+      ).pipe(Layer.provideMerge(threadServers));

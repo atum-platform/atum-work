@@ -45,6 +45,7 @@ import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import { resolveRuntimeMode } from "../../delegatedTaskModes.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
+import * as ThreadMcpServers from "../../ThreadMcpServers.ts";
 import * as OrchestrationMcp from "../../OrchestratorMcpService.ts";
 import { newCommandId, readCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
 import { ProjectToolkit } from "./tools.ts";
@@ -453,7 +454,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
             ),
           );
         }
-        const result = yield* ThreadMessageIntake.launchThread({
+        const launch = ThreadMessageIntake.launchThread({
           commandId,
           threadId,
           projectId,
@@ -508,6 +509,10 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
             }
             return unavailable();
           }),
+        );
+        const result = yield* ThreadMcpServers.aroundDispatch(
+          { scope, commandId, threadId, launch: true, servers: input.mcpServers },
+          launch,
         );
         const thread = result.projection.thread;
         const run = result.projection.runs.find((run) => run.userMessageId === messageId);

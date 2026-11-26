@@ -63,6 +63,7 @@ import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpToolAccess from "./McpToolAccess.ts";
 import * as McpToolExposure from "./McpToolExposure.ts";
+import * as ThreadMcpServers from "./ThreadMcpServers.ts";
 import * as McpWebhookTransport from "./McpWebhookTransport.ts";
 import { MCP_TOOL_EXPOSURE_HEADER } from "@t3tools/provider-core/server/mcpSession";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
@@ -378,7 +379,8 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
     }
     if (forwardGrantsFile && invocation.client?.nativeForwardConsent) {
       const nativeConsent = yield* Effect.tryPromise({
-        try: () => admitForwardSession(forwardGrantsFile!, invocation!.client!.nativeForwardConsent!),
+        try: () =>
+          admitForwardSession(forwardGrantsFile!, invocation!.client!.nativeForwardConsent!),
         catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
       }).pipe(Effect.orElseSucceed(() => undefined));
       if (!nativeConsent) return HttpServerResponse.empty({ status: 403 });
@@ -394,12 +396,19 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       limited.thread === undefined
         ? undefined
         : yield* Cache.get(forgeOfThread, limited.thread.threadId);
+    const threadMcpAuthorization =
+      limited.client === undefined
+        ? undefined
+        : ThreadMcpServers.authorizationReferences(
+            request.headers[ThreadMcpServers.AUTHORIZATION_HEADER],
+          );
     return {
       ...limited,
       linkedEnvironments,
       agentFeedback,
       workflows,
       origin,
+      ...(threadMcpAuthorization === undefined ? {} : { threadMcpAuthorization }),
       ...(forge === undefined ? {} : { forge }),
     };
   });
@@ -418,7 +427,12 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
         Effect.gen(function* () {
           if (forwardGrantsFile && admitted.client?.nativeForwardConsent) {
             const valid = yield* Effect.tryPromise({
-              try: () => admitForwardSession(forwardGrantsFile!, admitted.client!.nativeForwardConsent!, true),
+              try: () =>
+                admitForwardSession(
+                  forwardGrantsFile!,
+                  admitted.client!.nativeForwardConsent!,
+                  true,
+                ),
               catch: () => new ForwardAdmissionError({ message: "Consent unavailable" }),
             }).pipe(
               Effect.as(true),

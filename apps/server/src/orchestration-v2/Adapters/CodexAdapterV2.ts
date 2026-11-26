@@ -1678,9 +1678,16 @@ function codexThreadRuntimeParams(input: {
     config: {
       ...CODEX_THREAD_CONFIG,
       ...Object.fromEntries(
-        input.managedMcpServers.map(({ name, url, authorizationHeader }) => [
+        input.managedMcpServers.map(({ name, url, authorizationHeader, toolTimeoutMs }) => [
           `mcp_servers.${name}`,
-          { url, required: false, http_headers: { Authorization: authorizationHeader } },
+          {
+            url,
+            required: false,
+            ...(authorizationHeader === undefined
+              ? {}
+              : { http_headers: { Authorization: authorizationHeader } }),
+            ...(toolTimeoutMs === undefined ? {} : { tool_timeout_sec: toolTimeoutMs / 1000 }),
+          },
         ]),
       ),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
@@ -8039,7 +8046,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               Effect.all([
                 readMcpSession(providerThread.appThreadId),
                 readStdioMcpServers(undefined),
-                mcpSessions.readManagedServers,
+                mcpSessions.readManagedServersForThread(providerThread.appThreadId),
               ]).pipe(
                 Effect.flatMap(([mcpSession, stdioMcpServers, managedMcpServers]) =>
                   resumeNativeThread(threadId, {
@@ -8219,7 +8226,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 Effect.all([
                   mcpSessions.read(threadInput.threadId),
                   readStdioMcpServers(threadInput.runtimePolicy.cwd),
-                  mcpSessions.readManagedServers,
+                  mcpSessions.readManagedServersForThread(threadInput.threadId),
                 ]),
               ),
               Effect.flatMap(([mcpSession, stdioMcpServers, managedMcpServers]) =>
@@ -8268,7 +8275,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 ...codexThreadRuntimeParams({
                   threadId: appThreadId,
                   mcpSession: yield* readMcpSession(appThreadId),
-                  managedMcpServers: yield* mcpSessions.readManagedServers,
+                  managedMcpServers: yield* mcpSessions.readManagedServersForThread(appThreadId),
                   stdioMcpServers: yield* readStdioMcpServers(threadInput.runtimePolicy?.cwd),
                   ...(threadInput.modelSelection === undefined
                     ? {}
@@ -9281,7 +9288,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   ...codexThreadRuntimeParams({
                     threadId: threadInput.providerThread.appThreadId,
                     mcpSession: yield* readMcpSession(threadInput.providerThread.appThreadId),
-                    managedMcpServers: yield* mcpSessions.readManagedServers,
+                    managedMcpServers: yield* mcpSessions.readManagedServersForThread(
+                      threadInput.providerThread.appThreadId,
+                    ),
                     stdioMcpServers: yield* readStdioMcpServers(undefined),
                   }),
                 });
@@ -9330,7 +9339,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 ...codexThreadRuntimeParams({
                   threadId: threadInput.targetThreadId,
                   mcpSession: yield* mcpSessions.read(threadInput.targetThreadId),
-                  managedMcpServers: yield* mcpSessions.readManagedServers,
+                  managedMcpServers: yield* mcpSessions.readManagedServersForThread(
+                    threadInput.targetThreadId,
+                  ),
                   stdioMcpServers: yield* readStdioMcpServers(threadInput.runtimePolicy?.cwd),
                   ...(threadInput.modelSelection === undefined
                     ? {}

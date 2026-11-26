@@ -1272,6 +1272,7 @@ describe("ClaudeAdapterV2 Auto-accept edits", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -1401,6 +1402,7 @@ describe("ClaudeAdapterV2 Auto-accept edits", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -1531,6 +1533,7 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
               setPermissionMode: () => Effect.void,
               renameSession: () => Effect.void,
               backgroundTasks: () => Effect.succeed(false),
+              setMcpServers: () => Effect.succeed(true),
               mcpServerStatus: Effect.succeed([]),
               readMcpResource: () => Effect.die("unexpected MCP resource read"),
               callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -1823,6 +1826,7 @@ describe("ClaudeAdapterV2 provider installation gate", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -2014,6 +2018,7 @@ const captureSdkExecutablePaths = Effect.fn("captureSdkExecutablePaths")(functio
             setPermissionMode: () => Effect.void,
             renameSession: () => Effect.void,
             backgroundTasks: () => Effect.succeed(false),
+            setMcpServers: () => Effect.succeed(true),
             mcpServerStatus: Effect.succeed([]),
             readMcpResource: () => Effect.die("unexpected MCP resource read"),
             callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -2220,6 +2225,7 @@ describe("ClaudeAdapterV2 resume compaction", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -2613,6 +2619,7 @@ describe("ClaudeAdapterV2 attachments", () => {
                   setPermissionMode: () => Effect.void,
                   renameSession: () => Effect.void,
                   backgroundTasks: () => Effect.succeed(false),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -3158,6 +3165,7 @@ describe("ClaudeAdapterV2 native fork", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -3590,6 +3598,7 @@ describe("ClaudeAdapterV2 native session identity", () => {
                   setPermissionMode: () => Effect.void,
                   renameSession: () => Effect.void,
                   backgroundTasks: () => Effect.succeed(false),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -3930,6 +3939,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     ) => Effect.Effect<void>;
     readonly renameSession?: ClaudeAdapterV2.ClaudeAgentSdkQuerySession["renameSession"];
     readonly applyFlagSettings?: ClaudeAdapterV2.ClaudeAgentSdkQuerySession["applyFlagSettings"];
+    readonly setMcpServers?: ClaudeAdapterV2.ClaudeAgentSdkQuerySession["setMcpServers"];
     readonly stopTask?: (
       taskId: string,
     ) => Effect.Effect<void, ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerError>;
@@ -4077,6 +4087,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                       renameCalls.push(title);
                     }).pipe(Effect.andThen(() => options?.renameSession?.(title) ?? Effect.void)),
                   backgroundTasks: options?.backgroundTasks ?? (() => Effect.succeed(false)),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -4120,6 +4131,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     renameCalls.push(title);
                   }).pipe(Effect.andThen(() => options?.renameSession?.(title) ?? Effect.void)),
                 backgroundTasks: options?.backgroundTasks ?? (() => Effect.succeed(false)),
+                setMcpServers: options?.setMcpServers ?? (() => Effect.succeed(true)),
                 mcpServerStatus: options?.mcp?.mcpServerStatus ?? Effect.succeed([]),
                 readMcpResource:
                   options?.mcp?.readMcpResource ??
@@ -4262,6 +4274,66 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         makeResultFrame({ uuid: `title-result-${ordinal}`, result: "Done." }),
       );
       yield* Queue.take(harness.terminalReceipts);
+    });
+
+    it.effect("updates thread MCP registrations on the retained query", () => {
+      const first = { name: "relay", url: "http://127.0.0.1:43124/first", toolTimeoutMs: 180_000 };
+      const second = { ...first, url: "http://127.0.0.1:43124/second" };
+      const account = {
+        name: "atum-account-google-fixture",
+        url: "http://127.0.0.1:43123/mcp/google",
+        omitWhenRelayAttached: true as const,
+      };
+      let current = [first];
+      const updates: Array<unknown> = [];
+      return Effect.gen(function* () {
+        const harness = yield* makeWakeHarnessWithOptions({
+          close: Queue.shutdown,
+          freshQueueOnReopen: true,
+          setMcpServers: (servers) =>
+            Effect.sync(() => {
+              updates.push(servers);
+              return true;
+            }),
+        });
+        yield* startTurn(harness, "MCP fixture", 1);
+        yield* finishTurn(harness, 1);
+        assert.deepEqual(harness.getOpenedOptions()?.mcpServers, {
+          relay: { type: "http", url: first.url, timeout: 180_000 },
+        });
+        yield* startTurn(harness, "MCP fixture", 2);
+        yield* finishTurn(harness, 2);
+        assert.deepEqual(updates, []);
+        current = [second];
+        yield* startTurn(harness, "MCP fixture", 3);
+        yield* finishTurn(harness, 3);
+        assert.deepEqual(updates, [{ relay: { type: "http", url: second.url, timeout: 180_000 } }]);
+        assert.equal(harness.getOpenedOptions()?.mcpServers?.["relay"]?.type, "http");
+        assert.deepEqual(harness.getOpenedOptions()?.mcpServers?.["relay"], {
+          type: "http",
+          url: first.url,
+          timeout: 180_000,
+        });
+
+        current = [];
+        yield* startTurn(harness, "MCP fixture", 4);
+        yield* finishTurn(harness, 4);
+        assert.deepEqual(harness.getOpenedOptions()?.mcpServers, {
+          [account.name]: { type: "http", url: account.url },
+        });
+        assert.equal(harness.getOpenedOptions()?.resume, WAKE_NATIVE_SESSION);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layerWithManagedServers(Effect.succeed([account]), () =>
+              Effect.sync(() => current),
+            ),
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      );
     });
 
     it.effect("renames the native session only when the thread title changed", () =>
@@ -8818,6 +8890,98 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   });
 
   // regression: #17270 root text_delta frames stream the reply before the block's snapshot
+  it.effect.each([false, true])(
+    "classifies Claude commentary and the answer (streamed: %s)",
+    (streamed) =>
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarness;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("claude-commentary"),
+            text: "Check both files and summarize.",
+            attachments: [],
+          }),
+        );
+        const offer = (frame: Record<string, unknown>) =>
+          harness.offerAndWait(
+            claudeSdkFrame({ session_id: WAKE_NATIVE_SESSION, parent_tool_use_id: null, ...frame }),
+          );
+        const snapshot = (id: string, block: Record<string, unknown>) => ({
+          type: "assistant",
+          uuid: `${id}-${block.type}`,
+          message: { id, model: "claude-opus-5-5", content: [block], stop_reason: null },
+        });
+        const items = () =>
+          harness.events.flatMap((event) =>
+            event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"
+              ? [event.turnItem]
+              : [],
+          );
+        const replies = [
+          "Checking the first file.",
+          "Checking the second file.",
+          "Both files passed.",
+        ];
+        for (const [index, text] of replies.entries()) {
+          const id = `message-${index}`;
+          if (streamed) {
+            for (const event of [
+              { type: "message_start", message: { id } },
+              { type: "content_block_start", index: 0, content_block: { type: "text", text } },
+              { type: "content_block_stop", index: 0 },
+            ]) {
+              yield* offer({ type: "stream_event", event, uuid: `stream-${id}-${event.type}` });
+            }
+          }
+          const assistant = snapshot(id, { type: "text", text });
+          yield* offer(assistant);
+          yield* harness.until(() => items().at(-1)?.text === text);
+          assert.include(items().at(-1), { phase: "commentary", status: "running", text });
+          if (index < 2) {
+            const toolId = `tool-${index}`;
+            yield* offer(snapshot(id, { type: "tool_use", id: toolId, name: "Read", input: {} }));
+            yield* harness.until(() =>
+              harness.events.some(
+                (event) =>
+                  event.type === "turn_item.updated" &&
+                  event.turnItem.nativeItemRef?.nativeId === toolId,
+              ),
+            );
+            assert.include(items().at(-1), { phase: "commentary", status: "completed", text });
+          }
+          yield* offer(assistant);
+        }
+        yield* Queue.offer(
+          harness.sdkMessages,
+          makeResultFrame({ uuid: "commentary-result", result: replies[2]! }),
+        );
+        yield* Queue.take(harness.terminalReceipts);
+        const completed = items().filter((item) => item.status === "completed");
+        assert.deepEqual(
+          completed.map(({ phase, text }) => [phase, text]),
+          [
+            ["commentary", replies[0]],
+            ["commentary", replies[1]],
+            ["final_answer", replies[2]],
+          ],
+        );
+        assert.equal(new Set(items().map((item) => item.id)).size, 3);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layer,
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      ),
+  );
+
   it.effect("streams Claude assistant text deltas before the completed snapshot", () =>
     Effect.gen(function* () {
       const harness = yield* makeWakeHarness;
@@ -15529,6 +15693,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -15734,6 +15899,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               setPermissionMode: () => Effect.void,
               renameSession: () => Effect.void,
               backgroundTasks: () => Effect.succeed(false),
+              setMcpServers: () => Effect.succeed(true),
               mcpServerStatus: Effect.succeed([]),
               readMcpResource: () => Effect.die("unexpected MCP resource read"),
               callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -15949,6 +16115,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   setPermissionMode: () => Effect.void,
                   renameSession: () => Effect.void,
                   backgroundTasks: () => Effect.succeed(false),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -19421,6 +19588,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
                 stopTask: () => Effect.void,
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.die("unexpected MCP server status"),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -22782,6 +22950,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -22963,6 +23132,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   setPermissionMode: () => Effect.void,
                   renameSession: () => Effect.void,
                   backgroundTasks: () => Effect.succeed(false),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -23144,6 +23314,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -23346,6 +23517,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 setPermissionMode: () => Effect.void,
                 renameSession: () => Effect.void,
                 backgroundTasks: () => Effect.succeed(false),
+                setMcpServers: () => Effect.succeed(true),
                 mcpServerStatus: Effect.succeed([]),
                 readMcpResource: () => Effect.die("unexpected MCP resource read"),
                 callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -23496,6 +23668,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   setPermissionMode: () => Effect.void,
                   renameSession: () => Effect.void,
                   backgroundTasks: () => Effect.succeed(false),
+                  setMcpServers: () => Effect.succeed(true),
                   mcpServerStatus: Effect.succeed([]),
                   readMcpResource: () => Effect.die("unexpected MCP resource read"),
                   callMcpTool: () => Effect.die("unexpected MCP tool call"),
@@ -23621,6 +23794,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               setPermissionMode: () => Effect.void,
               renameSession: () => Effect.void,
               backgroundTasks: () => Effect.succeed(false),
+              setMcpServers: () => Effect.succeed(true),
               mcpServerStatus: Effect.succeed([]),
               readMcpResource: () => Effect.die("unexpected MCP resource read"),
               callMcpTool: () => Effect.die("unexpected MCP tool call"),

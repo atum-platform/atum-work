@@ -1920,6 +1920,7 @@ export const OrchestrationV2TurnItem = Schema.Union([
   Schema.Struct({
     ...OrchestrationV2TurnItemBaseFields,
     type: Schema.Literal("assistant_message"),
+    /** A running commentary item can resolve to a final answer when the provider finishes. */
     phase: Schema.optional(AssistantMessagePhase),
     /** The provider sent this mid-turn, apart from the turn's answer. */
     delivery: Schema.optional(Schema.Literal("async")),
@@ -2130,6 +2131,10 @@ export const OrchestrationV2TurnItem = Schema.Union([
   }),
 ]);
 export type OrchestrationV2TurnItem = typeof OrchestrationV2TurnItem.Type;
+export type OrchestrationV2AssistantMessageTurnItem = Extract<
+  OrchestrationV2TurnItem,
+  { type: "assistant_message" }
+>;
 
 const isUnknownTurnItem = hasUnknownUnionTag(OrchestrationV2TurnItem.members, "type");
 
