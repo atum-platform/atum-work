@@ -5,13 +5,11 @@ import {
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
-import { RegistryContext } from "@effect/atom-react";
 import { T, useGT } from "gt-react";
 import {
   createContext,
   memo,
   type ReactNode,
-  useContext,
   useEffect,
   useEffectEvent,
   useRef,
@@ -24,15 +22,15 @@ import { cn } from "~/lib/utils";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { retainedModelWhileProviderLocked } from "./ProviderModelPicker.logic";
-import { ChatGptSharingControl } from "./ChatGptSharingControl";
+import { ChatGptSharingControl, useRefreshModelCatalog } from "./modelPickerHost";
+// Registers Work's state as the default host; the library build replaces it with nothing.
+import "./workModelPickerHost";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { takeOpenTarget, useComposerMenuProps } from "./composerEventScope";
 import { shortcutLabelForCommand } from "../../keybindings";
-import { serverEnvironment } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
 
 /** Holds the page still behind the open picker; its lifetime is the popup element's. */
 function lockBackgroundScroll(popup: HTMLElement | null) {
@@ -132,18 +130,8 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   const composerFloatingLayerProps = useComposerMenuProps();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
-  const registry = useContext(RegistryContext);
-  const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
-    reportFailure: false,
-  });
-  const refreshModelCatalog = useEffectEvent(() => {
-    const environmentId = props.environmentId;
-    if (environmentId === null) return;
-    // An older server drops the field and probes every provider.
-    const config = registry.get(serverEnvironment.configValueAtom(environmentId));
-    if (config?.environment.capabilities.modelCatalogRefresh !== true) return;
-    void refreshProviders({ environmentId, input: { modelCatalogOnly: true } });
-  });
+  const refreshCatalog = useRefreshModelCatalog(props.environmentId);
+  const refreshModelCatalog = useEffectEvent(() => refreshCatalog());
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- asks the server for newly released models on every open; a parent, a keybinding or the palette can open the picker, so no one handler sees them all
   useEffect(() => {
     if (isMenuOpen) refreshModelCatalog();

@@ -10,7 +10,7 @@ import { ComposerControl, ComposerControlIcon } from "./ComposerControl";
 import { focusRequestedPermission, useComposerMenuProps } from "./composerEventScope";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
-import { ProviderModelPicker } from "./ProviderModelPicker";
+import { ProviderModelPicker } from "~/model-picker";
 import { resolveRuntimeModeOption, runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
 

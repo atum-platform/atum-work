@@ -24,11 +24,8 @@ import { cn } from "~/lib/utils";
 import { resolveComposerTraitsInput } from "./composerProviderState";
 import { useApplyThreadModelPick } from "./useApplyThreadModelPick";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import {
-  ComposerEffortColumn,
-  ComposerPickerFooter,
-  describeComposerEffort,
-} from "./ComposerModelEffort";
+import { ComposerPickerFooter, describeComposerEffort } from "./ComposerModelEffort";
+import { ComposerEffortColumn } from "~/model-picker";
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
 
