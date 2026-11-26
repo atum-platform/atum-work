@@ -39,7 +39,10 @@ export interface ModelPickerProps {
   readonly onRefresh?: () => void;
   /** Opens setup for a provider that is not ready. */
   readonly onOpenSetup?: (instanceId: ProviderInstanceId) => void;
-  /** UI language; the host supplies it because the picker has no settings of its own. */
+  /**
+   * UI language, as Work's own I18nProvider passes it. Omit it under a host that already provides
+   * GT (Work and its tests); the library entry initializes GT and passes the host's language.
+   */
   readonly locale?: string;
   readonly disabled?: boolean;
   readonly triggerClassName?: string;
@@ -108,9 +111,8 @@ export function ModelPicker(props: ModelPickerProps) {
       }
     : null;
 
-  return (
-    <GTProvider locale={props.locale ?? "en"}>
-      <ModelPickerPropsContext value={props}>
+  const picker = (
+    <ModelPickerPropsContext value={props}>
         <ModelPickerHostProvider value={standaloneHost}>
           <ProviderModelPicker
             environmentId={null}
@@ -132,7 +134,7 @@ export function ModelPicker(props: ModelPickerProps) {
             effortColumn={<ComposerEffortColumn traits={traits} />}
           />
         </ModelPickerHostProvider>
-      </ModelPickerPropsContext>
-    </GTProvider>
+    </ModelPickerPropsContext>
   );
+  return props.locale ? <GTProvider locale={props.locale}>{picker}</GTProvider> : picker;
 }

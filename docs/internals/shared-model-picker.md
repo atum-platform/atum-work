@@ -99,9 +99,11 @@ inline. As a result:
 - **CSS.** Desktop also uses Tailwind 4 (`apps/desktop/package.json:177`), with different theme
   tokens. Scope the emitted CSS under one root selector, and render Base UI portals into a
   container inside that root, because they otherwise mount on `document.body`.
-- **Locale.** `ModelPicker` wraps itself in `GTProvider` with the `locale` prop. Per-locale catalogs
-  are about 0.7 MB each (`src/i18n/translations/*.json`). Ship only the picker's message hashes,
-  extracted at build time, and load a locale on demand.
+- **Locale.** GT runs from singletons that `initializeGTSPA` sets up (`src/i18n/initializeI18n.ts`).
+  Work's app and its tests call it at startup. The library entry must call it once, too. With a
+  `locale` prop, `ModelPicker` wraps itself in `GTProvider`, as Work's `I18nProvider` does.
+  Per-locale catalogs are about 0.7 MB each (`src/i18n/translations/*.json`). Ship only the
+  picker's message hashes, extracted at build time, and load a locale on demand.
 
 **Rejected alternative.** Desktop could host the picker in a second Work-rendered
 `WebContentsView` laid over Matrix chat (`apps/desktop/electron/work/surface/electron-view.ts`).
