@@ -104,6 +104,7 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
       const {
         delegatedFrom: _delegatedFrom,
         workflowRun: _workflowRun,
+        hidden: _hidden,
         ...inherited
       } = input.sourceProjection.thread;
       const targetThread: OrchestrationV2AppThread = {

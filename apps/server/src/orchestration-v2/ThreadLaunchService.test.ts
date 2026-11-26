@@ -650,6 +650,50 @@ it.effect("retains automation and sender attribution while a message waits in th
   }).pipe(Effect.provide(harness.layer));
 });
 
+it.effect("persists a hidden launch without changing its send or interrupt lifecycle", () => {
+  const harness = makeHarness({ runSetup: () => Effect.never });
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const { threadId, projection } = yield* launches.launch({
+      ...launchInput({
+        command: "command:hidden:launch",
+        thread: "thread:hidden",
+        message: "First message",
+        workspace: { type: "worktree", baseRef: "main" },
+      }),
+      createdBy: "agent",
+      creationSource: "mcp",
+      hidden: true,
+    });
+    assert.isTrue((yield* threads.getThreadShell(threadId))?.hidden);
+    assert.isTrue((yield* threads.getThreadProjection(threadId)).thread.hidden);
+    const followUp = yield* threads.sendToThread({
+      projectId,
+      commandId: CommandId.make("command:hidden:follow-up"),
+      threadId,
+      messageId: MessageId.make("message:hidden:follow-up"),
+      text: "Follow up",
+      attachments: [],
+      mode: "queue",
+      createdBy: "agent",
+      creationSource: "mcp",
+    });
+    assert.equal(followUp.delivery, "queued");
+    const firstRun = projection.runs[0]!;
+    yield* threads.dispatch({
+      type: "run.interrupt",
+      commandId: CommandId.make("command:hidden:interrupt"),
+      threadId,
+      runId: firstRun.id,
+    });
+    const updated = yield* threads.getThreadProjection(threadId);
+    assert.isTrue(updated.thread.hidden);
+    assert.isNull(updated.thread.archivedAt);
+    assert.equal(updated.runs.find((run) => run.id === firstRun.id)?.status, "interrupted");
+  }).pipe(Effect.provide(harness.layer));
+});
+
 it.effect("a run asked for a result stores what its agent submits once it fits the schema", () => {
   const harness = makeHarness({ runSetup: () => Effect.never });
   const outputSchema = {

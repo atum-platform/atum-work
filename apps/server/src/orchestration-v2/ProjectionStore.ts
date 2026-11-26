@@ -508,6 +508,7 @@ export interface ActiveShellIndexEntry extends Pick<
   OrchestrationV2ThreadShell,
   | "id"
   | "projectId"
+  | "hidden"
   | "lineage"
   | "settledOverride"
   | "settledAt"
@@ -1931,6 +1932,7 @@ export function threadShellFromProjection(
     id: projection.thread.id,
     projectId: projection.thread.projectId,
     title: projection.thread.title,
+    ...(projection.thread.hidden === true ? { hidden: true } : {}),
     providerInstanceId: projection.thread.providerInstanceId,
     modelSelection: projection.thread.modelSelection,
     runtimeMode: projection.thread.runtimeMode,
@@ -2248,6 +2250,7 @@ function shellFromState(input: {
     id: input.state.thread.id,
     projectId: input.state.thread.projectId,
     title: input.state.thread.title,
+    ...(input.state.thread.hidden === true ? { hidden: true } : {}),
     providerInstanceId: input.state.thread.providerInstanceId,
     modelSelection: input.state.thread.modelSelection,
     runtimeMode: input.state.thread.runtimeMode,
@@ -9538,6 +9541,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       const rows = yield* sql<{
         readonly thread_id: string;
         readonly project_id: string;
+        readonly hidden: number | null;
         readonly relationship_to_parent: string | null;
         readonly parent_thread_id: string | null;
         readonly root_thread_id: string;
@@ -9553,6 +9557,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         SELECT
           t.thread_id,
           t.project_id,
+          ${indexedField("$.hidden")} AS hidden,
           ${indexedField("$.lineage.relationshipToParent")} AS relationship_to_parent,
           ${indexedField("$.lineage.parentThreadId")} AS parent_thread_id,
           ${indexedField("$.lineage.rootThreadId")} AS root_thread_id,
@@ -9617,6 +9622,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return rows.map((row): ActiveShellIndexEntry => ({
         id: ThreadId.make(row.thread_id),
         projectId: ProjectId.make(row.project_id),
+        ...(row.hidden === 1 ? { hidden: true } : {}),
         lineage: shellIndexLineage(row),
         settledOverride:
           row.settled_override === "settled" || row.settled_override === "active"
@@ -9750,6 +9756,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         FROM orchestration_v2_projection_threads t
         WHERE t.deleted_at IS NULL
           AND t.archived_at IS NULL
+          AND json_extract(t.payload_json, '$.hidden') IS NOT 1
           AND json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NOT 'subagent'
           AND json_extract(t.payload_json, '$.lineage.sideChat') IS NOT 1
           AND json_extract(t.payload_json, '$.settledOverride') = 'settled'

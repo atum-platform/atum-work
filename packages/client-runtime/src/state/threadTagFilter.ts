@@ -10,7 +10,7 @@ import { threadKey } from "./entities.ts";
 
 type FilterableThread = Pick<
   OrchestrationV2ThreadShell,
-  "id" | "lineage" | "tags" | "delegatedFrom"
+  "id" | "lineage" | "tags" | "delegatedFrom" | "hidden"
 >;
 
 export interface TagFilteredEnvironment {
@@ -63,10 +63,8 @@ function hasHiddenTag(
 }
 
 /**
- * Keys of threads the tag filter hides. Children (subagents, side chats, delegated tasks) follow
- * their parent; while any environment hides tags, a child whose parent is not loaded stays hidden.
- * For a partial list such as an archive page, `alreadyHidden` and `loadedElsewhere` give the
- * hidden and loaded keys of live threads, and `hidingAnywhere` the global flag.
+ * Children inherit tag filtering. While any environment hides tags, a child whose parent is
+ * unavailable stays hidden. Archive pages supply the live parent keys separately.
  */
 export function hiddenThreadKeys(
   environments: ReadonlyArray<TagFilteredEnvironment>,
@@ -74,7 +72,15 @@ export function hiddenThreadKeys(
   loadedElsewhere: ReadonlySet<string> = NO_HIDDEN_THREADS,
   hidingAnywhere: boolean = environments.some((environment) => environment.hiddenTags !== null),
 ): ReadonlySet<string> {
-  if (alreadyHidden.size === 0 && !hidingAnywhere) return NO_HIDDEN_THREADS;
+  if (alreadyHidden.size === 0 && !hidingAnywhere) {
+    const hidden = new Set<string>();
+    for (const { environmentId, threads } of environments) {
+      for (const thread of threads) {
+        if (thread.hidden === true) hidden.add(threadKey({ environmentId, threadId: thread.id }));
+      }
+    }
+    return hidden.size === 0 ? NO_HIDDEN_THREADS : hidden;
+  }
   const byKey = new Map<
     string,
     { thread: FilterableThread; environment: TagFilteredEnvironment }
@@ -118,8 +124,8 @@ export function hiddenThreadKeys(
     return hidden;
   };
   const hidden = new Set<string>();
-  for (const key of byKey.keys()) {
-    if (isHidden(key)) hidden.add(key);
+  for (const [key, { thread }] of byKey) {
+    if (thread.hidden === true || isHidden(key)) hidden.add(key);
   }
   return hidden.size === 0 ? NO_HIDDEN_THREADS : hidden;
 }
