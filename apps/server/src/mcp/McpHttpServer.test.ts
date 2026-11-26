@@ -24,6 +24,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
@@ -1259,7 +1260,16 @@ it.effect("admits provider and OAuth client credentials and points only clients 
             probe: McpToolAccess.reads(() =>
               McpInvocationContext.McpInvocationContext.pipe(
                 Effect.tap((scope) => Effect.sync(() => seen.push(scope))),
-                Effect.as({ ok: true }),
+                Effect.flatMap((scope) =>
+                  scope.threadMcpAuthorization?.has("relay")
+                    ? Effect.fail(
+                        new OrchestratorMcpFailure({
+                          code: "thread_mcp_update_busy",
+                          message: "Update thread MCP servers between turns.",
+                        }),
+                      )
+                    : Effect.succeed({ ok: true }),
+                ),
               ),
             ),
           }),
@@ -1314,6 +1324,7 @@ it.effect("admits provider and OAuth client credentials and points only clients 
           return yield* httpClient.post("/mcp", {
             headers: {
               ...headers,
+              "x-api-key": '{"relay":"Bearer synthetic-upstream"}',
               "mcp-session-id": initialize.headers["mcp-session-id"]!,
               "mcp-protocol-version": "2025-06-18",
             },
@@ -1340,11 +1351,26 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       expect(traced.order.slice(0, traced.order.indexOf(`start ${toolSpan?.spanId}`))).toContain(
         `end ${authSpan?.spanId}`,
       );
-      expect((yield* call(clientToken)).status).toBe(200);
+      const clientResponse = yield* call(clientToken);
+      expect(clientResponse.status).toBe(200);
+      const toolResponse = JSON.parse(
+        (yield* clientResponse.text)
+          .split("\n")
+          .find((line) => line.startsWith("data: ") || line.startsWith("{"))!
+          .replace(/^data: /u, ""),
+      );
+      expect(toolResponse.result.isError).toBe(true);
+      expect(JSON.parse(toolResponse.result.content[0].text)).toMatchObject({
+        code: "thread_mcp_update_busy",
+      });
       expect(seen.map((scope) => scope.requestNamespace)).toEqual([
         "provider-session",
         "client:session-1",
       ]);
+      expect(seen[0]?.threadMcpAuthorization).toBeUndefined();
+      expect(Redacted.value(seen[1]!.threadMcpAuthorization!.get("relay")!)).toBe(
+        "Bearer synthetic-upstream",
+      );
 
       const missing = yield* call(undefined);
       expect(missing.status).toBe(401);

@@ -3729,20 +3729,20 @@ const make = Effect.gen(function* () {
             const shell = yield* threadManagement
               .getThreadShell(input.threadId)
               .pipe(Effect.mapError(threadManagementFailure));
-            if (
-              shell === null ||
-              shell.activeRunId !== null ||
-              mode === "steer" ||
-              mode === "restart"
-            )
-              return yield* failure("invalid_request", "Update thread MCP servers between turns.");
+            if (shell === null)
+              return yield* failure("thread_not_found", `Thread ${input.threadId} was not found.`);
+            if (shell.activeRunId !== null || mode === "steer" || mode === "restart")
+              return yield* failure(
+                "thread_mcp_update_busy",
+                "Update thread MCP servers between turns.",
+              );
             if (topologyChanged && !input.freshContext) {
               const provider = (yield* providerRegistry.getProviders).find(
                 (provider) => provider.instanceId === shell.modelSelection.instanceId,
               );
               if (provider?.driver !== "claude")
                 return yield* failure(
-                  "invalid_request",
+                  "thread_mcp_fresh_context_required",
                   "Changing this provider's MCP server list requires freshContext.",
                 );
             }

@@ -559,7 +559,7 @@ export const OrchestratorMcpThreadServers = Schema.Array(
     url: Schema.String.check(Schema.isMaxLength(2048)),
     headersRef: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,48}$/)),
     toolTimeoutMs: Schema.optional(
-      Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 3_900_000 })),
+      Schema.Int.check(Schema.isBetween({ minimum: 1000, maximum: 7_200_000 })),
     ),
   }),
 ).check(Schema.isMaxLength(4));
@@ -1016,6 +1016,9 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
       "run_not_found",
       "thread_not_sendable",
       "thread_not_interruptible",
+      "thread_mcp_attachment_denied",
+      "thread_mcp_update_busy",
+      "thread_mcp_fresh_context_required",
       "invalid_request",
       "orchestration_error",
       "thread_credential_required",

@@ -69,10 +69,7 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
 });
 
 const readAccountServers = readConnectorMcpServers(endpoint, token);
-const threadServers = ThreadMcpServers.configure(
-  process.env.T3CODE_THREAD_MCP_ORIGIN,
-  process.env.T3CODE_THREAD_MCP_CLIENT_SESSION,
-);
+const threadServers = ThreadMcpServers.configure(process.env.T3CODE_THREAD_MCP_ORIGIN);
 
 export const layer =
   threadServers === undefined

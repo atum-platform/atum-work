@@ -20,10 +20,11 @@ import type { McpInvocationScope } from "./McpInvocationContext.ts";
 // Effect redacts this header in HTTP traces by default.
 export const AUTHORIZATION_HEADER = "x-api-key";
 
-const unavailable = () =>
+const attachmentDenied = () =>
   new OrchestratorMcpFailure({
-    code: "invalid_request",
-    message: "Thread MCP servers require a configured relay and one of its own threads.",
+    code: "thread_mcp_attachment_denied",
+    message:
+      "Thread MCP servers require an enabled relay origin and the OAuth session that launched the thread.",
   });
 
 const invalid = () =>
@@ -40,13 +41,9 @@ interface Registration {
 }
 
 interface ThreadRegistration {
+  readonly ownerSessionId: string;
   readonly servers: ReadonlyArray<Registration>;
   readonly accepted: Set<CommandId>;
-}
-
-interface Policy {
-  readonly clientSessionId: string;
-  readonly origin: URL;
 }
 
 interface Attachment {
@@ -126,14 +123,20 @@ function forward(
     },
   );
   upstream.on("error", () => {
+    if (response.destroyed) return;
     if (response.headersSent) response.destroy();
     else response.writeHead(502).end();
   });
-  response.once("close", () => upstream.destroy());
+  response.once("close", () => {
+    if (!response.writableFinished) {
+      request.unpipe(upstream);
+      upstream.destroy();
+    }
+  });
   request.pipe(upstream);
 }
 
-export const layer = (policy: Policy) =>
+export const layer = (origins: ReadonlySet<string>) =>
   Layer.effect(
     ThreadMcpServers,
     Effect.gen(function* () {
@@ -163,7 +166,7 @@ export const layer = (policy: Policy) =>
               listening.once("error", reject);
               listening.listen(0, "127.0.0.1", () => resolve(listening));
             }),
-          catch: () => unavailable(),
+          catch: () => attachmentDenied(),
         }),
         (server) =>
           Effect.sync(() => {
@@ -172,7 +175,7 @@ export const layer = (policy: Policy) =>
           }),
       );
       const address = server.address();
-      if (address === null || typeof address === "string") return yield* unavailable();
+      if (address === null || typeof address === "string") return yield* attachmentDenied();
       const localOrigin = `http://127.0.0.1:${address.port}`;
 
       const replace = (threadId: ThreadId, next?: ThreadRegistration) => {
@@ -194,21 +197,21 @@ export const layer = (policy: Policy) =>
             dispatch: Effect.Effect<A, E, R>,
             beforeUpdate?: (topologyChanged: boolean) => Effect.Effect<void, E, R>,
           ) => {
-            const trusted =
-              input.scope.thread === undefined &&
-              input.scope.client?.sessionId === policy.clientSessionId &&
-              input.scope.client.access !== "read-only";
-            if (
-              input.servers === undefined &&
-              !(trusted && (input.launch || threads.has(input.threadId)))
-            )
+            const { client, thread } = input.scope;
+            if (client === undefined || thread !== undefined || client.access === "read-only")
+              return input.servers === undefined ? dispatch : Effect.fail(attachmentDenied());
+            if (input.servers === undefined && !input.launch && !threads.has(input.threadId))
               return dispatch;
-            if (!trusted) return Effect.fail(unavailable());
             return lock.withLock(
               input.threadId,
               Effect.gen(function* () {
                 const previous = threads.get(input.threadId);
-                if (!input.launch && previous === undefined) return yield* unavailable();
+                if (
+                  previous === undefined
+                    ? !input.launch
+                    : previous.ownerSessionId !== client.sessionId
+                )
+                  return input.servers === undefined ? yield* dispatch : yield* attachmentDenied();
                 if (previous?.accepted.has(input.commandId)) return yield* dispatch;
                 const authorizations = input.scope.threadMcpAuthorization;
                 const entries: Registration[] = [];
@@ -218,7 +221,7 @@ export const layer = (policy: Policy) =>
                   const authorization = authorizations?.get(headersRef);
                   if (
                     target === null ||
-                    target.origin !== policy.origin.origin ||
+                    !origins.has(target.origin) ||
                     target.username ||
                     target.password ||
                     target.hash ||
@@ -245,6 +248,7 @@ export const layer = (policy: Policy) =>
                   });
                 }
                 const next = {
+                  ownerSessionId: client.sessionId,
                   servers: input.servers === undefined ? (previous?.servers ?? []) : entries,
                   accepted: previous?.accepted ?? new Set<CommandId>(),
                 };
@@ -272,12 +276,21 @@ export const layer = (policy: Policy) =>
     }),
   );
 
-export const configure = (origin: string | undefined, clientSessionId: string | undefined) => {
-  const url = origin === undefined ? null : URL.parse(origin);
-  if (!url || !clientSessionId || url.href !== url.origin + "/") return undefined;
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "127.0.0.1"))
-    return undefined;
-  return layer({ origin: url, clientSessionId });
+export const configure = (configuredOrigins: string | undefined) => {
+  if (configuredOrigins === undefined) return undefined;
+  const origins = new Set<string>();
+  for (const origin of configuredOrigins.split(",")) {
+    const url = URL.parse(origin.trim());
+    if (
+      url === null ||
+      url.href !== url.origin + "/" ||
+      url.hostname.includes("*") ||
+      (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "127.0.0.1"))
+    )
+      return undefined;
+    origins.add(url.origin);
+  }
+  return layer(origins);
 };
 
 export function authorizationReferences(header: string | undefined) {
@@ -309,6 +322,6 @@ export const aroundDispatch = <A, E, R>(
         ? relay.value.around(input, dispatch, beforeUpdate)
         : input.servers === undefined
           ? dispatch
-          : Effect.fail(unavailable()),
+          : Effect.fail(attachmentDenied()),
     ),
   );

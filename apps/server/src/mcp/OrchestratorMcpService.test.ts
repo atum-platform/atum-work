@@ -5098,6 +5098,11 @@ describe("OrchestratorMcpService thread lookup", () => {
       const origin = new URL("https://example.test");
       const thread = { ...launched, activeRunId: null };
       const servers = [{ name: "relay", url: new URL("/tools", origin).href, headersRef: "relay" }];
+      const changedServers = [{ ...servers[0]!, toolTimeoutMs: 7_200_000 }];
+      const shell = yield* Ref.make<OrchestrationV2ThreadShell>({
+        ...thread,
+        activeRunId: RunId.make("active-relay-run"),
+      });
       const scope = (value: string): McpInvocationScope => ({
         ...client,
         threadMcpAuthorization: ThreadMcpServers.authorizationReferences(
@@ -5119,6 +5124,22 @@ describe("OrchestratorMcpService thread lookup", () => {
         );
         yield* Effect.gen(function* () {
           const mcp = yield* OrchestratorMcpService.OrchestratorMcpService;
+          const update = (mcpServers: typeof servers, freshContext?: true) =>
+            mcp.sendToThread(scope("synthetic-send"), {
+              threadId: thread.id,
+              message: "Follow up",
+              clientRequestId: "update-attachment",
+              mcpServers,
+              ...(freshContext === undefined ? {} : { freshContext }),
+            });
+          const busy = yield* update(servers).pipe(Effect.flip);
+          assert.equal(busy.code, "thread_mcp_update_busy");
+          yield* Ref.set(shell, thread);
+          const fresh = yield* update(changedServers).pipe(Effect.flip);
+          assert.equal(fresh.code, "thread_mcp_fresh_context_required");
+          assert.deepEqual(yield* relay.read(thread.id), initial);
+          assert.equal(yield* Ref.get(sent), 0);
+
           const result = yield* mcp.sendToThread(scope("synthetic-send"), {
             threadId: thread.id,
             message: "Follow up",
@@ -5127,23 +5148,29 @@ describe("OrchestratorMcpService thread lookup", () => {
           });
           assert.equal(result.runId, "fixture-run");
           assert.deepEqual(yield* relay.read(thread.id), initial);
+          yield* update(changedServers, true);
+          assert.equal((yield* relay.read(thread.id))[0]?.toolTimeoutMs, 7_200_000);
+          assert.equal(yield* Ref.get(sent), 2);
         }).pipe(
           Effect.provide(
             service([thread], sent, {
+              getThreadShell: () => Ref.get(shell),
               getProjectThreadRecords: () => Effect.succeed(idleThreadProjection(thread)),
               sendToThread: (input) =>
-                Effect.sync(() => {
-                  assert.notProperty(input, "mcpServers");
-                  assert.notInclude(JSON.stringify(input), "synthetic-send");
-                  return {
-                    run: { id: RunId.make("fixture-run"), status: "queued" },
-                    delivery: "queued",
-                  } as unknown as ThreadManagementService.ThreadManagementSendResult;
-                }),
+                Ref.update(sent, (count) => count + 1).pipe(
+                  Effect.map(() => {
+                    assert.notProperty(input, "mcpServers");
+                    assert.notInclude(JSON.stringify(input), "synthetic-send");
+                    return {
+                      run: { id: RunId.make("fixture-run"), status: "queued" },
+                      delivery: "queued",
+                    } as unknown as ThreadManagementService.ThreadManagementSendResult;
+                  }),
+                ),
             }),
           ),
         );
-      }).pipe(Effect.provide(ThreadMcpServers.layer({ origin, clientSessionId: "thread-lookup" })));
+      }).pipe(Effect.provide(ThreadMcpServers.layer(new Set([origin.origin]))));
     }),
   );
 

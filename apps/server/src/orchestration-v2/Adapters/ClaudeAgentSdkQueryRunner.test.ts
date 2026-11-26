@@ -233,6 +233,35 @@ const resumedMcpQueryInput = {
   },
 } satisfies ClaudeAgentSdkQueryOpenInput;
 
+it.effect("registers a relay loopback URL only on the Claude control channel", () =>
+  Effect.gen(function* () {
+    const setMcpServers = vi.fn(async () => ({ added: ["relay"], removed: [], errors: {} }));
+    const query = vi.spyOn(ClaudeSdk, "query").mockImplementation(
+      () =>
+        ({
+          initializationResult: async () => ({}),
+          setMcpServers,
+          close: vi.fn(),
+        }) as unknown as ClaudeSdk.Query,
+    );
+    yield* Effect.addFinalizer(() => Effect.sync(() => query.mockRestore()));
+    const runner = yield* ClaudeAgentSdkQueryRunner;
+    const relay = {
+      type: "http",
+      url: "http://127.0.0.1:3774/fixture-relay-capability",
+      timeout: 7_200_000,
+    } as const;
+    const session = yield* runner.open({
+      ...resumedMcpQueryInput,
+      options: { ...resumedMcpQueryInput.options, mcpServers: { relay } },
+    });
+    yield* Effect.addFinalizer(() => session.close.pipe(Effect.orDie));
+    assert.isUndefined(query.mock.calls[0]?.[0].options?.mcpServers);
+    assert.notInclude(JSON.stringify(query.mock.calls[0]?.[0].options), relay.url);
+    assert.deepEqual(setMcpServers.mock.calls, [[{ relay }]]);
+  }).pipe(Effect.provide(realQueryRunner)),
+);
+
 it.effect("resumes a session whose history exceeds the status-probe output limit", () =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;

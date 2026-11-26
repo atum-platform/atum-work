@@ -4,6 +4,7 @@ import * as Schema from "effect/Schema";
 import {
   OrchestratorMcpDelegateTaskInput,
   OrchestratorMcpDelegateTaskResult,
+  OrchestratorMcpThreadServers,
   OrchestratorMcpThreadWaitResult,
 } from "./orchestratorMcp.ts";
 
@@ -12,6 +13,13 @@ const decodeDelegateTaskResult = Schema.decodeUnknownSync(OrchestratorMcpDelegat
 const decodeThreadWaitResult = Schema.decodeUnknownSync(OrchestratorMcpThreadWaitResult);
 
 describe("orchestrator MCP contracts", () => {
+  it("allows a two-hour thread MCP deadline and rejects larger timeouts", () => {
+    const decode = Schema.decodeUnknownSync(OrchestratorMcpThreadServers);
+    const server = { name: "relay", url: "https://relay.example/mcp", headersRef: "relay" };
+    expect(decode([{ ...server, toolTimeoutMs: 7_200_000 }])[0]?.toolTimeoutMs).toBe(7_200_000);
+    expect(() => decode([{ ...server, toolTimeoutMs: 7_200_001 }])).toThrow();
+  });
+
   it("decodes cross-provider delegated task requests and durable results", () => {
     const request = decodeDelegateTaskInput({
       task: "Inspect the workspace and report the result.",

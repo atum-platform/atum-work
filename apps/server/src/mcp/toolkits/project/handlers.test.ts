@@ -51,6 +51,7 @@ import { ProjectToolkit } from "./tools.ts";
 
 const clientLaunchHarness = (input: {
   readonly runtimeModeCeiling: RuntimeMode;
+  readonly sessionId?: string;
   readonly defaultRuntimeMode?: RuntimeMode;
   readonly newWorktreesStartFromOrigin?: boolean;
   readonly defaultThreadEnvMode?: "local" | "worktree";
@@ -70,6 +71,7 @@ const clientLaunchHarness = (input: {
   readonly refusedByCeiling?: true;
 }) => {
   const projectId = ProjectId.make("project:client-target");
+  const sessionId = input.sessionId ?? "session-1";
   const modelSelection = {
     instanceId: ProviderInstanceId.make("claudeAgent"),
     model: "claude-opus",
@@ -110,10 +112,10 @@ const clientLaunchHarness = (input: {
     }),
     Layer.succeed(McpInvocationContext.McpInvocationContext, {
       environmentId: EnvironmentId.make("environment"),
-      requestNamespace: "client:session-1",
+      requestNamespace: `client:${sessionId}`,
       thread: undefined,
       client: {
-        sessionId: "session-1",
+        sessionId,
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
@@ -523,47 +525,57 @@ it.effect("a launch retried with the same clientRequestId replays the first one"
   }),
 );
 
-it.live("attaches relay servers before launching without putting them in the launch input", () =>
+it.live("scopes relay launches and their attachment registries by OAuth session", () =>
   Effect.gen(function* () {
     const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
     const origin = new URL("https://example.test");
     const relayAuthorization = ThreadMcpServers.authorizationReferences(
       '{"relay":"Bearer synthetic-launch"}',
     )!;
-    const { projectId, dependencies } = clientLaunchHarness({
-      runtimeModeCeiling: "auto",
-      launched,
-      relayAuthorization,
-    });
     yield* Effect.gen(function* () {
       const relay = yield* ThreadMcpServers.ThreadMcpServers;
-      const toolkit = yield* ProjectToolkit.pipe(
-        Effect.provide(
-          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
-            Layer.provide(dependencies),
+      const launch = Effect.fnUntraced(function* (sessionId: string) {
+        const { projectId, dependencies } = clientLaunchHarness({
+          runtimeModeCeiling: "auto",
+          sessionId,
+          launched,
+          relayAuthorization,
+        });
+        const toolkit = yield* ProjectToolkit.pipe(
+          Effect.provide(
+            McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+              Layer.provide(dependencies),
+            ),
           ),
-        ),
-      );
-      const result = (yield* toolkit
-        .handle("t3_thread_launch", {
-          title: "Relay",
-          projectId,
-          mcpServers: [{ name: "relay", url: new URL("/tools", origin).href, headersRef: "relay" }],
-        })
-        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies))).at(-1)?.result;
-      expect(launched).toHaveLength(1);
-      const threadId = launched[0]!.threadId!;
-      expect(result).toMatchObject({ threadId });
-      expect(launched[0]).not.toHaveProperty("mcpServers");
+        );
+        const result = (yield* toolkit
+          .handle("t3_thread_launch", {
+            title: "Relay",
+            projectId,
+            clientRequestId: "same-key",
+            mcpServers: [
+              { name: "relay", url: new URL("/tools", origin).href, headersRef: "relay" },
+            ],
+          })
+          .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies))).at(-1)?.result;
+        const threadId = launched.at(-1)!.threadId!;
+        expect(result).toMatchObject({ threadId });
+        expect(launched.at(-1)).not.toHaveProperty("mcpServers");
+        expect(yield* relay.read(threadId)).toEqual([
+          {
+            name: "relay",
+            url: expect.stringMatching(/^http:\/\/127\.0\.0\.1:/),
+            toolTimeoutMs: 180_000,
+          },
+        ]);
+        return threadId;
+      });
+      const first = yield* launch("relay-1");
+      const second = yield* launch("relay-2");
+      expect(first).not.toBe(second);
+      expect(launched).toHaveLength(2);
       expect(JSON.stringify(launched)).not.toContain("synthetic-launch");
-      expect(yield* relay.read(threadId)).toEqual([
-        {
-          name: "relay",
-          url: expect.stringMatching(/^http:\/\/127\.0\.0\.1:/),
-          toolTimeoutMs: 180_000,
-        },
-      ]);
-    }).pipe(Effect.provide(ThreadMcpServers.layer({ origin, clientSessionId: "session-1" })));
+    }).pipe(Effect.provide(ThreadMcpServers.layer(new Set([origin.origin]))));
   }),
 );
 
