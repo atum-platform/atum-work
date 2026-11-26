@@ -8877,6 +8877,98 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   });
 
   // regression: #17270 root text_delta frames stream the reply before the block's snapshot
+  it.effect.each([false, true])(
+    "classifies Claude commentary and the answer (streamed: %s)",
+    (streamed) =>
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarness;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("claude-commentary"),
+            text: "Check both files and summarize.",
+            attachments: [],
+          }),
+        );
+        const offer = (frame: Record<string, unknown>) =>
+          harness.offerAndWait(
+            claudeSdkFrame({ session_id: WAKE_NATIVE_SESSION, parent_tool_use_id: null, ...frame }),
+          );
+        const snapshot = (id: string, block: Record<string, unknown>) => ({
+          type: "assistant",
+          uuid: `${id}-${block.type}`,
+          message: { id, model: "claude-opus-5-5", content: [block], stop_reason: null },
+        });
+        const items = () =>
+          harness.events.flatMap((event) =>
+            event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"
+              ? [event.turnItem]
+              : [],
+          );
+        const replies = [
+          "Checking the first file.",
+          "Checking the second file.",
+          "Both files passed.",
+        ];
+        for (const [index, text] of replies.entries()) {
+          const id = `message-${index}`;
+          if (streamed) {
+            for (const event of [
+              { type: "message_start", message: { id } },
+              { type: "content_block_start", index: 0, content_block: { type: "text", text } },
+              { type: "content_block_stop", index: 0 },
+            ]) {
+              yield* offer({ type: "stream_event", event, uuid: `stream-${id}-${event.type}` });
+            }
+          }
+          const assistant = snapshot(id, { type: "text", text });
+          yield* offer(assistant);
+          yield* harness.until(() => items().at(-1)?.text === text);
+          assert.include(items().at(-1), { phase: "commentary", status: "running", text });
+          if (index < 2) {
+            const toolId = `tool-${index}`;
+            yield* offer(snapshot(id, { type: "tool_use", id: toolId, name: "Read", input: {} }));
+            yield* harness.until(() =>
+              harness.events.some(
+                (event) =>
+                  event.type === "turn_item.updated" &&
+                  event.turnItem.nativeItemRef?.nativeId === toolId,
+              ),
+            );
+            assert.include(items().at(-1), { phase: "commentary", status: "completed", text });
+          }
+          yield* offer(assistant);
+        }
+        yield* Queue.offer(
+          harness.sdkMessages,
+          makeResultFrame({ uuid: "commentary-result", result: replies[2]! }),
+        );
+        yield* Queue.take(harness.terminalReceipts);
+        const completed = items().filter((item) => item.status === "completed");
+        assert.deepEqual(
+          completed.map(({ phase, text }) => [phase, text]),
+          [
+            ["commentary", replies[0]],
+            ["commentary", replies[1]],
+            ["final_answer", replies[2]],
+          ],
+        );
+        assert.equal(new Set(items().map((item) => item.id)).size, 3);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layer,
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      ),
+  );
+
   it.effect("streams Claude assistant text deltas before the completed snapshot", () =>
     Effect.gen(function* () {
       const harness = yield* makeWakeHarness;

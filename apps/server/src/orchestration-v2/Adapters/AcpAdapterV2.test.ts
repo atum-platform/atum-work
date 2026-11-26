@@ -3511,6 +3511,39 @@ describe("AcpAdapterV2", () => {
     }).pipe(Effect.provide(layerTest)),
   );
 
+  it.effect.each([false, true])("classifies ACP commentary and the answer (named: %s)", (named) =>
+    Effect.gen(function* () {
+      const tool = (toolCallId: string) => ({
+        sessionUpdate: "tool_call" as const,
+        toolCallId,
+        title: "Read a file",
+        kind: "read" as const,
+        status: "completed" as const,
+      });
+      const events = yield* runScriptedTextTurn([
+        answer(named ? "first" : undefined, "Checking the first file."),
+        tool("first"),
+        answer(named ? "second" : undefined, "Checking the second file."),
+        tool("second"),
+        answer(named ? "final" : undefined, "Both files passed."),
+      ]);
+      const items = Array.from(events).flatMap((event) =>
+        event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"
+          ? [event.turnItem]
+          : [],
+      );
+      assert.deepEqual(
+        items.filter((item) => item.status === "completed").map(({ phase, text }) => [phase, text]),
+        [
+          ["commentary", "Checking the first file."],
+          ["commentary", "Checking the second file."],
+          ["final_answer", "Both files passed."],
+        ],
+      );
+      assert.equal(new Set(items.map((item) => item.id)).size, 3);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
   it.effect("ignores a text flush scheduled before an ACP segment resumed", () =>
     Effect.gen(function* () {
       const events = yield* runScriptedTextTurn([

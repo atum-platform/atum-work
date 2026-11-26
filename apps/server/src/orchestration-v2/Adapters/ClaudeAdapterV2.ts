@@ -123,6 +123,7 @@ import {
   type OrchestrationV2SubagentWorkflow,
   type OrchestrationV2WorkflowRunHandles,
   type OrchestrationV2TurnItem,
+  type OrchestrationV2AssistantMessageTurnItem,
   type OrchestrationV2WebSearchResult,
   type ProviderApprovalDecision,
   type ProviderApprovalFullAccessOverride,
@@ -5226,11 +5227,11 @@ function buildAssistantArtifacts(input: {
   readonly completedAt: DateTime.Utc;
   // A streamed message keeps its first timestamp across updates.
   readonly createdAt?: DateTime.Utc;
-  readonly finalAnswer?: boolean;
+  readonly phase?: OrchestrationV2AssistantMessageTurnItem["phase"];
 }): {
   readonly node: OrchestrationV2ExecutionNode;
   readonly message: OrchestrationV2ConversationMessage;
-  readonly turnItem: OrchestrationV2TurnItem;
+  readonly turnItem: OrchestrationV2AssistantMessageTurnItem;
 } {
   const nodeId = input.idAllocator.derive.nodeFromProviderItem({
     driver: CLAUDE_PROVIDER,
@@ -5301,7 +5302,7 @@ function buildAssistantArtifacts(input: {
       completedAt,
       updatedAt: input.completedAt,
       type: "assistant_message",
-      ...(input.finalAnswer === true ? { phase: "final_answer" as const } : {}),
+      ...(input.phase === undefined ? {} : { phase: input.phase }),
       messageId,
       text: input.text,
       streaming,
@@ -5369,6 +5370,8 @@ interface ActiveClaudeTurnContext {
   readonly itemOrdinals: Map<string, number>;
   readonly planIds: Map<string, OrchestrationV2PlanArtifact["id"]>;
   readonly assistant: {
+    messageId: string | null;
+    readonly pendingItems: Map<string, OrchestrationV2AssistantMessageTurnItem>;
     fallbackText: string;
     // Result-only replies of steered segments that ended before the current one.
     earlierFallbackText: string;
@@ -9581,7 +9584,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly startedAt: DateTime.Utc;
           readonly completedAt: DateTime.Utc;
           readonly createdAt?: DateTime.Utc;
-          readonly finalAnswer?: boolean;
+          readonly phase?: OrchestrationV2AssistantMessageTurnItem["phase"];
         }) {
           const ordinal = yield* resolveItemOrdinal(input.context, input.nativeItemId);
           const artifacts = buildAssistantArtifacts({
@@ -9595,8 +9598,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             startedAt: input.startedAt,
             completedAt: input.completedAt,
             ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
-            ...(input.finalAnswer === undefined ? {} : { finalAnswer: input.finalAnswer }),
+            phase: input.phase,
           });
+          const pending = input.context.assistant.pendingItems;
+          const awaitsPhase = input.phase === undefined && input.status !== "interrupted";
+          if (awaitsPhase && input.status === "completed") {
+            pending.set(input.nativeItemId, artifacts.turnItem);
+          } else {
+            pending.delete(input.nativeItemId);
+          }
           yield* Effect.all(
             [
               emitProviderEvent({
@@ -9612,11 +9622,43 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               emitProviderEvent({
                 type: "turn_item.updated",
                 driver: CLAUDE_PROVIDER,
-                turnItem: artifacts.turnItem,
+                // Keep cursor readers at this position until the provider reveals its phase.
+                turnItem: awaitsPhase
+                  ? {
+                      ...artifacts.turnItem,
+                      phase: "commentary",
+                      status: "running",
+                      completedAt: null,
+                    }
+                  : artifacts.turnItem,
               }),
             ],
             { concurrency: 1 },
           );
+        });
+
+        const settleAssistantPhase = Effect.fnUntraced(function* (
+          context: ActiveClaudeTurnContext,
+          phase: OrchestrationV2AssistantMessageTurnItem["phase"],
+        ) {
+          const pending = context.assistant.pendingItems;
+          for (const item of pending.values()) {
+            yield* emitProviderEvent({
+              type: "turn_item.updated",
+              driver: CLAUDE_PROVIDER,
+              turnItem: { ...item, phase, updatedAt: yield* DateTime.now },
+            });
+          }
+          pending.clear();
+        });
+
+        const startAssistantMessage = Effect.fnUntraced(function* (
+          context: ActiveClaudeTurnContext,
+          messageId: string,
+        ) {
+          if (context.assistant.messageId === messageId) return;
+          yield* settleAssistantPhase(context, "commentary");
+          context.assistant.messageId = messageId;
         });
 
         const assistantDeltas = yield* makeProviderTextDeltaCoalescer({
@@ -9806,6 +9848,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           } else {
             yield* cutOffStreamedText(input.context);
           }
+          yield* settleAssistantPhase(
+            input.context,
+            input.status === "completed" ? "final_answer" : undefined,
+          );
           if (input.status === "completed" && input.context.appContextOffered !== undefined) {
             deliveredAppContext.set(input.context.nativeThreadId, input.context.appContextOffered);
           }
@@ -9908,6 +9954,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ordinal,
               startedAt: input.context.startedAt,
               completedAt: input.completedAt,
+              phase: input.status === "completed" ? "final_answer" : undefined,
             });
             yield* Effect.all(
               [
@@ -10191,6 +10238,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly context: ActiveClaudeTurnContext;
           readonly nativeItemId: string;
           readonly text: string;
+          readonly phase?: OrchestrationV2AssistantMessageTurnItem["phase"];
         }) {
           if (input.context.assistant.emittedNativeItemIds.has(input.nativeItemId)) {
             return undefined;
@@ -11281,6 +11329,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             const event = message.event;
             const reasoning = context.reasoning;
             if (event.type === "message_start") {
+              yield* startAssistantMessage(context, event.message.id);
               reasoning.messageId = event.message.id;
               reasoning.streamBlocks.clear();
               context.assistant.streamBlocks.clear();
@@ -11379,6 +11428,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             return;
           }
           // Snapshot text the stream did not deliver, once any of it streamed.
+          const rootToolUse =
+            message.type === "assistant" &&
+            message.parent_tool_use_id === null &&
+            message.message.content.some((block) => block.type === "tool_use");
           const unstreamedSnapshotText: Array<string> = [];
           let streamedSnapshotReply: NonNullable<
             ActiveClaudeTurnContext["assistant"]["lastReply"]
@@ -11389,6 +11442,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             !context.reasoning.snapshots.has(message.uuid)
           ) {
             context.reasoning.snapshots.add(message.uuid);
+            if (message.message.model !== "<synthetic>") {
+              yield* startAssistantMessage(context, message.message.id);
+            }
             // The SDK snapshots each completed block; count thinking blocks separately to preserve streamed ids.
             for (const block of message.message.content) {
               if (block.type === "text") {
@@ -11434,6 +11490,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     context,
                     nativeItemId: update.itemId,
                     text: update.text,
+                    phase: "commentary",
                   });
                 }
                 continue;
@@ -11462,6 +11519,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             if (streamedSnapshotReply !== null && unstreamedSnapshotText.join("").length === 0) {
               context.assistant.emittedNativeItemIds.add(message.uuid);
             }
+            if (rootToolUse) yield* settleAssistantPhase(context, "commentary");
           }
 
           if (message.type === "assistant" && input.replayed !== true) {
@@ -12349,6 +12407,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               context,
               nativeItemId: assistantText.nativeItemId,
               text,
+              phase: rootToolUse ? "commentary" : undefined,
             });
             if (startedAt !== undefined) {
               context.assistant.lastReply = {
@@ -12446,6 +12505,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   completedAt,
                 });
               }
+              yield* settleAssistantPhase(context, undefined);
               context.steeredSegmentUsage.push(message.usage);
               context.steeredLedgerUsage = addClaudeLedgerUsage(
                 context.steeredLedgerUsage,
@@ -12568,17 +12628,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ) {
               context.heldResult = message;
               // Claude ended its native turn on this reply; the run continues only for the steer.
-              const answer = context.assistant.lastReply;
-              if (answer !== null) {
-                yield* publishAssistantArtifacts({
-                  context,
-                  ...answer,
-                  createdAt: answer.startedAt,
-                  status: "completed",
-                  completedAt,
-                  finalAnswer: true,
-                });
-              }
+              yield* settleAssistantPhase(context, "final_answer");
               return;
             }
             yield* finalizeActiveTurn({
@@ -14060,6 +14110,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               itemOrdinals: new Map(),
               planIds: new Map(),
               assistant: {
+                messageId: null,
+                pendingItems: new Map(),
                 fallbackText: "",
                 earlierFallbackText: "",
                 fallbackNativeItemId: `assistant:${turnInput.runId}`,

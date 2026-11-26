@@ -77,3 +77,16 @@ through the same Claude query before and after replacing the Work credential.
 The upstream recorded first the old bearer and then the new one. The second
 call returned in 150.27 seconds under a 180-second budget. A scan of the four
 files created in the isolated Claude home found neither synthetic bearer.
+
+## Interim messages on the relay
+
+The relay pages Work messages by position. It holds its position at a running
+commentary item and forwards the text after the item completes as commentary.
+Claude and ACP use the running phase while the provider is still deciding
+whether the text is an update or an answer. They resolve it in place so a
+relay poll during streaming cannot skip it.
+
+ACP keeps chunks with the same native message ID together across tool calls.
+A tool boundary can complete anonymous text immediately. Named text becomes
+eligible once the adapter closes that message. Claude continues to treat a
+native answer that finishes before a queued steer as a final answer.

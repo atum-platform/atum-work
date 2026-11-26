@@ -17,6 +17,7 @@ import {
   type OrchestrationV2RuntimeRequest,
   type OrchestrationV2Subagent,
   type OrchestrationV2TurnItem,
+  type OrchestrationV2AssistantMessageTurnItem,
   type OrchestrationV2UserInputQuestion,
   type OrchestrationV2WebSearchResult,
   type ProviderApprovalDecision,
@@ -1728,6 +1729,7 @@ interface ActiveAcpTurn {
   consumedPromptMessageId?: string;
   readonly user: ActiveTextStream;
   readonly assistant: ActiveTextStream;
+  readonly pendingAssistantItems: Map<string, OrchestrationV2AssistantMessageTurnItem>;
   readonly reasoning: ActiveTextStream;
   providerRetry?:
     | {
@@ -3237,6 +3239,20 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               : context.reasoning;
 
         const textEmissionPermit = yield* Semaphore.make(1);
+        const settleAssistantPhase = Effect.fnUntraced(function* (
+          context: ActiveAcpTurn,
+          phase: OrchestrationV2AssistantMessageTurnItem["phase"],
+        ) {
+          for (const item of context.pendingAssistantItems.values()) {
+            yield* emitProviderEvent({
+              type: "turn_item.updated",
+              driver,
+              turnItem: { ...item, phase, updatedAt: yield* DateTime.now },
+            });
+          }
+          context.pendingAssistantItems.clear();
+        });
+
         /**
          * Emits the stream's current segment. A `flushOf` call is a delayed
          * flush: it emits only while that segment is still current and has
@@ -3312,60 +3328,62 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               updatedAt: now,
             };
             yield* emitProviderEvent({ type: "message.updated", driver, message });
-            yield* emitProviderEvent(
-              kind === "user"
-                ? {
-                    type: "turn_item.updated",
-                    driver,
-                    turnItem: {
-                      createdBy: "user",
-                      creationSource: "provider",
-                      id: turnItemId,
-                      threadId: context.input.threadId,
-                      runId: context.input.runId,
-                      nodeId: messageNodeId,
-                      providerThreadId: context.input.providerThread.id,
-                      providerTurnId: context.providerTurnId,
-                      nativeItemRef,
-                      parentItemId: null,
-                      ordinal,
-                      status: completed ? "completed" : "running",
-                      title: null,
-                      startedAt: segment.startedAt,
-                      completedAt: completed ? now : null,
-                      updatedAt: now,
-                      type: "user_message",
-                      messageId,
-                      inputIntent: "turn_start",
-                      text,
-                      attachments: [],
-                    },
-                  }
-                : {
-                    type: "turn_item.updated",
-                    driver,
-                    turnItem: {
-                      id: turnItemId,
-                      threadId: context.input.threadId,
-                      runId: context.input.runId,
-                      nodeId,
-                      providerThreadId: context.input.providerThread.id,
-                      providerTurnId: context.providerTurnId,
-                      nativeItemRef,
-                      parentItemId: null,
-                      ordinal,
-                      status: completed ? "completed" : "running",
-                      title: null,
-                      startedAt: segment.startedAt,
-                      completedAt: completed ? now : null,
-                      updatedAt: now,
-                      type: "assistant_message",
-                      messageId,
-                      text,
-                      streaming: !completed,
-                    },
-                  },
-            );
+            if (kind === "user") {
+              yield* emitProviderEvent({
+                type: "turn_item.updated",
+                driver,
+                turnItem: {
+                  createdBy: "user",
+                  creationSource: "provider",
+                  id: turnItemId,
+                  threadId: context.input.threadId,
+                  runId: context.input.runId,
+                  nodeId: messageNodeId,
+                  providerThreadId: context.input.providerThread.id,
+                  providerTurnId: context.providerTurnId,
+                  nativeItemRef,
+                  parentItemId: null,
+                  ordinal,
+                  status: completed ? "completed" : "running",
+                  title: null,
+                  startedAt: segment.startedAt,
+                  completedAt: completed ? now : null,
+                  updatedAt: now,
+                  type: "user_message",
+                  messageId,
+                  inputIntent: "turn_start",
+                  text,
+                  attachments: [],
+                },
+              });
+            } else {
+              const item: OrchestrationV2AssistantMessageTurnItem = {
+                id: turnItemId,
+                threadId: context.input.threadId,
+                runId: context.input.runId,
+                nodeId,
+                providerThreadId: context.input.providerThread.id,
+                providerTurnId: context.providerTurnId,
+                nativeItemRef,
+                parentItemId: null,
+                ordinal,
+                status: completed ? "completed" : "running",
+                title: null,
+                startedAt: segment.startedAt,
+                completedAt: completed ? now : null,
+                updatedAt: now,
+                type: "assistant_message",
+                messageId,
+                text,
+                streaming: !completed,
+              };
+              if (completed) context.pendingAssistantItems.set(segment.nativeItemId, item);
+              yield* emitProviderEvent({
+                type: "turn_item.updated",
+                driver,
+                turnItem: { ...item, phase: "commentary", status: "running", completedAt: null },
+              });
+            }
             if (completed) yield* rememberSnapshotMessage(message);
             return;
           }
@@ -3459,6 +3477,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 }
               : { ...closed, emitted: false, dirty: false };
           if (closed === undefined) stream.nextSegment += 1;
+          if (kind === "assistant") {
+            context.pendingAssistantItems.delete(segment.nativeItemId);
+            yield* settleAssistantPhase(context, "commentary");
+          }
           stream.current = segment;
           return segment;
         });
@@ -6395,6 +6417,12 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               const parsed = parseSessionUpdateEvent(notification);
               for (const event of parsed.events) {
                 if (event._tag === "ToolCallUpdated") {
+                  if (update.sessionUpdate === "tool_call") {
+                    // Named messages can keep streaming across a tool call.
+                    if (context.assistant.current?.sourceMessageId == null)
+                      yield* closeTextStream(context, "assistant");
+                    yield* settleAssistantPhase(context, "commentary");
+                  }
                   yield* emitTool(context, event.toolCall, undefined, event.rawPayload);
                 } else if (event._tag === "PlanUpdated") {
                   yield* emitPlan(context, event.payload, update.sessionUpdate !== "plan");
@@ -6433,6 +6461,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           transportRequestId: string,
         ) {
           yield* closeTextStreams(context);
+          yield* settleAssistantPhase(context, "commentary");
           const parsed = parsePermissionRequest(params);
           const approvalOptions = flavor.approvalOptions?.(params);
           const nativeRequestId = params.toolCall.toolCallId;
@@ -6558,6 +6587,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         ) {
           const context = yield* activeContext;
           yield* closeTextStreams(context);
+          yield* settleAssistantPhase(context, "commentary");
           const requestId = yield* idAllocator.allocate.runtimeRequest({
             driver,
             providerTurnId: context.providerTurnId,
@@ -8736,6 +8766,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             });
           }
           yield* closeTextStreams(context);
+          yield* settleAssistantPhase(
+            context,
+            settledStatus === "completed" ? "final_answer" : undefined,
+          );
           // Ingestion may stop at turn.terminal, before a delayed flush would run.
           yield* textEmissionPermit.withPermit(
             Effect.forEach(context.subagents.values(), flushPendingSubagentAssistant, {
@@ -9731,6 +9765,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               appContextSequence: 0,
               user: { current: null, nextSegment: 0, closedNamedSegments: new Map() },
               assistant: { current: null, nextSegment: 0, closedNamedSegments: new Map() },
+              pendingAssistantItems: new Map(),
               reasoning: { current: null, nextSegment: 0, closedNamedSegments: new Map() },
               contextUsage: rememberedContextUsage ?? turnInput.providerThread.contextUsage ?? null,
               nativeMetadata: initialNativeMetadata,
