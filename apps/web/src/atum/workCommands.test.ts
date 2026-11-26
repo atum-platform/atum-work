@@ -5,7 +5,10 @@ import { dispatchMenuAction, runCommand } from "../shortcuts/dispatcher";
 import { offerAtumRightPanel } from "./rightPanel";
 import { installAtumWorkCommands, runAtumBandCommand } from "./workCommands";
 
-vi.mock("../shortcuts/dispatcher", () => ({ dispatchMenuAction: vi.fn(), runCommand: vi.fn(() => true) }));
+vi.mock("../shortcuts/dispatcher", () => ({
+  dispatchMenuAction: vi.fn(),
+  runCommand: vi.fn(() => true),
+}));
 vi.mock("../commandPaletteBus", () => ({
   isCommandPaletteOpen: vi.fn(() => false),
   openCommandPalette: vi.fn(),
