@@ -13,6 +13,7 @@ export interface ManagedMcpServer {
   readonly url: string;
   readonly authorizationHeader?: string;
   readonly toolTimeoutMs?: number;
+  readonly omitWhenRelayAttached?: true;
 }
 
 export interface McpProviderSessionConfig {

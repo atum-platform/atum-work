@@ -58,6 +58,7 @@ export const readConnectorMcpServers = Effect.fn("readConnectorMcpServers")(func
     name: `atum-account-${route}-${tag}`,
     url: new URL(`/mcp/${route}`, connector).href,
     authorizationHeader,
+    omitWhenRelayAttached: true as const,
   }));
 
   // Prove connector ownership without sending a bearer or a query to a recycled port.

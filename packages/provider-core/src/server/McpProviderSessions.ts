@@ -28,15 +28,21 @@ interface KeptHtmlRender {
 
 const hashHtml = (html: string) => NodeCrypto.createHash("sha256").update(html).digest("hex");
 
+type ReadThreadServers = (threadId: ThreadId) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
+
+interface ManagedServerGroups {
+  readonly host: ReadonlyArray<ManagedMcpServer>;
+  readonly relay: ReadonlyArray<ManagedMcpServer>;
+}
+
 export class McpProviderSessions extends Context.Service<
   McpProviderSessions,
   {
     readonly set: (config: McpProviderSessionConfig) => Effect.Effect<void>;
     readonly read: (threadId: ThreadId) => Effect.Effect<McpProviderSessionConfig | undefined>;
-    readonly readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
-    readonly readThreadServers: (
+    readonly readManagedServerGroupsForThread: (
       threadId: ThreadId,
-    ) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
+    ) => Effect.Effect<ManagedServerGroups>;
     readonly readManagedServersForThread: (
       threadId: ThreadId | null,
     ) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
@@ -112,22 +118,29 @@ const matchingPageIndex = (kept: ReadonlyArray<KeptHtmlRender>, input: PageInput
 
 const make = Effect.fnUntraced(function* (
   readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
-  readThreadServers: McpProviderSessions["Service"]["readThreadServers"],
+  readThreadServers: ReadThreadServers,
 ) {
   const sessions = yield* Ref.make(new Map<ThreadId, McpProviderSessionConfig>());
   const htmlRenders = yield* Ref.make(new Map<ThreadId, ReadonlyArray<KeptHtmlRender>>());
+  const readManagedServerGroupsForThread = Effect.fn(
+    "McpProviderSessions.readManagedServerGroupsForThread",
+  )(function* (threadId: ThreadId) {
+    const host = yield* readManagedServers;
+    const relay = yield* readThreadServers(threadId);
+    return {
+      host: relay.length === 0 ? host : host.filter((server) => !server.omitWhenRelayAttached),
+      relay: relay.filter((entry) => !host.some(({ name }) => name === entry.name)),
+    };
+  });
+
   return McpProviderSessions.of({
-    readManagedServers,
-    readThreadServers,
+    readManagedServerGroupsForThread,
     readManagedServersForThread: Effect.fn("McpProviderSessions.readManagedServersForThread")(
       (threadId: ThreadId | null) =>
         threadId === null
           ? readManagedServers
-          : Effect.all([readManagedServers, readThreadServers(threadId)]).pipe(
-              Effect.map(([account, thread]) => [
-                ...account,
-                ...thread.filter((entry) => !account.some(({ name }) => name === entry.name)),
-              ]),
+          : readManagedServerGroupsForThread(threadId).pipe(
+              Effect.map(({ host, relay }) => [...host, ...relay]),
             ),
     ),
     set: Effect.fn("McpProviderSessions.set")(function* (config) {
@@ -210,7 +223,7 @@ const make = Effect.fnUntraced(function* (
 
 export const layerWithManagedServers = (
   readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
-  readThreadServers: McpProviderSessions["Service"]["readThreadServers"] = () => Effect.succeed([]),
+  readThreadServers: ReadThreadServers = () => Effect.succeed([]),
 ) => Layer.effect(McpProviderSessions, make(readManagedServers, readThreadServers));
 
 export const layer = layerWithManagedServers(Effect.succeed([]));

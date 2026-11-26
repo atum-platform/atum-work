@@ -13488,24 +13488,26 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 return pendingWake !== undefined && (yield* pendingWake) ? { continue: false } : {};
               }),
             );
+          const { host, relay } = yield* mcpSessions.readManagedServerGroupsForThread(
+            turnInput.threadId,
+          );
+          const readOnlySandbox =
+            sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly";
           const mcpOverrides = claudeMcpQueryOverrides({
             mcpSession,
-            managedMcpServers: yield* mcpSessions.readManagedServers,
-            readOnlySandbox:
-              sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly",
+            managedMcpServers: host,
+            readOnlySandbox,
             ...(queryPolicy.allowedTools === undefined
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
+          // Host access changes require a new query even if a live MCP update would fail.
           const queryPolicyKey = claudeEffectiveQueryPolicyKey(
             queryPolicy,
             mcpOverrides,
             turnInput.runtimePolicy.workspace,
           );
-          const threadServers =
-            sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly"
-              ? []
-              : yield* mcpSessions.readThreadServers(turnInput.threadId);
+          const threadServers = readOnlySandbox ? [] : relay;
           const threadMcpKey = threadServers.map(({ url }) => url).join(" ");
           const mcpServers = {
             ...claudeMcpQueryOverrides({

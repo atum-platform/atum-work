@@ -68,12 +68,22 @@ logs and persistent retry payloads.
   `t3-code` and its `t3-code-` prefix. URLs can use any path on an allowed
   origin and must omit credentials, query strings, and fragments.
 
+A nonempty attachment suppresses the host-managed Google and Owner Chats
+servers. The relay supplies screened Google access through `atum_google`.
+Owner Chats also exposes third-party text in previews and search results. Its
+untrusted-text markers frame that content for the model, which would still
+receive it outside the relay's screening. Threads without attachments retain
+the host account tools.
+
 A send with an attachment update requires an idle thread and `mode` set to
 `auto` (the default) or `queue`. Send with `freshContext: true` for structural
 changes (including clearing, reordering, or changing timeouts) on Codex, ACP,
-or other non-Claude providers. Credential rotation keeps the provider URL
-byte-stable and needs no provider restart. Within the current Work process
-an accepted `clientRequestId` replays dispatch without resetting credentials.
+or other non-Claude providers. Clearing restores the host account tools when
+the next provider session opens. Claude opens a new query when attachment
+changes alter the host account list and resumes the existing conversation
+without requiring `freshContext`. Credential rotation keeps the provider URL
+byte-stable and needs no provider restart. Within the current Work process an
+accepted `clientRequestId` replays dispatch without resetting credentials.
 
 MCP tool refusals use `result.isError: true` with a JSON-encoded failure in
 `result.content[0].text`. Read its `code` to distinguish:

@@ -4279,10 +4279,17 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     it.effect("updates thread MCP registrations on the retained query", () => {
       const first = { name: "relay", url: "http://127.0.0.1:43124/first", toolTimeoutMs: 180_000 };
       const second = { ...first, url: "http://127.0.0.1:43124/second" };
-      let current = first;
+      const account = {
+        name: "atum-account-google-fixture",
+        url: "http://127.0.0.1:43123/mcp/google",
+        omitWhenRelayAttached: true as const,
+      };
+      let current = [first];
       const updates: Array<unknown> = [];
       return Effect.gen(function* () {
         const harness = yield* makeWakeHarnessWithOptions({
+          close: Queue.shutdown,
+          freshQueueOnReopen: true,
           setMcpServers: (servers) =>
             Effect.sync(() => {
               updates.push(servers);
@@ -4291,15 +4298,13 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         });
         yield* startTurn(harness, "MCP fixture", 1);
         yield* finishTurn(harness, 1);
-        assert.deepEqual(harness.getOpenedOptions()?.mcpServers?.["relay"], {
-          type: "http",
-          url: first.url,
-          timeout: 180_000,
+        assert.deepEqual(harness.getOpenedOptions()?.mcpServers, {
+          relay: { type: "http", url: first.url, timeout: 180_000 },
         });
         yield* startTurn(harness, "MCP fixture", 2);
         yield* finishTurn(harness, 2);
         assert.deepEqual(updates, []);
-        current = second;
+        current = [second];
         yield* startTurn(harness, "MCP fixture", 3);
         yield* finishTurn(harness, 3);
         assert.deepEqual(updates, [{ relay: { type: "http", url: second.url, timeout: 180_000 } }]);
@@ -4309,12 +4314,20 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           url: first.url,
           timeout: 180_000,
         });
+
+        current = [];
+        yield* startTurn(harness, "MCP fixture", 4);
+        yield* finishTurn(harness, 4);
+        assert.deepEqual(harness.getOpenedOptions()?.mcpServers, {
+          [account.name]: { type: "http", url: account.url },
+        });
+        assert.equal(harness.getOpenedOptions()?.resume, WAKE_NATIVE_SESSION);
       }).pipe(
         Effect.provide(
           Layer.mergeAll(
             IdAllocator.layer,
-            McpProviderSessions.layerWithManagedServers(Effect.succeed([]), () =>
-              Effect.sync(() => [current]),
+            McpProviderSessions.layerWithManagedServers(Effect.succeed([account]), () =>
+              Effect.sync(() => current),
             ),
             NodeServices.layer,
             NodeCrypto.layer,
