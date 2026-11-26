@@ -8,7 +8,6 @@ import type { ModelPreferences } from "@t3tools/contracts/settings";
 import { createContext, use, type ComponentType } from "react";
 
 import type { useComposerDraftStore } from "../../composerDraftStore";
-import { workModelPickerHost } from "./workModelPickerHost";
 
 type SetProviderModelOptions = ReturnType<
   typeof useComposerDraftStore.getState
@@ -50,10 +49,23 @@ const ModelPickerHostContext = createContext<ModelPickerHost | null>(null);
 /** Supplies another host's state to every picker below. Work needs none. */
 export const ModelPickerHostProvider = ModelPickerHostContext.Provider;
 
-/** Read at render, not at module load: Work's host imports modules that import the picker. */
+// Work's host registers itself when ProviderModelPicker loads it. This module must not import it:
+// TraitsPicker is reachable from the composer draft store, and Work's host imports the store, the
+// server atoms and settings, so a static edge here would run them before they are initialized.
+let defaultHost: ModelPickerHost | null = null;
+
+/** Called once by workModelPickerHost.tsx. */
+export function registerDefaultModelPickerHost(host: ModelPickerHost): void {
+  defaultHost = host;
+}
+
 function useHost(): ModelPickerHost {
   "use no memo";
-  return use(ModelPickerHostContext) ?? workModelPickerHost;
+  const host = use(ModelPickerHostContext) ?? defaultHost;
+  if (!host) {
+    throw new Error("No model picker host: render inside ModelPickerHostProvider or load Work's.");
+  }
+  return host;
 }
 
 // Static hooks for the picker to import, so React Compiler sees the same function every render.

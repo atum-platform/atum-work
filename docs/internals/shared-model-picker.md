@@ -23,19 +23,19 @@ The closure is measured by following the runtime (non-type) imports from
 persisted composer draft store, connection storage and platform, the theme, toasts and the command
 palette's logic. The coupling comes from a handful of edges, each with its own closure:
 
-| Edge | Evidence (origin/main `0b02be3d5f`) | Reaches | Handled by |
-| --- | --- | --- | --- |
-| Catalog refresh on open | `ProviderModelPicker.tsx:135-150` (`RegistryContext`, `useAtomCommand(serverEnvironment.refreshProviders)`) | `state/server.ts`, 70 files | seam |
-| ChatGPT sharing row | `ProviderModelPicker.tsx:328,500` → `ChatGptSharingControl.tsx:6` (`ChatGptUsageButton`) | 49 files | seam |
-| Settings link on an update notice | `ModelPickerContent.tsx:225,264` (`useNavigate`) | TanStack Router | seam |
-| Favorites | `ModelPickerContent.tsx:393,492` → `hooks/useSettings.ts:479-549` | 95 files | seam |
-| Workspace catalog scan | `ModelPickerContent.tsx:466` → `useProviderWorkspaceSnapshotRefresh.ts:10-15` | `state/server.ts` | seam |
-| Server keybindings | `ModelPickerContent.tsx:490` (`primaryServerKeybindingsAtom`, `state/server.ts:161`) | `state/server.ts` | seam |
-| Option writes | `TraitsPicker.tsx:37,328` (`useComposerDraftStore`) | `composerDraftStore.ts`, 41 files | seam |
-| Command palette guard | `ModelPickerContent.tsx:907` → `commandPaletteBus.ts:36-40`, a DOM query in a module that imports the palette store | 50 files | tree-shaking |
-| Setup status text | `ModelPickerContent.tsx:34` → `ProviderStatusBanner.tsx:95-137`, pure functions beside the banner | 74 files | tree-shaking |
-| Permissions footer | `ComposerModelEffort.tsx:27` → `ComposerFooterControls.tsx`, used only by `ComposerPickerFooter` | 139 files | tree-shaking |
-| `cn` helper | `lib/utils.ts:7,55` (`DraftId` for `newDraftId`) | `composerDraftStore.ts` | tree-shaking |
+| Edge                              | Evidence (origin/main `0b02be3d5f`)                                                                                 | Reaches                           | Handled by   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------ |
+| Catalog refresh on open           | `ProviderModelPicker.tsx:135-150` (`RegistryContext`, `useAtomCommand(serverEnvironment.refreshProviders)`)         | `state/server.ts`, 70 files       | seam         |
+| ChatGPT sharing row               | `ProviderModelPicker.tsx:328,500` → `ChatGptSharingControl.tsx:6` (`ChatGptUsageButton`)                            | 49 files                          | seam         |
+| Settings link on an update notice | `ModelPickerContent.tsx:225,264` (`useNavigate`)                                                                    | TanStack Router                   | seam         |
+| Favorites                         | `ModelPickerContent.tsx:393,492` → `hooks/useSettings.ts:479-549`                                                   | 95 files                          | seam         |
+| Workspace catalog scan            | `ModelPickerContent.tsx:466` → `useProviderWorkspaceSnapshotRefresh.ts:10-15`                                       | `state/server.ts`                 | seam         |
+| Server keybindings                | `ModelPickerContent.tsx:490` (`primaryServerKeybindingsAtom`, `state/server.ts:161`)                                | `state/server.ts`                 | seam         |
+| Option writes                     | `TraitsPicker.tsx:37,328` (`useComposerDraftStore`)                                                                 | `composerDraftStore.ts`, 41 files | seam         |
+| Command palette guard             | `ModelPickerContent.tsx:907` → `commandPaletteBus.ts:36-40`, a DOM query in a module that imports the palette store | 50 files                          | tree-shaking |
+| Setup status text                 | `ModelPickerContent.tsx:34` → `ProviderStatusBanner.tsx:95-137`, pure functions beside the banner                   | 74 files                          | tree-shaking |
+| Permissions footer                | `ComposerModelEffort.tsx:27` → `ComposerFooterControls.tsx`, used only by `ComposerPickerFooter`                    | 139 files                         | tree-shaking |
+| `cn` helper                       | `lib/utils.ts:7,55` (`DraftId` for `newDraftId`)                                                                    | `composerDraftStore.ts`           | tree-shaking |
 
 Stopping the walk at all eleven targets leaves **50 files and 8.1k lines**: rendering, keyboard,
 search, ordering and pure provider/model helpers. Method: a static import walk over
@@ -51,7 +51,10 @@ through the seam would only add edits to upstream files.
 
 `components/chat/modelPickerHost.tsx` defines `ModelPickerHost`, the hooks and the one component
 behind the seam rows. Its default is Work's own host, `workModelPickerHost.tsx`, which holds exactly
-the code that used to sit inline. The picker imports static forwarders from `modelPickerHost.tsx`
+the code that used to sit inline. That module registers itself when `ProviderModelPicker.tsx`
+imports it for its side effect. `modelPickerHost.tsx` never imports it: `TraitsPicker` is reachable
+from the composer draft store, and a static edge from it into the store, server atoms and settings
+ran them before initialization (`twMerge`, `connectionAtomRuntime` TDZ errors in the first test run). The picker imports static forwarders from `modelPickerHost.tsx`
 that carry the original names (`useEnvironmentModelPreferences`, `useToggleEnvironmentModelFavorite`,
 `useProviderWorkspaceSnapshotRefresh`, `ChatGptSharingControl`), plus `useRefreshModelCatalog`,
 `useOpenProviderSettings`, `useServerKeybindings` and `useSetProviderModelOptions` for code that was
@@ -65,8 +68,11 @@ inline. As a result:
   out with `"use no memo"`. Calling `host.useX()` inside the picker would make the compiler skip
   the whole component.
 - A host that is not Work wraps the picker in `ModelPickerHostProvider` with one constant object.
-  The library build aliases `workModelPickerHost.tsx` to a stub, so Work's atoms, router and draft
-  store never enter that bundle.
+  The library build aliases `workModelPickerHost.tsx` to an empty module, so Work's atoms, router
+  and draft store never enter that bundle. Measured from `src/model-picker/index.tsx` with that
+  alias and the four tree-shaking rows stopped, the closure is **53 files and 9.0k lines**, with
+  no router or zustand. Its one atom is `AcpRegistryIcon.tsx`'s local icon cache, which needs no
+  Work state.
 - Most edits to upstream files change only an import line. `ProviderModelPicker.tsx` loses its
   inline refresh block, and `ModelPickerContent.tsx` swaps `useNavigate` and the keybindings atom.
   An upstream change conflicts only when it changes those lines.
@@ -117,3 +123,21 @@ components/chat/ComposerModelEffort.tsx [--stop=<path> ...]`. It walks runtime i
 `~/` and relative specifiers, and prints local files, lines and external packages. Any new edge from
 the picker into `state/`, `hooks/useSettings`, `composerDraftStore` or the router belongs in
 `ModelPickerHost`.
+
+## Verification, slice 1 (2026-11-26)
+
+- `apps/web` typecheck (`effect-tsgo tsrs --noEmit`) reports no errors in touched files. The
+  remaining errors are unresolved markdown packages (`react-markdown`, `remark-*`, `mdast-*`,
+  `unified`, `vfile`) missing from the linked shared-deps tree, in files this change does not touch.
+- Browser tests, run with those markdown modules stubbed in an uncommitted local config because the
+  linked tree lacks them: `ProviderModelPicker`, `ProviderModelPicker.composition` and
+  `ComposerModelEffort` 9/9; `ProjectSettingsPanel`, `ScheduledTasksSettings`,
+  `ComposerPermissionsSection`, `useChatShortcuts` plus the picker logic, composer state, settings
+  and draft store unit suites 175/175.
+- Geometry: the new test measures the popup's layout width (`offsetWidth`; the open animation
+  scales the bounding box). At 1280×800 it stays 554 px (360 list + 192 column) across the Codex
+  rail, which has a Thinking select, and the Claude rail, which has no options. At 400×800 the
+  column stacks under the list.
+- Lint: the repo config cannot load its own `oxlint-plugin-t3code` under linked deps
+  (`@oxlint/plugins` not linked). `oxlint` with `rules-of-hooks`, `exhaustive-deps` and
+  `no-unused-vars` passes on the touched files.

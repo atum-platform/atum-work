@@ -416,6 +416,12 @@ it("runs from props alone and keeps its options column, at one width, on every r
     );
   }
 
+  // Desktop width docks the column beside the list; Work stacks them below `sm`.
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  await page.viewport(1280, 800);
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+  };
   // No router and no Work environment: everything the picker reads comes through its props.
   await using screen = await render(<Host />, { router: false });
   const selection = screen.getByRole("status", { name: "Selection" });
@@ -423,14 +429,15 @@ it("runs from props alone and keeps its options column, at one width, on every r
   expect(onRefresh).toHaveBeenCalledTimes(1);
   const search = page.getByPlaceholder("Search models...");
   await expect.element(search).toHaveFocus();
+  // Layout width: the open animation scales the popup, which a bounding box would include.
   const popupWidth = () =>
-    search.element().closest('[data-slot="popover-popup"]')!.getBoundingClientRect().width;
+    search.element().closest<HTMLElement>('[data-slot="popover-popup"]')!.offsetWidth;
   const column = () => document.querySelector("[data-model-picker-effort]");
   await expect.element(page.getByRole("radiogroup", { name: "Thinking" })).toBeVisible();
   const codexWidth = popupWidth();
 
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(page.getByRole("radio", { name: "Low" })).toHaveFocus();
+  await expect.element(page.getByRole("radio", { name: /^Low/ })).toHaveFocus();
   await userEvent.keyboard("{ArrowLeft}");
   await expect.element(search).toHaveFocus();
 
@@ -448,16 +455,22 @@ it("runs from props alone and keeps its options column, at one width, on every r
   await page.getByRole("button", { name: /^Codex/ }).click();
   await page.getByRole("option", { name: /GPT model/ }).click();
   await page.getByRole("radio", { name: "High" }).click();
-  await expect
-    .element(selection)
-    .toHaveTextContent(
-      JSON.stringify({
-        instanceId: "codex",
-        model: "gpt",
-        options: [{ id: "thought_level", value: "high" }],
-      }),
-    );
+  await expect.element(selection).toHaveTextContent(
+    JSON.stringify({
+      instanceId: "codex",
+      model: "gpt",
+      options: [{ id: "thought_level", value: "high" }],
+    }),
+  );
   expect(popupWidth()).toBe(codexWidth);
   await userEvent.keyboard("{Escape}");
   await expect.element(search).not.toBeInTheDocument();
+
+  // Narrow, the column moves under the list instead of leaving.
+  await page.viewport(400, 800);
+  await screen.getByRole("button", { name: "GPT model" }).click();
+  await expect.element(page.getByRole("radiogroup", { name: "Thinking" })).toBeVisible();
+  const list = document.querySelector("[data-model-picker-content]")!.getBoundingClientRect();
+  expect(column()!.getBoundingClientRect().top).toBeGreaterThanOrEqual(list.bottom - 1);
+  await userEvent.keyboard("{Escape}");
 });

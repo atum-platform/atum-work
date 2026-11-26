@@ -11,7 +11,7 @@ import {
 } from "@t3tools/contracts";
 import { withImplicitFastModeDefault } from "@t3tools/shared/model";
 import { GTProvider } from "gt-react";
-import { createContext, use, useMemo } from "react";
+import { type ComponentProps, createContext, use, useMemo } from "react";
 
 import { ComposerEffortColumn } from "../components/chat/ComposerModelEffort";
 import { type ModelPickerHost, ModelPickerHostProvider } from "../components/chat/modelPickerHost";
@@ -52,6 +52,9 @@ const NO_FAVORITES = { favorites: [] } as const;
 const NOT_SCANNING = { scanning: false } as const;
 const NO_KEYBINDINGS: ReturnType<ModelPickerHost["useServerKeybindings"]> = [];
 const noop = () => {};
+// Catalogs arrive with the library build (docs/internals/shared-model-picker.md, Locale); until
+// then a locale without one renders the English source text.
+const NO_TRANSLATIONS: ComponentProps<typeof GTProvider>["translations"] = {};
 
 const ModelPickerPropsContext = createContext<ModelPickerProps | null>(null);
 
@@ -113,28 +116,34 @@ export function ModelPicker(props: ModelPickerProps) {
 
   const picker = (
     <ModelPickerPropsContext value={props}>
-        <ModelPickerHostProvider value={standaloneHost}>
-          <ProviderModelPicker
-            environmentId={null}
-            activeInstanceId={selection.instanceId}
-            model={selection.model}
-            lockedProvider={null}
-            instanceEntries={instanceEntries}
-            modelOptionsByInstance={modelOptionsByInstance}
-            {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
-            {...(props.triggerClassName ? { triggerClassName: props.triggerClassName } : {})}
-            {...(props.onOpenSetup ? { onOpenProviderSetup: props.onOpenSetup } : {})}
-            onInstanceModelChange={(instanceId, model) =>
-              onSelect(
-                instanceId === selection.instanceId
-                  ? { ...selection, model }
-                  : { instanceId, model, options: [] },
-              )
-            }
-            effortColumn={<ComposerEffortColumn traits={traits} />}
-          />
-        </ModelPickerHostProvider>
+      <ModelPickerHostProvider value={standaloneHost}>
+        <ProviderModelPicker
+          environmentId={null}
+          activeInstanceId={selection.instanceId}
+          model={selection.model}
+          lockedProvider={null}
+          instanceEntries={instanceEntries}
+          modelOptionsByInstance={modelOptionsByInstance}
+          {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
+          {...(props.triggerClassName ? { triggerClassName: props.triggerClassName } : {})}
+          {...(props.onOpenSetup ? { onOpenProviderSetup: props.onOpenSetup } : {})}
+          onInstanceModelChange={(instanceId, model) =>
+            onSelect(
+              instanceId === selection.instanceId
+                ? { ...selection, model }
+                : { instanceId, model, options: [] },
+            )
+          }
+          effortColumn={<ComposerEffortColumn traits={traits} />}
+        />
+      </ModelPickerHostProvider>
     </ModelPickerPropsContext>
   );
-  return props.locale ? <GTProvider locale={props.locale}>{picker}</GTProvider> : picker;
+  return props.locale ? (
+    <GTProvider locale={props.locale} translations={NO_TRANSLATIONS}>
+      {picker}
+    </GTProvider>
+  ) : (
+    picker
+  );
 }

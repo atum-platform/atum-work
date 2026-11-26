@@ -23,6 +23,8 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { retainedModelWhileProviderLocked } from "./ProviderModelPicker.logic";
 import { ChatGptSharingControl, useRefreshModelCatalog } from "./modelPickerHost";
+// Registers Work's state as the default host; the library build replaces it with nothing.
+import "./workModelPickerHost";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";

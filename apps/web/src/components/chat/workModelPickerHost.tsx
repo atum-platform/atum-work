@@ -11,7 +11,7 @@ import {
 import { primaryServerKeybindingsAtom, serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ChatGptSharingControl } from "./ChatGptSharingControl";
-import type { ModelPickerHost } from "./modelPickerHost";
+import { type ModelPickerHost, registerDefaultModelPickerHost } from "./modelPickerHost";
 import { useProviderWorkspaceSnapshotRefresh } from "./useProviderWorkspaceSnapshotRefresh";
 
 function useRefreshModelCatalog(environmentId: EnvironmentId | null) {
@@ -44,3 +44,5 @@ export const workModelPickerHost: ModelPickerHost = {
   useSetProviderModelOptions: () => useComposerDraftStore((store) => store.setProviderModelOptions),
   ChatGptSharingControl,
 };
+
+registerDefaultModelPickerHost(workModelPickerHost);
