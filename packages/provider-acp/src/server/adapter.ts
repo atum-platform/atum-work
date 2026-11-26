@@ -1085,9 +1085,30 @@ function acpMcpContext(
   mcpOverHttp: boolean | undefined,
   deferMcpTools: boolean | undefined,
   callLauncher: string | undefined,
+  managed: ReadonlyArray<McpProviderSession.ManagedMcpServer>,
 ): AcpMcpContext {
+  const managedStdio = managed.map(({ name, url, authorizationHeader }) => ({
+    name,
+    command: self.command,
+    args: [...selfInvocationArgs(self, ["acp-mcp-bridge"])],
+    env: [
+      { name: "ELECTRON_RUN_AS_NODE", value: "1" },
+      { name: "T3_ACP_MCP_ENDPOINT", value: url },
+      { name: "T3_ACP_MCP_AUTHORIZATION", value: authorizationHeader },
+    ],
+  }));
+  const managedHttp = managed.map(({ name, url, authorizationHeader }) => ({
+    type: "http" as const,
+    name,
+    url,
+    headers: [{ name: "Authorization", value: authorizationHeader }],
+  }));
   if (session === undefined) {
-    return { servers: [], acpServers: [], httpServers: [] };
+    return {
+      servers: managedStdio,
+      acpServers: [],
+      httpServers: mcpOverHttp === true ? managedHttp : [],
+    };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -1102,8 +1123,10 @@ function acpMcpContext(
           { name: "T3_ACP_MCP_AUTHORIZATION", value: session.authorizationHeader },
         ],
       },
+      ...managedStdio,
     ],
-    acpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
+    // Native ACP serves only T3. Use one compatible transport for all servers when adding managed tools.
+    acpServers: managed.length === 0 ? [{ type: "acp", name: "t3-code", serverId: "t3-code" }] : [],
     httpServers:
       mcpOverHttp === true
         ? [
@@ -1118,6 +1141,7 @@ function acpMcpContext(
                   : []),
               ],
             },
+            ...managedHttp,
           ]
         : [],
     endpoint: session.endpoint,
@@ -2074,17 +2098,21 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const { flavor, selfInvocation: self } = options;
   const callLauncher = yield* writeAcpMcpCallLauncher(host.paths.stateDir);
   const readMcpContext = (threadId: ThreadId | null) =>
-    threadId === null
-      ? Effect.succeed(
-          acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
-        )
-      : mcpSessions
-          .read(threadId)
-          .pipe(
-            Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
-            ),
-          );
+    Effect.all([
+      threadId === null ? Effect.undefined : mcpSessions.read(threadId),
+      mcpSessions.readManagedServers,
+    ]).pipe(
+      Effect.map(([session, managed]) =>
+        acpMcpContext(
+          session,
+          self,
+          flavor.mcpOverHttp,
+          flavor.deferMcpTools,
+          callLauncher,
+          managed,
+        ),
+      ),
+    );
   const driver = flavor.driver;
   const continuationRequests = options.continuationRequests;
 

@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
   ChatFileAttachment,
+  EnvironmentId,
   MessageId,
   NodeId,
   ProjectId,
@@ -159,24 +160,25 @@ describe("AntigravityAdapterV2 flavor", () => {
   });
 });
 
-const layerSession = Layer.mergeAll(
+const layerSessionBase = Layer.mergeAll(
   NodeServices.layer,
   NodeCrypto.layer,
   IdAllocator.layer,
-  McpProviderSessions.layer,
   TestProviderHost.layer().pipe(
     Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   ),
 );
+const layerSession = Layer.merge(layerSessionBase, McpProviderSessions.layer);
 
 describe("AntigravityAdapterV2 compaction", () => {
   it.live.each([
-    { nativeGoals: false, compact: false },
-    { nativeGoals: true, compact: false },
-    { nativeGoals: false, compact: true },
+    { nativeGoals: false, compact: false, httpMcp: true, nativeMcp: false },
+    { nativeGoals: true, compact: false, httpMcp: true, nativeMcp: true },
+    { nativeGoals: false, compact: true, httpMcp: false, nativeMcp: true },
+    { nativeGoals: false, compact: false, httpMcp: false, nativeMcp: false },
   ])(
-    "negotiates native goals ($nativeGoals) and advertised compaction ($compact)",
-    ({ nativeGoals, compact }) =>
+    "negotiates goals ($nativeGoals), compaction ($compact) and MCP transports ($httpMcp/$nativeMcp)",
+    ({ nativeGoals, compact, httpMcp, nativeMcp }) =>
       Effect.gen(function* () {
         const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
         const fileSystem = yield* FileSystem.FileSystem;
@@ -208,6 +210,8 @@ describe("AntigravityAdapterV2 compaction", () => {
                 cwd: input.cwd,
                 env: {
                   T3_ACP_ANTIGRAVITY: "1",
+                  T3_ACP_MCP_HTTP: httpMcp ? "1" : "0",
+                  T3_ACP_MCP_ACP: nativeMcp ? "1" : "0",
                   T3_ACP_AVAILABLE_COMMANDS: compact ? "compact" : "",
                   T3_ACP_REQUEST_LOG_PATH: requestLog,
                 },
@@ -240,6 +244,16 @@ describe("AntigravityAdapterV2 compaction", () => {
               : Effect.void,
         });
         const threadId = ThreadId.make("thread-antigravity-compaction");
+        const providerSessionId = ProviderSessionId.make("provider-session-antigravity-compaction");
+        yield* (yield* McpProviderSessions.McpProviderSessions).set({
+          environmentId: EnvironmentId.make("environment-antigravity-compaction"),
+          threadId,
+          providerSessionId,
+          providerInstanceId: instanceId,
+          endpoint: "http://127.0.0.1:43123/mcp",
+          authorizationHeader: "Bearer t3-fixture",
+          browserToolsAvailable: false,
+        });
         const modelSelection = { instanceId, model: "gemini-test-low" } as const;
         const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: "full-access",
@@ -249,7 +263,7 @@ describe("AntigravityAdapterV2 compaction", () => {
         const opening = yield* adapter
           .openSession({
             threadId,
-            providerSessionId: ProviderSessionId.make("provider-session-antigravity-compaction"),
+            providerSessionId,
             modelSelection,
             runtimePolicy,
           })
@@ -298,14 +312,57 @@ describe("AntigravityAdapterV2 compaction", () => {
           assert.instanceOf(error, ProviderAdapter.ProviderAdapterTurnStartError);
           assert.instanceOf(error.cause, ProviderAdapter.ProviderCompactionUnsupportedError);
         }
-        const prompts = (yield* fileSystem.readFileString(requestLog))
+        const requests = (yield* fileSystem.readFileString(requestLog))
           .trim()
           .split("\n")
-          .map((line) => JSON.parse(line) as { method?: string; params?: { prompt?: unknown } })
+          .map(
+            (line) =>
+              JSON.parse(line) as {
+                method?: string;
+                params?: { prompt?: unknown; mcpServers?: unknown };
+              },
+          );
+        const servers = requests.find((request) => request.method === "session/new")?.params
+          ?.mcpServers as ReadonlyArray<EffectAcpSchema.McpServer>;
+        assert.deepEqual(
+          servers.map((server) => server.name),
+          ["t3-code", "connection"],
+        );
+        if (httpMcp) {
+          assert.isTrue(servers.every((server) => "type" in server && server.type === "http"));
+          assert.deepEqual(servers[1], {
+            type: "http",
+            name: "connection",
+            url: "http://127.0.0.1:43124/connection",
+            headers: [{ name: "Authorization", value: "Bearer local-fixture" }],
+          });
+        } else {
+          assert.isTrue(servers.every((server) => "command" in server));
+          assert.deepInclude("env" in servers[1]! ? servers[1].env : [], {
+            name: "T3_ACP_MCP_ENDPOINT",
+            value: "http://127.0.0.1:43124/connection",
+          });
+        }
+        const prompts = requests
           .filter((request) => request.method === "session/prompt")
           .map((request) => request.params?.prompt);
         assert.deepEqual(prompts, compact ? [[{ type: "text", text: "/compact" }]] : []);
-      }).pipe(Effect.provide(layerSession)),
+      }).pipe(
+        Effect.provide(
+          Layer.merge(
+            layerSessionBase,
+            McpProviderSessions.layerWithManagedServers(
+              Effect.succeed([
+                {
+                  name: "connection",
+                  url: "http://127.0.0.1:43124/connection",
+                  authorizationHeader: "Bearer local-fixture",
+                },
+              ]),
+            ),
+          ),
+        ),
+      ),
   );
 });
 

@@ -720,6 +720,24 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
 });
 
 describe("ClaudeAdapterV2 MCP query overrides", () => {
+  it("passes host MCP servers to Claude without pre-approving their tools", () => {
+    const mcpSession = undefined;
+    const url = "http://127.0.0.1:43124/connection";
+    const authorizationHeader = "Bearer local-fixture";
+    const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
+      mcpSession,
+      managedMcpServers: [{ name: "connection", url, authorizationHeader }],
+      readOnlySandbox: true,
+      allowedTools: ["Read"],
+    });
+    assert.deepEqual(overrides, {
+      allowedTools: ["Read"],
+      mcpServers: {
+        connection: { type: "http", url, headers: { Authorization: authorizationHeader } },
+      },
+    });
+  });
+
   const T3_MCP_SERVERS = {
     "t3-code": {
       type: "http",
@@ -3312,6 +3330,7 @@ function makeFakeClaudeCli(answerSetServers = true) {
   const spawns: Array<SpawnOptions> = [];
   const controlRequests: Array<object> = [];
   const stdins: Array<NodeStream.PassThrough> = [];
+  const registration = Promise.withResolvers<void>();
   const spawn = (options: SpawnOptions): SpawnedProcess => {
     spawns.push(options);
     const stdin = new NodeStream.PassThrough();
@@ -3337,7 +3356,10 @@ function makeFakeClaudeCli(answerSetServers = true) {
         if (frame.type !== "control_request") continue;
         controlRequests.push(frame.request);
         const setServers = frame.request.subtype === "mcp_set_servers";
-        if (setServers && !answerSetServers) continue;
+        if (setServers) {
+          registration.resolve();
+          if (!answerSetServers) continue;
+        }
         const response = {
           subtype: "success",
           request_id: frame.request_id,
@@ -3353,7 +3375,7 @@ function makeFakeClaudeCli(answerSetServers = true) {
     return child;
   };
   const closed = () => stdins.length > 0 && stdins.every((stdin) => stdin.writableEnded);
-  return { spawn, spawns, controlRequests, closed };
+  return { spawn, spawns, controlRequests, closed, registration: registration.promise };
 }
 
 describe("ClaudeAdapterV2 MCP credential channel", () => {
@@ -3365,6 +3387,10 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
   const openWith = (
     cli: ReturnType<typeof makeFakeClaudeCli>,
     native?: ProviderEventLoggers.EventNdjsonLogger,
+    overrides?: Pick<
+      Parameters<typeof ClaudeAdapterV2.makeClaudeQueryOptions>[0],
+      "cwd" | "mcpServers"
+    >,
   ) =>
     Effect.gen(function* () {
       const runner = yield* ClaudeAdapterV2.ClaudeAgentSdkQueryRunner;
@@ -3380,6 +3406,7 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
             cwd: null,
             environment: { PATH: "/usr/bin" },
             mcpServers: { "t3-code": t3McpServer },
+            ...overrides,
           }),
           pathToClaudeCodeExecutable: "/opt/claude/cli.js",
           spawnClaudeCodeProcess: cli.spawn,
@@ -3416,6 +3443,77 @@ describe("ClaudeAdapterV2 MCP credential channel", () => {
       yield* Fiber.interrupt(offering);
       assert.isTrue(committed);
       committed = false;
+      yield* session.close;
+    }),
+  );
+
+  it.effect(
+    "registers the account server separately from names in the repository's MCP config",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const cwd = yield* fileSystem.makeTempDirectoryScoped();
+          const projectConfig = NodePath.join(cwd, ".mcp.json");
+          const config = JSON.stringify({
+            mcpServers: {
+              "atum-google": { command: "project-server" },
+              "atum-google-0123456789abcdef": { command: "previous-connector-name" },
+            },
+          });
+          yield* fileSystem.writeFileString(projectConfig, config);
+          const cli = makeFakeClaudeCli();
+          const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
+            mcpSession: undefined,
+            managedMcpServers: [
+              {
+                name: "atum-google-fedcba9876543210",
+                url: "http://127.0.0.1:43124/mcp/google",
+                authorizationHeader: "Bearer local-fixture",
+              },
+            ],
+            readOnlySandbox: false,
+          });
+          const session = yield* openWith(cli, undefined, {
+            cwd,
+            mcpServers: overrides.mcpServers,
+          });
+          yield* session.close;
+
+          assert.deepInclude(cli.controlRequests, {
+            subtype: "mcp_set_servers",
+            servers: {
+              "atum-google-fedcba9876543210": {
+                type: "http",
+                url: "http://127.0.0.1:43124/mcp/google",
+                headers: { Authorization: "Bearer local-fixture" },
+              },
+            },
+          });
+          assert.equal(cli.spawns[0]?.cwd, cwd);
+          assert.equal(yield* fileSystem.readFileString(projectConfig), config);
+          assert.notInclude(JSON.stringify(cli.spawns), "Bearer local-fixture");
+        }).pipe(Effect.provide(NodeServices.layer)),
+      ),
+  );
+
+  it.effect("opens Claude even when optional account MCP registration stalls", () =>
+    Effect.gen(function* () {
+      const cli = makeFakeClaudeCli(false);
+      const opening = yield* openWith(cli, undefined, {
+        cwd: null,
+        mcpServers: {
+          "t3-code": t3McpServer,
+          "atum-google-fedcba9876543210": {
+            type: "http",
+            url: "http://127.0.0.1:43124/mcp/google",
+            headers: { Authorization: "Bearer local-fixture" },
+          },
+        },
+      }).pipe(Effect.forkChild);
+      yield* Effect.promise(() => cli.registration);
+      yield* TestClock.adjust("91 seconds");
+      const session = yield* Fiber.join(opening);
       yield* session.close;
     }),
   );

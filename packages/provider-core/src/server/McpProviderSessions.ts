@@ -7,7 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
-import type { McpProviderSessionConfig } from "./mcpSession.ts";
+import type { ManagedMcpServer, McpProviderSessionConfig } from "./mcpSession.ts";
 
 // Other providers may never consume these references.
 const MAX_KEPT_HTML_RENDERS = 64;
@@ -33,6 +33,7 @@ export class McpProviderSessions extends Context.Service<
   {
     readonly set: (config: McpProviderSessionConfig) => Effect.Effect<void>;
     readonly read: (threadId: ThreadId) => Effect.Effect<McpProviderSessionConfig | undefined>;
+    readonly readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
     readonly clear: (threadId: ThreadId) => Effect.Effect<void>;
     readonly recordHtmlRender: (
       threadId: ThreadId,
@@ -103,10 +104,13 @@ const matchingPageIndex = (kept: ReadonlyArray<KeptHtmlRender>, input: PageInput
   return matches.length === 1 ? matches[0]! : -1;
 };
 
-const make = Effect.gen(function* () {
+const make = Effect.fnUntraced(function* (
+  readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
+) {
   const sessions = yield* Ref.make(new Map<ThreadId, McpProviderSessionConfig>());
   const htmlRenders = yield* Ref.make(new Map<ThreadId, ReadonlyArray<KeptHtmlRender>>());
   return McpProviderSessions.of({
+    readManagedServers,
     set: Effect.fn("McpProviderSessions.set")(function* (config) {
       const current = yield* Ref.get(sessions);
       if (current.get(config.threadId)?.providerSessionId !== config.providerSessionId) {
@@ -185,4 +189,8 @@ const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(McpProviderSessions, make);
+export const layerWithManagedServers = (
+  readManagedServers: Effect.Effect<ReadonlyArray<ManagedMcpServer>>,
+) => Layer.effect(McpProviderSessions, make(readManagedServers));
+
+export const layer = layerWithManagedServers(Effect.succeed([]));
