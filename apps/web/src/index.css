@@ -758,6 +758,11 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   body {
     background-color: var(--app-chrome-background);
   }
+  /* The panels sidebar sits on the host's own frame; !important beats the boot script's inline colour. */
+  html:has([data-slot="sidebar"][data-variant="panels"]),
+  html:has([data-slot="sidebar"][data-variant="panels"]) body {
+    background-color: transparent !important;
+  }
   body {
     @apply text-foreground relative;
   }

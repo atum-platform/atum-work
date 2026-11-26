@@ -37,12 +37,14 @@ export function atumThemeColors(theme, mode) {
     return value;
   };
   const surface = t("surface");
-  const ground = t("ground");
+  const frame = t("chrome");
+  // The left panel is Kit's roster panel over the frame, the shade every Atum screen's left panel wears.
+  const ground = solid(t("panel"), frame);
   const on = (name, base = surface) => solid(t(name), base);
   return {
-    // Main card: opaque surface. Frame and sidebar: the ground behind it (STYLE.md section 2).
+    // Main card: opaque surface. Frame: Kit's chrome; the sidebar card sits on it (STYLE.md section 2).
     canvas: surface,
-    chrome: ground,
+    chrome: frame,
     toolbar: surface,
     toolbarForeground: t("ink"),
     toolbarBorder: on("line"),

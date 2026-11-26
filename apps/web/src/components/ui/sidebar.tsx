@@ -233,7 +233,7 @@ function SidebarProvider({
     <SidebarContext value={contextValue}>
       <div
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          "group/sidebar-wrapper flex min-h-svh w-full",
           SIDEBAR_TITLEBAR_CONTROL_SIZE,
           className,
         )}
@@ -289,7 +289,8 @@ function Sidebar({
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
-  variant?: "sidebar" | "floating" | "inset";
+  /** `panels`: the list and the inset are separate cards on a transparent ground a host paints. */
+  variant?: "sidebar" | "floating" | "inset" | "panels";
   collapsible?: "offcanvas" | "icon" | "none";
   resizable?: boolean | SidebarResizableOptions;
 }) {
@@ -407,14 +408,16 @@ function Sidebar({
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-              : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+              : variant === "panels"
+                ? "group-data-[side=left]:pe-2 group-data-[side=right]:ps-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(2)))]"
+                : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
             className,
           )}
           data-slot="sidebar-container"
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5 group-data-[variant=panels]:overflow-hidden group-data-[variant=panels]:rounded-xl group-data-[variant=panels]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -648,7 +651,9 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       className={cn(
         "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
-        "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:h-[calc(100dvh-(--spacing(4)))] md:peer-data-[variant=inset]:overflow-hidden md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
+        "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
+        // Panels: the host draws the margins, so the thread is a card the height of the view.
+        "md:peer-data-[variant=panels]:h-dvh md:peer-data-[variant=panels]:overflow-hidden md:peer-data-[variant=panels]:rounded-xl md:peer-data-[variant=panels]:shadow-sm/5",
         className,
       )}
       data-slot="sidebar-inset"
