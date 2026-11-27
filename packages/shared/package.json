@@ -351,6 +351,10 @@
       "types": "./src/filePreview.ts",
       "import": "./src/filePreview.ts"
     },
+    "./workOfficeStarters": {
+      "types": "./src/workOfficeStarters.ts",
+      "import": "./src/workOfficeStarters.ts"
+    },
     "./imageDimensions": {
       "types": "./src/imageDimensions.ts",
       "import": "./src/imageDimensions.ts"

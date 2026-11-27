@@ -73,6 +73,8 @@ import {
 import { offerAtumRightPanel } from "../atum/rightPanel";
 import { atumOpenThreadFrom, offerAtumOpenThread } from "../atum/openThread";
 import { atumDraftOverlayStyle } from "../atum/bannerAnchor";
+import { WorkCreateMenu, WorkSessionChips } from "../atum/WorkSessionChips";
+import { useWorkStarter } from "../atum/useWorkStarter";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
 import * as Schema from "effect/Schema";
@@ -3236,7 +3238,25 @@ export default function ChatView(props: ChatViewProps) {
     });
   };
   const onWorktreeSetupWorkLocallyStable = useStableCallback(onWorktreeSetupWorkLocally);
-  const onComposerSendStable = useStableCallback(onSend);
+  const showWorkStarters =
+    atumWork &&
+    isDraftHeroState &&
+    activeProjectIsScratch &&
+    !embedded &&
+    serverConfig?.environment.capabilities.workStarters === true;
+  const workStarter = useWorkStarter({
+    shown: showWorkStarters,
+    canOperate: canOperateThread && !activeEnvironmentUnavailable && !isSendBusy,
+    thread: routeThreadRef,
+    projectId: activeProject?.id,
+    runtimeMode,
+    readModel: () => composerRef.current?.getSendContext().selectedModelSelection,
+    isCurrentThread: () => currentRouteThreadKeyRef.current === routeThreadKey,
+  });
+  const onComposerSendStable = useStableCallback((...args: Parameters<typeof onSend>) => {
+    if (!workStarter.isStarting()) return onSend(...args);
+    return Promise.resolve();
+  });
   const sendPreviewAnnotation = (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
@@ -3883,7 +3903,15 @@ export default function ChatView(props: ChatViewProps) {
                             ) : null}
                             {!composerMounted ? null : (
                               <ChatComposer
-                                canOperateThread={canOperateThread}
+                                canOperateThread={canOperateThread && !workStarter.pending}
+                                workCreateAction={
+                                  showWorkStarters ? (
+                                    <WorkCreateMenu
+                                      disabled={workStarter.disabled}
+                                      onChoose={workStarter.choose}
+                                    />
+                                  ) : null
+                                }
                                 reportedModelSelection={reportedModelSelection}
                                 multipleModelSelections={multipleModelSelections}
                                 supportsMultipleModels={
@@ -4113,6 +4141,12 @@ export default function ChatView(props: ChatViewProps) {
                           </div>
                         </div>
                       </ComposerSurface.Shell>
+                      {showWorkStarters ? (
+                        <WorkSessionChips
+                          disabled={workStarter.disabled}
+                          onChoose={workStarter.choose}
+                        />
+                      ) : null}
                       {isDraftHeroState && composerBannerItems.length > 0 ? (
                         // Out of flow, like the headline, so a notice never moves the centered composer.
                         // Short windows pin the composer to the bottom, where an out-of-flow notice

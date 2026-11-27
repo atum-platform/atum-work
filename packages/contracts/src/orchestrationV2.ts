@@ -4163,6 +4163,15 @@ export const OrchestrationV2ArchivedShellSnapshot = Schema.Struct({
 });
 export type OrchestrationV2ArchivedShellSnapshot = typeof OrchestrationV2ArchivedShellSnapshot.Type;
 
+export const WorkDocumentFormat = Schema.Literals(["docx", "xlsx", "pptx", "svg"]);
+export type WorkDocumentFormat = typeof WorkDocumentFormat.Type;
+
+export const WorkStarterFile = Schema.Struct({
+  format: WorkDocumentFormat,
+  relativePath: TrimmedNonEmptyString,
+});
+export type WorkStarterFile = typeof WorkStarterFile.Type;
+
 export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   commandId: CommandId,
   creationSource: Schema.optional(OrchestrationV2CreationSource),
@@ -4175,6 +4184,7 @@ export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
   workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
+  workFormat: Schema.optional(WorkDocumentFormat),
   initialMessage: Schema.optional(
     Schema.Struct({
       messageId: Schema.optional(MessageId),
@@ -4190,6 +4200,7 @@ export const OrchestrationV2ThreadLaunchResult = Schema.Struct({
   threadId: ThreadId,
   projection: OrchestrationV2ThreadProjection,
   resumed: Schema.Boolean,
+  workStarter: Schema.optional(WorkStarterFile),
   /** The initial message's commit sequence. Older servers omit it. */
   sequence: Schema.optionalKey(NonNegativeInt),
 });
