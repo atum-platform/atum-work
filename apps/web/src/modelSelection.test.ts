@@ -66,6 +66,35 @@ function provider(input: {
   };
 }
 
+it("keeps a saved Atum model on its original route when ACP removes the offer", () => {
+  const instanceId = ProviderInstanceId.make("atum-managed");
+  const luna = "atum-managed:nguyet-thuc";
+  const terra = "atum-managed:nhat-thuc";
+  const saved = "atum-managed:sonnet";
+  const providers = [
+    provider({
+      provider: ProviderDriverKind.make("acpRegistry"),
+      instanceId,
+      models: [luna, terra],
+    }),
+  ];
+  const [entry] = deriveProviderInstanceEntries(providers);
+  const settings: UnifiedSettings = {
+    ...DEFAULT_UNIFIED_SETTINGS,
+    providerModelPreferences: { [instanceId]: { hiddenModels: [terra], modelOrder: [] } },
+  };
+  expect(getAppModelOptionsForInstance(settings, entry!)).toMatchObject([{ slug: luna }]);
+  expect(getAppModelOptionsForInstance(settings, entry!, saved)).toMatchObject([
+    { slug: luna, name: "GPT-6 Luna" },
+    { slug: saved, name: "Sonnet 5.5", isUnavailable: true },
+  ]);
+  expect(
+    resolveAppModelSelectionForInstance(instanceId, settings, providers, saved, {
+      preserveUnavailableSelection: true,
+    }),
+  ).toBe(saved);
+});
+
 function settingsWithProviderInstances(): UnifiedSettings {
   return {
     ...DEFAULT_UNIFIED_SETTINGS,

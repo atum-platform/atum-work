@@ -74,12 +74,6 @@
       "count": 1
     },
     {
-      "file": "src/atum/pickerRail.logic.ts",
-      "from": " T3 ",
-      "to": " Atum ",
-      "count": 1
-    },
-    {
       "file": "src/atum/workCommands.ts",
       "from": " T3 ",
       "to": " Atum ",

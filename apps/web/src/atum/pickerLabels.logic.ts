@@ -10,11 +10,6 @@ const LOCALES = Object.keys(labels.thinking.heading) as PickerLabelLocale[];
 const ALIASES: Readonly<Record<string, string>> = labels.thinking.aliases;
 const LEVELS: Readonly<Record<string, Readonly<Record<PickerLabelLocale, string>>>> =
   labels.thinking.levels;
-const LINEUP: Readonly<Record<string, keyof typeof labels.taglines>> = labels.lineup as Record<
-  string,
-  keyof typeof labels.taglines
->;
-
 // The ids T3's drivers give the reasoning control when they do not mark it `role: "reasoning"`.
 const THINKING_DESCRIPTOR_IDS = new Set(["effort", "reasoningEffort", "reasoning", "variant"]);
 
@@ -66,21 +61,4 @@ export function withAtumThinkingLabels(
         : descriptor,
     ),
   };
-}
-
-/**
- * The muted line after one of Atum's own models, as the agent chats' picker writes it: the everyday
- * model is the suggested one. Only for Atum's instances (`atum-…`); the alias follows the provider
- * prefix in the slug (`atum-managed:nguyet-thuc`).
- */
-export function atumModelTagline(
-  instanceId: string,
-  slug: string,
-  locale: PickerLabelLocale,
-): string | undefined {
-  if (!instanceId.startsWith("atum-")) return undefined;
-  const kind = LINEUP[slug.slice(slug.lastIndexOf(":") + 1)];
-  if (!kind) return undefined;
-  const tagline = labels.taglines[kind][locale];
-  return kind === "everyday" ? `${labels.suggested[locale]} · ${tagline}` : tagline;
 }

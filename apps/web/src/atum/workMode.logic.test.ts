@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { atumPickerRailOrder } from "./pickerRail.logic";
 import { isWorkModeHiddenSurface, workModeDisabledShortcuts } from "./surfaceMode.logic";
 import { workApprovalChoices, workFileKind } from "./WorkPresentation.logic";
 
@@ -40,20 +39,5 @@ describe("Work mode", () => {
     expect(workFileKind("shots\\hero.png")).toBe("image");
     expect(workFileKind("budget.csv")).toBe("sheet");
     expect(workFileKind(".env")).toBe("file");
-  });
-
-  it("orders the picker rail Atum, connected, then not connected, keeping T3's order inside", () => {
-    const entries = [
-      { instanceId: "claudeAgent", ready: false },
-      { instanceId: "codex", ready: true },
-      { instanceId: "atum-managed", ready: true },
-      { instanceId: "antigravity", ready: false },
-    ];
-    expect(atumPickerRailOrder(entries, (entry) => entry.ready).map((e) => e.instanceId)).toEqual([
-      "atum-managed",
-      "codex",
-      "claudeAgent",
-      "antigravity",
-    ]);
   });
 });

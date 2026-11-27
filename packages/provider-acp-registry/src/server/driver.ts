@@ -12,6 +12,7 @@ import {
 import { AcpRegistrySettings } from "../settings.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { createModelCapabilities } from "@t3tools/shared/model";
+import { atumProviderName, projectAtumModels } from "@t3tools/shared/atumModels";
 import * as Clock from "effect/Clock";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -296,10 +297,13 @@ function baseSnapshot(
       ? null
       : (resolveOfficialAcpRegistryIconUrl(input.probe?.probe.icon) ??
         officialAcpRegistryIconUrlForAgentId(input.settings.agentId));
+  const managedName = atumProviderName(input.instanceId, DRIVER_KIND);
+  const displayName = managedName ?? input.displayName;
+  const models = modelsFromDiscovery(input.probe?.probe, input.settings.customModels);
   return {
     instanceId: input.instanceId,
     driver: DRIVER_KIND,
-    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(displayName ? { displayName } : {}),
     ...(input.accentColor ? { accentColor: input.accentColor } : {}),
     ...(iconUrl ? { iconUrl } : {}),
     continuation: { groupKey: input.continuationKey },
@@ -322,7 +326,7 @@ function baseSnapshot(
             : input.settings.agentId.length > 0),
     },
     ...(input.message ? { message: input.message } : {}),
-    models: modelsFromDiscovery(input.probe?.probe, input.settings.customModels),
+    models: managedName ? projectAtumModels(models) : models,
     ...(input.probe === undefined
       ? {}
       : {
@@ -386,17 +390,21 @@ export function applyAcpRegistryLiveConfiguration(
         })),
         currentModelId: selectedProbedModelId,
       };
+  const models =
+    !useLiveCatalog && configuration.configOptions.length === 0
+      ? withAcpRegistryDefaultModel(provider.models, selectedProbedModelId)
+      : modelsFromDiscovery(
+          discovery,
+          customModels,
+          previousModels.filter((model) => !model.isCustom),
+        );
   return {
     ...snapshot,
     status: provider.enabled ? "ready" : provider.status,
     models:
-      !useLiveCatalog && configuration.configOptions.length === 0
-        ? withAcpRegistryDefaultModel(provider.models, selectedProbedModelId)
-        : modelsFromDiscovery(
-            discovery,
-            customModels,
-            previousModels.filter((model) => !model.isCustom),
-          ),
+      models !== provider.models && atumProviderName(provider.instanceId, provider.driver)
+        ? projectAtumModels(models)
+        : models,
   };
 }
 

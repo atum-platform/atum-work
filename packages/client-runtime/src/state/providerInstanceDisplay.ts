@@ -4,6 +4,7 @@ import {
   type ProviderDriverKind,
   type ServerProvider,
 } from "@t3tools/contracts";
+import { atumProviderName } from "@t3tools/shared/atumModels";
 
 function humanizeSlug(slug: string): string {
   return slug
@@ -16,6 +17,8 @@ function humanizeSlug(slug: string): string {
 export function resolveProviderInstanceDisplayName(
   snapshot: Pick<ServerProvider, "instanceId" | "driver" | "displayName">,
 ): string {
+  const managedName = atumProviderName(snapshot.instanceId, snapshot.driver);
+  if (managedName) return managedName;
   const trimmedSnapshotName = snapshot.displayName?.trim();
   const kindLabel = PROVIDER_DISPLAY_NAMES[snapshot.driver] ?? humanizeSlug(snapshot.driver);
   if (trimmedSnapshotName && trimmedSnapshotName !== kindLabel) return trimmedSnapshotName;

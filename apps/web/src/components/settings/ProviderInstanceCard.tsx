@@ -1,3 +1,4 @@
+import { atumProviderName } from "@t3tools/shared/atumModels";
 import { Spinner } from "~/components/ui/spinner";
 
 import {
@@ -855,8 +856,9 @@ export function ProviderInstanceCard({
       ? onInstallRecommended
       : onRunUpdate;
   const urlAuthAction = liveProvider?.auth.action;
+  const managedName = atumProviderName(instanceId, instance.driver);
   const displayName =
-    instance.displayName?.trim() || driverOption?.label || String(instance.driver);
+    managedName ?? (instance.displayName?.trim() || driverOption?.label || String(instance.driver));
   const accentColor = normalizeProviderAccentColor(instance.accentColor);
   const managedPolicy = useManagedPolicy(environmentId);
   const instanceLocks = managedInstanceLocks(managedPolicy, instance.driver, m);
@@ -1381,7 +1383,8 @@ export function ProviderInstanceCard({
                 id={`provider-instance-${instanceId}-display-name`}
                 size="sm"
                 className="min-w-0 flex-1 @min-[32rem]/settings-row:w-56"
-                value={instance.displayName ?? ""}
+                value={managedName ?? instance.displayName ?? ""}
+                readOnly={managedName !== undefined}
                 onCommit={updateDisplayName}
                 placeholder={driverOption?.label ?? gt("Instance label")}
                 spellCheck={false}

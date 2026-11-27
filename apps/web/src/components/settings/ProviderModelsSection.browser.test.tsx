@@ -41,6 +41,29 @@ it("lists a favorite the provider no longer reports so it can be unstarred", asy
   expect(onToggleFavorite).toHaveBeenCalledWith("retired-model");
 });
 
+it("shows Atum names and uses the stable route IDs for visibility and favourites", async () => {
+  const terra = "atum-managed:nhat-thuc";
+  const opus = "atum-managed:opus";
+  const onHiddenModelsChange = vi.fn();
+  const onToggleFavorite = vi.fn();
+  await using screen = await render(
+    section({
+      instanceId: ProviderInstanceId.make("atum-managed"),
+      driverKind: ProviderDriverKind.make("acpRegistry"),
+      models: [{ slug: terra, name: "Old ACP label", isCustom: false, capabilities: null }],
+      favoriteModels: [opus],
+      onHiddenModelsChange,
+      onToggleFavorite,
+    }),
+  );
+  await expect.element(screen.getByText("openai/gpt-6.1-terra")).toBeVisible();
+  await expect.element(screen.getByText(terra)).not.toBeInTheDocument();
+  await screen.getByRole("switch", { name: "Show GPT-6.1 Terra in the model picker" }).click();
+  expect(onHiddenModelsChange).toHaveBeenCalledWith([terra], [terra]);
+  await screen.getByRole("button", { name: "Remove Opus 5.5 from favorites" }).click();
+  expect(onToggleFavorite).toHaveBeenCalledWith(opus);
+});
+
 it("keeps custom model drafts until they save, so a failed save can be retried", async () => {
   const saves: Array<(saved: boolean) => void> = [];
   const onChange = () => new Promise<boolean>((resolve) => saves.push(resolve));

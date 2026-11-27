@@ -74,9 +74,11 @@ function providerWithModels(
     readonly description: string | null;
   }>,
   currentModelId: string | null,
+  instanceId = identity.instanceId,
 ): ReturnType<typeof buildCheckedAcpRegistrySnapshot> {
   return buildCheckedAcpRegistrySnapshot({
     ...identity,
+    instanceId,
     settings: decodeSettings({ agentId: "test-agent" }),
     checkedAt: "2026-08-13T10:00:00.000Z",
     inspection: {
@@ -87,7 +89,7 @@ function providerWithModels(
     },
     probe: {
       probe: {
-        instanceId: identity.instanceId,
+        instanceId,
         ready: true,
         icon: null,
         authMethods: [],
@@ -103,6 +105,44 @@ function providerWithModels(
 }
 
 describe("acpRegistrySnapshotReadiness", () => {
+  it("names and orders only the managed models admitted by ACP, on probe and live refresh", () => {
+    const instanceId = ProviderInstanceId.make("atum-managed");
+    const luna = "atum-managed:nguyet-thuc";
+    const terra = "atum-managed:nhat-thuc";
+    const opus = "atum-managed:opus";
+    const sonnet = "atum-managed:sonnet";
+    const reported = [opus, "atum-managed:google-protected", terra, luna].map((id) => ({
+      id,
+      name: "Old ACP label",
+      description: null,
+    }));
+    const snapshot = providerWithModels(reported, luna, instanceId);
+    expect(snapshot.displayName).toBe("Atum");
+    expect(snapshot.models.map(({ slug, name, isLegacy }) => [slug, name, isLegacy])).toEqual([
+      [luna, "GPT-6 Luna", false],
+      [terra, "GPT-6.1 Terra", false],
+      [opus, "Opus 5.5", true],
+    ]);
+    expect(snapshot.models[0]?.isDefault).toBe(true);
+    expect(providerWithModels(reported, luna).models[0]).toMatchObject({
+      slug: opus,
+      name: "Old ACP label",
+    });
+    const refreshed = applyAcpRegistryLiveConfiguration(
+      snapshot,
+      {
+        models: [{ id: sonnet, name: "Old ACP label", description: null }],
+        currentModelId: sonnet,
+        configOptions: [],
+        modelsFromModelSelect: true,
+      },
+      [],
+    );
+    expect(refreshed.models).toMatchObject([
+      { slug: sonnet, name: "Sonnet 5.5", isDefault: true, isLegacy: false },
+    ]);
+  });
+
   it("keeps the custom model display name and options saved by the Settings editor", () => {
     const fastMode = { id: "fast", label: "Fast mode", type: "boolean" } as const;
     const snapshot = buildCheckedAcpRegistrySnapshot({

@@ -1,3 +1,4 @@
+import { atumModelDisplayName, atumProviderName } from "@t3tools/shared/atumModels";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -161,6 +162,21 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
     props.instanceEntries.find((entry) => entry.instanceId === props.activeInstanceId) ?? null;
 
   const activeInstanceId = props.activeInstanceId;
+  const activeAtumName = atumProviderName(
+    activeInstanceId,
+    activeEntry?.driverKind ?? "acpRegistry",
+  );
+  const reportedAtumModel = activeAtumName
+    ? activeEntry?.models.find((model) => model.slug === props.model)
+    : undefined;
+  const retainedAtumModel =
+    activeAtumName && props.model
+      ? {
+          slug: props.model,
+          name: reportedAtumModel?.name ?? atumModelDisplayName(props.model) ?? activeAtumName,
+          isUnavailable: !reportedAtumModel || !activeEntry?.enabled || !activeEntry.isAvailable,
+        }
+      : undefined;
   const selectedInstanceOptions = props.modelOptionsByInstance.get(activeInstanceId) ?? [];
   const selectedModel =
     resolveModelPickerSelectedModel({
@@ -168,6 +184,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
       model: props.model,
       options: selectedInstanceOptions,
     }) ??
+    retainedAtumModel ??
     retainedModelWhileProviderLocked(activeEntry, props.model) ??
     (activeEntry?.driverKind === "opencode" || activeEntry?.driverKind === "antigravity"
       ? undefined
@@ -245,15 +262,19 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
       model: selection.model,
       options: props.modelOptionsByInstance.get(selection.instanceId) ?? [],
     });
+    const managedName = atumProviderName(selection.instanceId, entry?.driverKind ?? "acpRegistry");
+    const fallbackLabel = managedName
+      ? withUnavailable(atumModelDisplayName(selection.model) ?? managedName, true)
+      : selection.model;
     return {
       ...selection,
       entry,
       label: model
         ? withUnavailable(getTriggerDisplayModelName(model, entry?.driverKind), model.isUnavailable)
-        : selection.model,
+        : fallbackLabel,
       fullLabel: model
         ? withUnavailable(getDisplayModelName(model), model.isUnavailable)
-        : selection.model,
+        : fallbackLabel,
     };
   });
   const multipleLabel = selectedEntries

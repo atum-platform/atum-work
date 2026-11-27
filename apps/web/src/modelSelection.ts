@@ -1,3 +1,4 @@
+import { atumModelDisplayName, atumProviderName } from "@t3tools/shared/atumModels";
 import {
   DEFAULT_TEXT_GENERATION_MODEL,
   DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER,
@@ -80,17 +81,20 @@ function appendUnavailableDynamicModelSelection(
   provider: ProviderDriverKind,
   selectedModel: string | null | undefined,
   hiddenModels: ReadonlyArray<string>,
+  instanceId?: ProviderInstanceId,
 ): AppModelOption[] {
   if (!hasRuntimeModelCatalog(provider)) return options;
   const slug = normalizeCustomModelSlug(selectedModel);
   if (!slug) return options;
-  if (isRuntimeModelDefaultAlias(provider, slug)) return options;
+  const isAtum = instanceId !== undefined && atumProviderName(instanceId, provider) !== undefined;
+  if (!isAtum && isRuntimeModelDefaultAlias(provider, slug)) return options;
 
   if (resolveSelectableModel(provider, slug, rawModels) !== null) return options;
   if (hiddenModels.includes(slug)) return options;
   if (options.some((option) => option.slug === slug)) return options;
 
-  return [...options, { slug, name: slug, isCustom: false, isUnavailable: true }];
+  const name = isAtum ? (atumModelDisplayName(slug) ?? "Atum") : slug;
+  return [...options, { slug, name, isCustom: false, isUnavailable: true }];
 }
 
 function toAppModelOption(
@@ -244,6 +248,7 @@ export function getAppModelOptionsForInstance(
     entry.driverKind,
     selectedModel,
     preferences.hiddenModels,
+    entry.instanceId,
   );
 }
 

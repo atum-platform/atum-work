@@ -8,6 +8,12 @@ import {
 } from "@t3tools/contracts";
 import { isReasoningControl } from "@t3tools/client-runtime/model-traits";
 import { type CustomModelDefinition, normalizeCustomModelSlug } from "@t3tools/shared/model";
+import {
+  atumModelDisplayName,
+  atumProviderName,
+  atumUpstreamModelId,
+  projectAtumModels,
+} from "@t3tools/shared/atumModels";
 
 import { useStableCallback } from "../../hooks/useStableCallback";
 import type { MessageResolver } from "../../i18n/messages";
@@ -126,7 +132,7 @@ interface ProviderModelsSectionProps {
 export function ProviderModelsSection({
   instanceId,
   driverKind,
-  models,
+  models: reportedModels,
   customModels,
   canManageCustomModels,
   canWritePreferences = true,
@@ -140,6 +146,8 @@ export function ProviderModelsSection({
   onModelOrderChange,
 }: ProviderModelsSectionProps) {
   const gt = useGT();
+  const managedName = atumProviderName(instanceId, driverKind);
+  const models = managedName ? projectAtumModels(reportedModels) : reportedModels;
   const [input, setInput] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -160,7 +168,16 @@ export function ProviderModelsSection({
   // A favorite the provider no longer reports (disabled, signed out, model removed)
   // still needs a row, or its star could never be cleared.
   const unreportedFavoriteModels = favoriteModels.flatMap((slug): ServerProviderModel[] =>
-    reportedSlugs.has(slug) ? [] : [{ slug, name: slug, isCustom: false, capabilities: null }],
+    reportedSlugs.has(slug)
+      ? []
+      : [
+          {
+            slug,
+            name: managedName ? (atumModelDisplayName(slug) ?? managedName) : slug,
+            isCustom: false,
+            capabilities: null,
+          },
+        ],
   );
   const listedModels = [...models, ...unreportedFavoriteModels];
   const placedHiddenSet = new Set(
@@ -329,6 +346,7 @@ export function ProviderModelsSection({
       <ProviderModelRow
         key={`${instanceId}:${model.slug}`}
         model={model}
+        displayId={managedName && !model.isCustom ? atumUpstreamModelId(model.slug) : model.slug}
         isHidden={!model.isCustom && hiddenModelSet.has(model.slug)}
         isFavorite={group === "favorite"}
         canMoveUp={!isFiltering && previousModel !== undefined && groupOf(previousModel) === group}
@@ -503,6 +521,7 @@ export function ProviderModelsSection({
 
 const ProviderModelRow = memo(function ProviderModelRow({
   model,
+  displayId,
   isHidden,
   isFavorite,
   canMoveUp,
@@ -518,6 +537,7 @@ const ProviderModelRow = memo(function ProviderModelRow({
   onRemove,
 }: {
   readonly model: ServerProviderModel;
+  readonly displayId: string | undefined;
   readonly isHidden: boolean;
   readonly isFavorite: boolean;
   readonly canMoveUp: boolean;
@@ -580,16 +600,16 @@ const ProviderModelRow = memo(function ProviderModelRow({
             }
           >
             <span className={cn(nameClassName, "max-w-full shrink-0 truncate")}>{model.name}</span>
-            {model.name !== model.slug ? (
+            {displayId && model.name !== displayId ? (
               <code className="truncate font-mono text-2xs text-muted-foreground/70">
-                {model.slug}
+                {displayId}
               </code>
             ) : null}
           </TooltipTrigger>
           <TooltipPopup side="top" align="start">
             <div>{model.name}</div>
-            {model.name !== model.slug ? (
-              <code className="font-mono text-2xs text-muted-foreground">{model.slug}</code>
+            {displayId && model.name !== displayId ? (
+              <code className="font-mono text-2xs text-muted-foreground">{displayId}</code>
             ) : null}
           </TooltipPopup>
         </Tooltip>

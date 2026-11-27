@@ -67,9 +67,6 @@ import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
 import { TooltipProvider } from "../ui/tooltip";
 import { Button, InlineButton } from "../ui/button";
 import { isAtumWorkBuild } from "../../atum/surfaceMode";
-import { atumPickerRailOrder } from "../../atum/pickerRail.logic";
-import { atumModelTagline, pickerLabelLocale } from "../../atum/pickerLabels.logic";
-import { getActiveLocale } from "~/i18n/messages";
 import { Badge } from "../ui/badge";
 import {
   isProviderInstancePickerReady,
@@ -739,9 +736,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const sidebarInstanceEntries = (() => {
     const enabledEntries = instanceEntries.filter(isProviderInstancePickerVisible);
     if (!isLocked) {
-      return isAtumWorkBuild
-        ? atumPickerRailOrder(enabledEntries, isProviderInstancePickerReady)
-        : enabledEntries;
+      return enabledEntries;
     }
     const available: ProviderInstanceEntry[] = [];
     const disabled: ProviderInstanceEntry[] = [];
@@ -1275,15 +1270,6 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                     slug={model.slug}
                     name={model.name}
                     subProvider={model.subProvider}
-                    tagline={
-                      isAtumWorkBuild
-                        ? atumModelTagline(
-                            model.instanceId,
-                            model.slug,
-                            pickerLabelLocale(getActiveLocale()),
-                          )
-                        : undefined
-                    }
                     instanceId={model.instanceId}
                     driverKind={model.driverKind}
                     providerDisplayName={model.instanceDisplayName}

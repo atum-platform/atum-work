@@ -1,3 +1,4 @@
+import { atumModelDisplayName, atumProviderName } from "@t3tools/shared/atumModels";
 import { T, Var, msg, useGT, useMessages } from "gt-react";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { AgentElapsed } from "./AgentElapsed";
@@ -660,7 +661,13 @@ export function ModelSwitchRow(props: {
   const describe = (selection: ModelSelection, effort: string | undefined) => {
     const provider = providers.find((candidate) => candidate.instanceId === selection.instanceId);
     const model = provider?.models.find((candidate) => candidate.slug === selection.model);
-    const modelName = model ? getTriggerDisplayModelName(model, provider?.driver) : selection.model;
+    const atum = atumProviderName(selection.instanceId, provider?.driver ?? "acpRegistry");
+    const modelName =
+      atum && !model?.isCustom
+        ? (atumModelDisplayName(selection.model) ?? atum)
+        : model
+          ? getTriggerDisplayModelName(model, provider?.driver)
+          : selection.model;
     return [change.modelChanged ? modelName : null, effort].filter(Boolean).join(" ");
   };
   const { from, to } = props.modelSwitch;
@@ -730,11 +737,14 @@ function HandoffEndpoint(props: {
     model === undefined || model.length === 0
       ? undefined
       : entry?.models.find((candidate) => candidate.slug === model);
+  const atum = atumProviderName(props.instanceId, entry?.driverKind ?? "acpRegistry");
   const label =
     providerModel !== undefined
       ? getTriggerDisplayModelName(providerModel, entry?.driverKind)
       : model !== undefined && model.length > 0
-        ? model
+        ? atum
+          ? (atumModelDisplayName(model) ?? atum)
+          : model
         : (entry?.displayName ?? props.instanceId);
   const labelColor = providerTextColor(
     entry?.driverKind ?? ProviderDriverKind.make(props.instanceId),

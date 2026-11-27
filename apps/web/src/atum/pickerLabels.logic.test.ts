@@ -4,12 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import digests from "../../../../atum-work/model-picker-digests.json";
 import labelsText from "../../../../atum-work/model-picker-labels.json?raw";
 import specText from "../../../../atum-work/model-picker-spec.json?raw";
-import {
-  atumModelTagline,
-  atumThinkingLabel,
-  pickerLabelLocale,
-  withAtumThinkingLabels,
-} from "./pickerLabels.logic";
+import { atumThinkingLabel, pickerLabelLocale, withAtumThinkingLabels } from "./pickerLabels.logic";
 
 const caps = createModelCapabilities({
   optionDescriptors: [
@@ -54,16 +49,6 @@ describe("Atum's picker words", () => {
     expect(pickerLabelLocale("zh-TW")).toBe("zh-hant");
     expect(pickerLabelLocale("ja")).toBe("ja");
     expect(pickerLabelLocale("fr")).toBe("en");
-  });
-
-  it("gives Atum's own models their tagline, the everyday one suggested, and no one else's", () => {
-    expect(atumModelTagline("atum-managed", "atum-managed:nguyet-thuc", "en")).toBe(
-      "Suggested · Good for everyday tasks",
-    );
-    expect(atumModelTagline("atum-gateway", "atum-gateway:nhat-thuc", "en")).toBe(
-      "Good for hard tasks",
-    );
-    expect(atumModelTagline("codex", "nhat-thuc", "en")).toBeUndefined();
   });
 
   it("keeps the shared files atum-desktop holds byte-identical copies of", async () => {
