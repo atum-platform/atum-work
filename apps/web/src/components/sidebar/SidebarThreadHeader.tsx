@@ -1,5 +1,12 @@
 import { useGT } from "gt-react";
-import { SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import {
+  FolderPlusIcon,
+  GitBranchIcon,
+  PlusIcon,
+  SearchIcon,
+  SquarePenIcon,
+  XIcon,
+} from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -8,8 +15,11 @@ import {
   type RefObject,
 } from "react";
 
+import { isAtumWorkBuild, useActiveAtumSurfaceMode } from "~/atum/surfaceMode";
+import { runAtumBandCommand } from "~/atum/workCommands";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
 import { SidebarInput, SidebarMenuButton } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -49,6 +59,9 @@ export function SidebarThreadHeader({
   onClearSearch,
 }: SidebarThreadHeaderProps) {
   const gt = useGT();
+  // Work mode names one folder, so its filter is noise there; Code mode keeps it.
+  const surfaceMode = useActiveAtumSurfaceMode();
+  const showProjectScope = hasProjects && !(isAtumWorkBuild && surfaceMode === "work");
   const resultsVisible = isSearching && searchResultCount > 0;
   // Shrinking results can remove the active option; never leave aria-activedescendant pointing at it.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
@@ -57,8 +70,15 @@ export function SidebarThreadHeader({
     : gt("New thread");
 
   return (
-    <div className="flex items-center gap-1">
-      <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-within:bg-sidebar-row-hover focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70">
+    <div className={cn("flex items-center", isAtumWorkBuild ? "gap-1.5" : "gap-1")}>
+      <div
+        className={
+          isAtumWorkBuild
+            ? ATUM_PANEL_SEARCH_CLASS
+            : "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-within:bg-sidebar-row-hover focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70"
+        }
+        {...(isAtumWorkBuild ? { "data-atum-panel-search": "" } : {})}
+      >
         <SearchIcon className="size-4 shrink-0 text-(--sidebar-icon-color)" />
         <SidebarInput
           ref={searchInputRef}
@@ -97,33 +117,85 @@ export function SidebarThreadHeader({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center">
-        {hasProjects ? projectScope : null}
-        <SidebarHeaderIconButton
-          data-sidebar-new-thread=""
-          label={gt("New thread")}
-          tooltip={
-            showNewThreadInProjectHint ? (
-              <span className="flex flex-col gap-0.5">
-                <span>{newThreadLabel}</span>
-                <span className="text-muted-foreground">
-                  {newThreadInProjectShortcutLabel
-                    ? gt("New thread in current project: Shift+click ({shortcut})", {
-                        shortcut: newThreadInProjectShortcutLabel,
-                      })
-                    : gt("New thread in current project: Shift+click")}
+        {showProjectScope ? projectScope : null}
+        {isAtumWorkBuild ? (
+          <AtumNewMenu
+            newThreadShortcutLabel={newThreadShortcutLabel}
+            disabled={newThreadDisabled}
+          />
+        ) : (
+          <SidebarHeaderIconButton
+            data-sidebar-new-thread=""
+            label={gt("New thread")}
+            tooltip={
+              showNewThreadInProjectHint ? (
+                <span className="flex flex-col gap-0.5">
+                  <span>{newThreadLabel}</span>
+                  <span className="text-muted-foreground">
+                    {newThreadInProjectShortcutLabel
+                      ? gt("New thread in current project: Shift+click ({shortcut})", {
+                          shortcut: newThreadInProjectShortcutLabel,
+                        })
+                      : gt("New thread in current project: Shift+click")}
+                  </span>
                 </span>
-              </span>
-            ) : (
-              newThreadLabel
-            )
-          }
-          disabled={newThreadDisabled}
-          onClick={onNewThread}
-        >
-          <SquarePenIcon />
-        </SidebarHeaderIconButton>
+              ) : (
+                newThreadLabel
+              )
+            }
+            disabled={newThreadDisabled}
+            onClick={onNewThread}
+          >
+            <SquarePenIcon />
+          </SidebarHeaderIconButton>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Zone D's search in the Atum build: the one left-panel search every Atum screen draws (the Kit's
+ * `ak-field--search`, as desktop's `MatrixPanelSearch`): 32 px, 8 px radius, the quiet fill, 14 px text,
+ * a 16 px magnifier. The palette's sidebar control surface is that fill laid on the panel.
+ */
+const ATUM_PANEL_SEARCH_CLASS =
+  "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg bg-sidebar-control-surface px-2.5 text-sm text-sidebar-muted-foreground focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70";
+
+/**
+ * Atum's plus menu in zone D, in place of T3's pencil (layout r2 section 4): New thread, New thread in a
+ * worktree, Add project. They run the same commands the desktop title band ran (`workCommands`), so New
+ * lives in one place once the band drops its own plus.
+ */
+function AtumNewMenu({
+  newThreadShortcutLabel,
+  disabled,
+}: {
+  newThreadShortcutLabel: string | null | undefined;
+  disabled: boolean;
+}) {
+  const gt = useGT();
+  return (
+    <Menu>
+      <MenuTrigger render={<SidebarHeaderIconButton data-atum-new-menu="" label={gt("New")} />}>
+        <PlusIcon />
+      </MenuTrigger>
+      <MenuPopup align="end" side="bottom">
+        <MenuItem disabled={disabled} onClick={() => void runAtumBandCommand("chat.new")}>
+          <SquarePenIcon />
+          {gt("New thread")}
+          {newThreadShortcutLabel ? <MenuShortcut>{newThreadShortcutLabel}</MenuShortcut> : null}
+        </MenuItem>
+        <MenuItem disabled={disabled} onClick={() => void runAtumBandCommand("chat.newWorktree")}>
+          <GitBranchIcon />
+          {gt("New thread in a worktree")}
+        </MenuItem>
+        <MenuItem onClick={() => void runAtumBandCommand("project.add")}>
+          <FolderPlusIcon />
+          {gt("Add project")}
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }
 

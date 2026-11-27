@@ -209,13 +209,15 @@ function SidebarUtilityItem({
   icon,
   label,
   onClick,
+  className,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
+  className?: string;
 }) {
   return (
-    <SidebarMenuItem className="shrink-0">
+    <SidebarMenuItem className={cn("shrink-0", className)}>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -287,11 +289,13 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         </SidebarMenuItem>
       ) : (
         <>
-          <SidebarUtilityItem
-            icon={<SettingsIcon />}
-            label={gt("Settings")}
-            onClick={handleSettingsClick}
-          />
+          {isAtumWorkBuild ? null : (
+            <SidebarUtilityItem
+              icon={<SettingsIcon />}
+              label={gt("Settings")}
+              onClick={handleSettingsClick}
+            />
+          )}
           {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
@@ -317,6 +321,15 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       )}
       <SidebarThreadUndoNotice />
       <SidebarUpdatePill />
+      {/* Every Atum screen's foot ends with the gear, on the right (layout r1 zone E). */}
+      {isAtumWorkBuild && !isOnUtilityPage ? (
+        <SidebarUtilityItem
+          className="ms-auto"
+          icon={<SettingsIcon />}
+          label={gt("Settings")}
+          onClick={handleSettingsClick}
+        />
+      ) : null}
     </SidebarMenu>
   );
 });

@@ -71,6 +71,7 @@ import {
   workModeDisabledShortcuts,
 } from "../atum/surfaceMode";
 import { offerAtumRightPanel } from "../atum/rightPanel";
+import { atumOpenThreadFrom, offerAtumOpenThread } from "../atum/openThread";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
 import * as Schema from "effect/Schema";
@@ -3009,6 +3010,20 @@ export default function ChatView(props: ChatViewProps) {
     if (!isAtumWorkBuild || embedded || backgroundThread || activeProject === null) return;
     return offerAtumRightPanel({ open: rightPanelOpen, toggle: toggleRightPanelStable });
   }, [embedded, backgroundThread, activeProject, rightPanelOpen, toggleRightPanelStable]);
+
+  const atumOpenThreadTitle = activeThread?.title;
+  const atumOpenThreadRepo = activeProject?.title;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- names the open thread in the Atum host's title bar
+  useEffect(() => {
+    if (!isAtumWorkBuild || embedded || backgroundThread) return;
+    return offerAtumOpenThread(
+      atumOpenThreadFrom({
+        title: atumOpenThreadTitle,
+        repo: atumOpenThreadRepo,
+        branch: activeThreadBranch,
+      }),
+    );
+  }, [embedded, backgroundThread, atumOpenThreadTitle, atumOpenThreadRepo, activeThreadBranch]);
 
   usePasteToFocusComposer(embedded ? null : activeThreadId, composerRef);
   // A delegated task is a remote thread's subagent.

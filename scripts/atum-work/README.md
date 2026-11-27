@@ -43,12 +43,14 @@ Before a release, typecheck web, shared, client-runtime, contracts and server wi
 
 ## Theme
 
-`atum-work/theme/atum.json` is an upstream environment theme (light with a dark variant and a small
-CSS block) generated from Atum Kit:
-`node scripts/atum-work/theme.mjs <atum-desktop>/packages/atum-kit/tokens.json`. The provenance file
-beside it records the Kit version and the tokens hash. Desktop main publishes and selects it once per
-home with the bundled CLI, before the first start: `theme set <path>/atum.json` with the scoped
-`T3CODE_HOME`. No fork patch is involved.
+`atum-work/theme/atum.json` is Atum's palette in T3's theme format, colours only, copied byte for byte from
+the Kit: `node scripts/atum-work/theme.mjs <atum-desktop>/packages/atum-kit/dist/atum-t3-theme.json`. The
+provenance file beside it records the source and its hash. Desktop main publishes the same file as Work's
+environment theme (`theme set <path>/atum.json` with the scoped `T3CODE_HOME`), and the Atum web build bundles
+this copy as its fallback, painted whenever no theme resolves (`apps/web/src/atum/atumPalette.ts`), so Work
+never shows stock T3's colours. Layout changes go in components under the Atum build flag, not in theme CSS
+(`docs/work-layout-consistency-1127.md`).
+
 In a dedicated checkout on macOS arm64, install the locked web, server and scripts
 dependencies using Vite+. Use the Node version specified in the root manifest,
 the LICENSE from that verified official Node distribution, and a Rust toolchain.
