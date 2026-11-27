@@ -230,6 +230,7 @@ function run(
 }
 
 export interface FakeThread {
+  readonly worktreePath?: string;
   /** Makes this a side chat of that thread. */
   readonly sideChatOf?: ThreadId;
   /** Makes this a subagent the provider started under that thread, which takes no messages. */
@@ -330,7 +331,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     runtimeMode: "full-access",
     interactionMode: "default",
     branch: "main",
-    worktreePath: null,
+    worktreePath: thread.worktreePath ?? null,
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
     ...(thread.issues === undefined ? {} : { issues: thread.issues }),
     lineage: {
@@ -612,6 +613,8 @@ export function installFakeEnvironment(
     /** Commands left unanswered even when accepting, until `rejectPendingCommand`. */
     readonly holdCommand?: (command: OrchestrationV2Command) => boolean;
     readonly providers?: ReadonlyArray<unknown>;
+    readonly workStarters?: boolean;
+    readonly assets?: ReadonlyMap<string, Blob>;
   },
 ): Disposable {
   threads = fixtures;
@@ -622,6 +625,16 @@ export function installFakeEnvironment(
     ),
     keybindings: options?.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS,
   };
+  if (options?.workStarters) {
+    baseServerConfig = {
+      ...baseServerConfig,
+      environment: {
+        ...baseServerConfig.environment,
+        capabilities: { ...baseServerConfig.environment.capabilities, workStarters: true },
+      },
+      scratchWorkspaceRoot: project.workspaceRoot,
+    };
+  }
   dispatched = [];
   acceptCommands = options?.acceptCommands === true;
   projects = [
@@ -636,6 +649,8 @@ export function installFakeEnvironment(
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
     if (url.origin !== window.location.origin) return realFetch(input, init);
+    const asset = options?.assets?.get(url.pathname);
+    if (asset) return new Response(asset);
     if (url.pathname === "/.well-known/t3/environment") return json(encodedDescriptor);
     if (url.pathname === "/api/auth/session") {
       return json({
@@ -719,6 +734,21 @@ export async function emitTerminalMetadata(event: TerminalMetadataStreamEvent): 
   if (terminalMetadataSubscriber === null) throw new Error("No terminal metadata subscription");
   await Effect.runPromise(Queue.offer(terminalMetadataSubscriber, event));
 }
+
+export const publishFakeThread = (thread: FakeThread) =>
+  Effect.gen(function* () {
+    threads = [...threads, thread];
+    sequence += 1;
+    if (shellSubscriber !== null) {
+      yield* Queue.offer(shellSubscriber, {
+        kind: "thread.updated",
+        sequence,
+        location: "active",
+        thread: shellOf(thread),
+      });
+    }
+    return projectionOf(thread);
+  });
 
 /** Whether the app holds a live subscription to the thread, so events reach it. */
 export function isThreadSubscribed(threadId: ThreadId): boolean {

@@ -43,6 +43,7 @@ import * as Stream from "effect/Stream";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
 import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
+import { hasValidWorkDeliverable, prepareWorkDeliverable } from "../project/workDeliverable.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EventSink from "./EventSink.ts";
@@ -678,6 +679,7 @@ export interface RunExecutionServiceV2StartRootRunInput {
   readonly message: ProviderAdapter.ProviderAdapterV2TurnMessage;
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  readonly workScratchRoot?: string;
 }
 
 type RunBaselineInput = Pick<
@@ -747,6 +749,7 @@ export const layer: Layer.Layer<
         readonly lostToolCalls?: ReadonlyArray<OrchestrationV2TurnItem>;
         readonly restoredHandoffs?: ReadonlyArray<OrchestrationV2ContextHandoff>;
         readonly terminal: ProviderTerminalEvent;
+        readonly workDeliverableId?: string;
         readonly completedAt?: DateTime.Utc;
         readonly failureItemPersisted: boolean;
         readonly refreshAfterTurn: Effect.Effect<void>;
@@ -853,6 +856,9 @@ export const layer: Layer.Layer<
           input.run;
         const finalizedRun: OrchestrationV2Run = {
           ...runWithoutDelegatedCompletion,
+          ...(input.workDeliverableId === undefined
+            ? {}
+            : { workDeliverableId: input.workDeliverableId }),
           status: persistedStatus,
           completedAt: input.terminal.status === "completed" ? null : completedAt,
         };
@@ -1217,6 +1223,22 @@ export const layer: Layer.Layer<
         if (responseStreamingMode === null) {
           return;
         }
+        const workOutput =
+          input.session.driver === "claudeAgent" &&
+          input.runtimePolicy.interactionMode === "default" &&
+          input.message.createdBy === "user" &&
+          !isDelegatedAppThread(input.appThread) &&
+          !input.message.text.trimStart().startsWith("/") &&
+          input.resume !== true &&
+          input.workScratchRoot !== undefined &&
+          input.appThread.worktreePath === input.checkpointScope.cwd
+            ? yield* prepareWorkDeliverable({
+                threadId: input.run.threadId,
+                runId: input.run.id,
+                workspace: input.checkpointScope.cwd,
+                scratchRoot: input.workScratchRoot,
+              })
+            : undefined;
         const terminalEvent = yield* Ref.make<ProviderTerminalEvent | null>(null);
         const latestTurnItemOrdinal = yield* Ref.make(input.providerTurnOrdinal * 100);
         const latestProviderThread = yield* Ref.make(input.providerThread);
@@ -1315,6 +1337,13 @@ export const layer: Layer.Layer<
           }
           const providerThread = yield* Ref.get(latestProviderThread);
           const openSubagents = yield* Ref.get(openRunOwnedSubagents);
+          const workDeliverableId =
+            workOutput !== undefined &&
+            terminal.status === "completed" &&
+            terminal.promptDropped !== true &&
+            (yield* hasValidWorkDeliverable(input.checkpointScope.cwd, workOutput.artifactId))
+              ? workOutput.artifactId
+              : undefined;
           const writeTerminal = Effect.fnUntraced(
             function* (settledTerminal: ProviderTerminalEvent) {
               const restoredHandoffs =
@@ -1353,6 +1382,7 @@ export const layer: Layer.Layer<
                 ...(abandonedProviderTurn === undefined ? {} : { abandonedProviderTurn }),
                 ...(restoredHandoffs === undefined ? {} : { restoredHandoffs }),
                 terminal: settledTerminal,
+                ...(workDeliverableId === undefined ? {} : { workDeliverableId }),
                 failureItemPersisted: settledTerminal.status === "failed",
                 refreshAfterTurn,
               });
@@ -2295,7 +2325,11 @@ export const layer: Layer.Layer<
           message: input.message,
           modelSelection: input.modelSelection,
           runtimePolicy: input.runtimePolicy,
-          ...(appContext.length === 0 ? {} : { appContext }),
+          ...(workOutput !== undefined
+            ? { appContext: [...appContext, workOutput.context] }
+            : appContext.length === 0
+              ? {}
+              : { appContext }),
         };
         // Check after the context read: ingestion can settle the run while
         // it awaits. A failed ownership read fails the start below.

@@ -234,24 +234,8 @@ export function AtumMark({ className }: { className?: string }) {
   );
 }
 
-const WORK_SUGGESTIONS = ["write", "research", "design"] as const;
-
-/** Work mode's new thread: the mark, one question, one line and three suggestions. */
-export function WorkDraftHero(props: {
-  project: React.ReactNode | null;
-  onSuggest: (prompt: string) => void;
-}) {
+export function WorkDraftHero(props: { project: React.ReactNode | null }) {
   const gt = useGT();
-  const label: Record<(typeof WORK_SUGGESTIONS)[number], string> = {
-    write: gt("Write something"),
-    research: gt("Research a topic"),
-    design: gt("Design a page"),
-  };
-  const prompt: Record<(typeof WORK_SUGGESTIONS)[number], string> = {
-    write: gt("Help me write "),
-    research: gt("Research "),
-    design: gt("Design a page for "),
-  };
   return (
     <div
       className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 text-center"
@@ -267,19 +251,6 @@ export function WorkDraftHero(props: {
           {gt("are in reach.")}
         </p>
       ) : null}
-      <div className="pointer-events-auto mt-4 flex flex-wrap justify-center gap-2">
-        {WORK_SUGGESTIONS.map((suggestion) => (
-          <Button
-            key={suggestion}
-            type="button"
-            size="sm-pill"
-            variant="secondary"
-            onClick={() => props.onSuggest(prompt[suggestion])}
-          >
-            {label[suggestion]}
-          </Button>
-        ))}
-      </div>
     </div>
   );
 }

@@ -369,6 +369,7 @@ export interface ChatComposerHandle {
 }
 
 export interface ChatComposerProps {
+  workCreateAction?: React.ReactNode;
   composerDraftTarget: ScopedThreadRef | DraftId;
   environmentId: EnvironmentId;
   canOperateThread: boolean;
@@ -4049,6 +4050,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerAttachButton && !dictationTakesFooter ? (
                   <div className="me-2">{composerAttachButton}</div>
                 ) : null}
+                {dictationTakesFooter ? null : props.workCreateAction}
                 <div
                   data-chat-composer-actions="right"
                   data-chat-composer-transition-actions="true"

@@ -19,6 +19,8 @@ import {
   ProjectId,
   type RunId,
   type RuntimeMode,
+  type WorkDocumentFormat,
+  type WorkStarterFile,
   type ScheduledTaskId,
   type GitCommandError,
   type GitManagerServiceError,
@@ -34,12 +36,15 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import {
   buildTemporaryWorktreeBranchName,
@@ -67,6 +72,7 @@ import { randomUuidV4 } from "@t3tools/provider-core/server/randomUuid";
 import { DispatchModeLimit } from "./DispatchModeLimit.ts";
 import * as ThreadManagement from "./ThreadManagementService.ts";
 import * as TaskFolders from "../workspace/TaskFolders.ts";
+import { prepareWorkStarter, workStarterFile } from "../project/workStarter.ts";
 
 // The agent waits for its branch name; a rate-limited provider would hold it for minutes.
 const BRANCH_NAME_TIMEOUT = "20 seconds";
@@ -111,6 +117,7 @@ export interface ThreadLaunchInput {
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
   readonly workspaceStrategy: ThreadLaunchWorkspaceStrategy;
+  readonly workFormat?: WorkDocumentFormat;
   readonly initialMessage?: ThreadLaunchInitialMessage;
   readonly importedNativeThread?: {
     readonly ref: {
@@ -148,6 +155,7 @@ export interface ThreadLaunchResult {
   readonly projection: OrchestrationV2ThreadProjection;
   /** The launch's last write (the initial message, else the thread claim) was accepted before this call. */
   readonly resumed: boolean;
+  readonly workStarter?: WorkStarterFile;
   readonly sequence?: number;
 }
 
@@ -296,6 +304,7 @@ const make = Effect.gen(function* () {
   const eventSink = yield* EventSink.EventSinkV2;
   const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
   const taskFolders = yield* TaskFolders.TaskFolders;
+  const workStarterServices = yield* Effect.context<FileSystem.FileSystem | Path.Path>();
   // A project-folder launch that names no branch records the folder's checkout, as the composer does.
   const launchBranch = (strategy: ThreadLaunchWorkspaceStrategy, workspaceRoot: string) =>
     strategy.type === "root" && strategy.branch === undefined
@@ -1358,8 +1367,21 @@ const make = Effect.gen(function* () {
     );
   });
 
-  const launch: ThreadLaunchService["Service"]["launch"] = Effect.fn("ThreadLaunchService.launch")(
-    function* (request) {
+  const workLaunchLock = yield* Semaphore.make(1);
+  const launchThread = Effect.fn("ThreadLaunchService.launch")(
+    function* (request: ThreadLaunchInput) {
+      if (
+        request.workFormat !== undefined &&
+        (request.workspaceStrategy.type !== "root" ||
+          request.reuseExistingThread === true ||
+          request.initialMessage !== undefined ||
+          !(yield* managedFolders.isScratchProject(request.projectId)))
+      ) {
+        return yield* mapError(
+          request,
+          "resolve-project",
+        )("Work starters require a new Scratch thread.");
+      }
       // Scratch has no Git repository. Normalize before folder allocation so
       // durable preparation and retries use the thread's own Scratch folder.
       const input: ThreadLaunchInput =
@@ -1429,6 +1451,31 @@ const make = Effect.gen(function* () {
           yield* validateReusableThread(input, candidateThreadId);
         }
 
+        const workStarter =
+          input.workFormat === undefined ? undefined : workStarterFile(input.workFormat);
+        if (
+          workStarter !== undefined &&
+          Option.isSome(launchReceipt) &&
+          launchReceipt.value.status === "accepted"
+        ) {
+          const projection = yield* threads
+            .getThreadProjection(launchReceipt.value.threadId)
+            .pipe(Effect.mapError(mapError(input, "create-thread", candidateThreadId)));
+          if (
+            launchReceipt.value.commandType !== "thread.create" ||
+            projection.thread.projectId !== input.projectId ||
+            projection.thread.id !== candidateThreadId ||
+            projection.thread.worktreePath === null
+          ) {
+            return yield* mapError(
+              input,
+              "create-thread",
+              candidateThreadId,
+            )("The previous Work launch does not match this request.");
+          }
+          return { threadId: candidateThreadId, projection, resumed: true, workStarter };
+        }
+
         const workspaceStrategy: ThreadLaunchWorkspaceStrategy =
           input.workspaceStrategy.type === "root" && Option.isNone(launchReceipt)
             ? Option.match(
@@ -1445,6 +1492,19 @@ const make = Effect.gen(function* () {
                 },
               )
             : input.workspaceStrategy;
+        if (workStarter !== undefined && Option.isNone(launchReceipt)) {
+          if (workspaceStrategy.type !== "existing_worktree") {
+            return yield* mapError(
+              input,
+              "provision-worktree",
+              candidateThreadId,
+            )("Could not allocate a Scratch folder.");
+          }
+          yield* prepareWorkStarter(workspaceStrategy.worktreePath, workStarter.format).pipe(
+            Effect.provideContext(workStarterServices),
+            Effect.mapError(mapError(input, "provision-worktree", candidateThreadId)),
+          );
+        }
         const initialBranch = yield* Effect.interruptible(
           launchBranch(workspaceStrategy, project.workspaceRoot),
         );
@@ -1632,6 +1692,7 @@ const make = Effect.gen(function* () {
               ? Option.isSome(launchReceipt) || claimed.replayed === true
               : messageWasAlreadyAccepted,
           ...(messageSequence === undefined ? {} : { sequence: messageSequence }),
+          ...(workStarter === undefined ? {} : { workStarter }),
         };
       });
     },
@@ -1639,6 +1700,11 @@ const make = Effect.gen(function* () {
     // caller that goes away must not stop the launch between the two.
     Effect.uninterruptible,
   );
+
+  const launch: ThreadLaunchService["Service"]["launch"] = (input) =>
+    input.workFormat === undefined
+      ? launchThread(input)
+      : workLaunchLock.withPermit(launchThread(input));
 
   const prepareRun: ThreadLaunchService["Service"]["prepareRun"] = Effect.fn(
     "ThreadLaunchService.prepareRun",

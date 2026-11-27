@@ -362,18 +362,7 @@ export function DraftHeroHeadline({
 
   if (workMode && !isScratchDraft) {
     return (
-      <WorkDraftHero
-        project={hasResolvedProject || canChooseProject ? projectSelector : null}
-        onSuggest={(prompt) => {
-          if (!draftId) return;
-          useComposerDraftStore.getState().setPrompt(draftId, prompt);
-          document
-            .querySelector<HTMLElement>(
-              '[data-chat-composer-stack] [contenteditable="true"], [data-chat-composer-stack] textarea',
-            )
-            ?.focus();
-        }}
-      />
+      <WorkDraftHero project={hasResolvedProject || canChooseProject ? projectSelector : null} />
     );
   }
 

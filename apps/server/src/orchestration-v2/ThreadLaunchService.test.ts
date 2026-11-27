@@ -290,6 +290,7 @@ function makeHarness(options: HarnessOptions = {}) {
         layerReceipts,
         layerOrchestrator,
         IdAllocator.layer,
+        NodeServices.layer,
         options.getLaunchSettings === undefined
           ? Layer.empty
           : Layer.mock(ServerSettings.ServerSettingsService)({
@@ -1158,7 +1159,13 @@ it.effect("a rejected initial message leaves no title change and no new thread",
 // Stands `projectId` in for a plain folder, not a Git repository, so Git fails
 // there with the error a real one raises. It is the Scratch project unless
 // `scratch` is false.
-function scratchHarness({ scratch = true }: { readonly scratch?: boolean } = {}) {
+function scratchHarness({
+  scratch = true,
+  folderForStarter,
+}: {
+  readonly scratch?: boolean;
+  readonly folderForStarter?: string;
+} = {}) {
   const claimed: Array<ThreadId> = [];
   const scratchRoot = project.workspaceRoot;
   const notARepository = (operation: string, cwd: string) =>
@@ -1176,7 +1183,7 @@ function scratchHarness({ scratch = true }: { readonly scratch?: boolean } = {})
         Effect.sync(() => {
           if (!scratch || input.projectId !== projectId) return Option.none();
           claimed.push(input.threadId);
-          return Option.some(`/scratch/folder-${claimed.length}`);
+          return Option.some(folderForStarter ?? `/scratch/folder-${claimed.length}`);
         }),
     }),
     git: { repositoryRoot: (cwd) => Effect.succeed(cwd === scratchRoot ? null : cwd) },
@@ -1418,6 +1425,69 @@ it.effect("launches a worktree request for Scratch at the root, in its own folde
     assert.equal(git.thread.worktreePath, "/other-repo-worktrees/feature");
     assert.equal(harness.createWorktree.mock.calls[0]?.[0]?.cwd, "/other-repo");
     assert.deepEqual(harness.claimed, [launched.threadId]);
+  }).pipe(Effect.provide(harness.layer));
+});
+
+it.effect.each([
+  { format: "docx", skill: "work-document" },
+  { format: "xlsx", skill: "work-spreadsheet" },
+  { format: "pptx", skill: "work-slides" },
+  { format: "svg", skill: "work-design" },
+] as const)(
+  "opens a Work document ($format) in Scratch before dispatch and reuses its launch receipt",
+  ({ format, skill }) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const folder = yield* fs.makeTempDirectoryScoped({ prefix: "work-starter-" });
+      const harness = scratchHarness({ folderForStarter: folder });
+      yield* Effect.gen(function* () {
+        const launches = yield* ThreadLaunch.ThreadLaunchService;
+        const input = {
+          ...launchInput({
+            command: "command:launch:work-write",
+            thread: "thread:launch:work-write",
+          }),
+          workFormat: format,
+        } as const;
+        const started = yield* launches.launch(input);
+        const filename = `Untitled.${format}`;
+        assert.deepEqual(started.workStarter, { format, relativePath: filename });
+        assert.equal(started.projection.thread.worktreePath, folder);
+        assert.deepEqual(started.projection.runs, []);
+        assert.deepEqual(started.projection.messages, []);
+        assert.deepEqual(
+          (yield* fs.readFile(`${folder}/${filename}`)).slice(0, 4),
+          format === "svg" ? new TextEncoder().encode("<svg") : new Uint8Array([80, 75, 3, 4]),
+        );
+        assert.include(yield* fs.readFileString(`${folder}/CLAUDE.md`), skill);
+        assert.include(
+          yield* fs.readFileString(`${folder}/.claude/skills/${skill}/SKILL.md`),
+          filename,
+        );
+        const retried = yield* launches.launch(input);
+        assert.isTrue(retried.resumed);
+        assert.equal(retried.threadId, started.threadId);
+        assert.deepEqual(retried.workStarter, started.workStarter);
+        assert.deepEqual(harness.claimed, [started.threadId]);
+      }).pipe(Effect.provide(harness.layer));
+    }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("rejects a Work starter in a user project before allocating a folder", () => {
+  const harness = scratchHarness({ scratch: false });
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const error = yield* Effect.flip(
+      launches.launch({
+        ...launchInput({
+          command: "command:launch:work-non-scratch",
+          thread: "thread:launch:work-non-scratch",
+        }),
+        workFormat: "xlsx",
+      }),
+    );
+    assert.equal(error._tag, "ThreadLaunchError");
+    assert.deepEqual(harness.claimed, []);
   }).pipe(Effect.provide(harness.layer));
 });
 

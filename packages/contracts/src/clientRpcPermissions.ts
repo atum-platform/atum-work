@@ -3,6 +3,7 @@ import { GitPreparePullRequestThreadInput, GitRunStackedActionInput } from "./gi
 import {
   AuthAccessWriteScope,
   AuthEnvironmentMaintainScope,
+  AuthFilesystemWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthPreviewOperateScope,
@@ -12,7 +13,10 @@ import {
   AuthTerminalOperateScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
-import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
+import {
+  ORCHESTRATION_V2_WS_METHODS,
+  type OrchestrationV2ThreadLaunchInput,
+} from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
@@ -111,6 +115,12 @@ export function clientRpcRequiredScopes(
   method: string,
   input: unknown,
 ): readonly AuthEnvironmentScope[] {
+  if (
+    method === ORCHESTRATION_V2_WS_METHODS.launchThread &&
+    (input as OrchestrationV2ThreadLaunchInput | undefined)?.workFormat !== undefined
+  ) {
+    return [AuthOrchestrationOperateScope, AuthFilesystemWriteScope];
+  }
   if (method === WS_METHODS.gitPreparePullRequestThread && input !== undefined) {
     const payload = decodePrepareThread(input);
     if (payload.mode === "worktree" && payload.threadId !== undefined)

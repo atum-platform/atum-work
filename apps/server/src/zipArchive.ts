@@ -5,7 +5,7 @@ import * as Yauzl from "yauzl";
 
 /** Closing the scope closes the archive. */
 export const openZipArchive = Effect.fn("zipArchive.open")(function* <E>(
-  archivePath: string,
+  source: string | Buffer,
   makeError: (detail: string, cause: unknown) => E,
 ) {
   const opened = yield* Effect.acquireRelease(
@@ -17,47 +17,53 @@ export const openZipArchive = Effect.fn("zipArchive.open")(function* <E>(
       },
       E
     >((resume) => {
-      Yauzl.open(
-        archivePath,
-        { lazyEntries: true, autoClose: false, validateEntrySizes: true, strictFileNames: true },
-        (error, zip) => {
-          if (error || !zip) {
-            resume(Effect.fail(makeError("Could not open the verified archive.", error)));
-            return;
-          }
-          let closed = false;
-          let archiveError: E | undefined;
-          zip.on("close", () => {
-            closed = true;
-          });
-          zip.on("error", (cause: unknown) => {
-            archiveError = makeError("The archive could not be read.", cause);
-          });
-          resume(
-            Effect.succeed({
-              zip,
-              error: () => archiveError,
-              close: Effect.callback<void>((finish) => {
-                if (closed) {
-                  finish(Effect.void);
-                  return;
-                }
-                const onClose = () => {
-                  zip.removeListener("error", onError);
-                  finish(Effect.void);
-                };
-                const onError = (cause: unknown) => {
-                  zip.removeListener("close", onClose);
-                  finish(Effect.die(makeError("Could not close the archive.", cause)));
-                };
-                zip.once("close", onClose);
-                zip.once("error", onError);
-                zip.close();
-              }),
-            }),
-          );
-        },
-      );
+      const options = {
+        lazyEntries: true,
+        autoClose: false,
+        validateEntrySizes: true,
+        strictFileNames: true,
+      };
+      const onOpen = (error: Error | null, zip: Yauzl.ZipFile) => {
+        if (error || !zip) {
+          resume(Effect.fail(makeError("Could not open the verified archive.", error)));
+          return;
+        }
+        let closed = false;
+        let archiveError: E | undefined;
+        zip.on("close", () => {
+          closed = true;
+        });
+        zip.on("error", (cause: unknown) => {
+          archiveError = makeError("The archive could not be read.", cause);
+        });
+        resume(
+          Effect.succeed({
+            zip,
+            error: () => archiveError,
+            close: Buffer.isBuffer(source)
+              ? Effect.sync(() => zip.close())
+              : Effect.callback<void>((finish) => {
+                  if (closed) {
+                    finish(Effect.void);
+                    return;
+                  }
+                  const onClose = () => {
+                    zip.removeListener("error", onError);
+                    finish(Effect.void);
+                  };
+                  const onError = (cause: unknown) => {
+                    zip.removeListener("close", onClose);
+                    finish(Effect.die(makeError("Could not close the archive.", cause)));
+                  };
+                  zip.once("close", onClose);
+                  zip.once("error", onError);
+                  zip.close();
+                }),
+          }),
+        );
+      };
+      if (typeof source === "string") Yauzl.open(source, options, onOpen);
+      else Yauzl.fromBuffer(source, options, onOpen);
     }),
     (opened) => opened.close,
   );

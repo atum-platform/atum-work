@@ -4,6 +4,12 @@ export type WorkPlanProvider = "codex" | "claudeAgent" | "antigravity";
 
 type WorkAccessState = "allowed" | "empty" | "unavailable";
 
+export interface WorkDeliverableIdentity {
+  readonly threadId: string;
+  readonly runId: string;
+  readonly artifactId: string;
+}
+
 /** The owner view's preload delegates this read to desktop main. */
 export interface WorkSubmitAccessBridge {
   readonly getConnectAssertion?: () => Promise<string>;
@@ -28,6 +34,11 @@ export interface WorkSubmitAccessBridge {
   readonly readModelAccess: () => Promise<WorkAccessState>;
   /** Opens the existing Protons top-up page; older preloads do not expose it. */
   readonly openProtons?: () => Promise<boolean>;
+  readonly getDeliverable?: (identity: WorkDeliverableIdentity) => Promise<{
+    readonly state: string;
+    readonly name?: string;
+  } | null>;
+  readonly openDeliverable?: (identity: WorkDeliverableIdentity) => Promise<boolean>;
   readonly prepareCodexSignIn?: () => Promise<boolean>;
   readonly openProviderSignIn?: (provider: WorkPlanProvider, url: string) => Promise<boolean>;
 }

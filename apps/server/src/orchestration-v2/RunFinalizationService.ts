@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 
 import * as ProjectEnrichment from "../project/ProjectEnrichmentService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
+import { settleWorkDeliverable, workDeliverablesEnabled } from "../project/workDeliverable.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as VcsStatusBroadcaster from "../vcs/VcsStatusBroadcaster.ts";
 import * as WorkspaceEntries from "../workspace/WorkspaceEntries.ts";
@@ -88,6 +89,22 @@ const make = Effect.gen(function* () {
         ),
       );
     const cwd = projection.checkpointScopes.find((scope) => scope.id === input.scopeId)?.cwd;
+    if (cwd !== undefined && workDeliverablesEnabled()) {
+      const run = yield* projections
+        .getRun(input.threadId, input.runId)
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new RunFinalizationError({ ...input, operation: "refresh-workspace", cause }),
+          ),
+        );
+      if (run?.status === "completed" && run.workDeliverableId !== undefined) {
+        yield* settleWorkDeliverable(
+          { threadId: input.threadId, runId: input.runId, artifactId: run.workDeliverableId },
+          cwd,
+        );
+      }
+    }
     if (cwd !== undefined) {
       // The refresh only updates the display, so the thread's next turn must not wait for it.
       // Never replaced by a newer one: back-to-back turns would interrupt each before it publishes.

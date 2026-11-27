@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity";
 import {
+  ORCHESTRATION_V2_WS_METHODS,
   WS_METHODS,
   type EnvironmentId,
   type OrchestrationV2ShellSnapshot,
@@ -349,6 +350,11 @@ export function createThreadEnvironmentAtoms<R, E>(
       execute: setThreadInteractionMode,
       scheduler,
       concurrency,
+    }),
+    launch: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:thread:launch",
+      tag: ORCHESTRATION_V2_WS_METHODS.launchThread,
+      scheduler,
     }),
     startTurn: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:start-turn",

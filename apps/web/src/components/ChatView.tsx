@@ -1,6 +1,7 @@
 import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
+import { WorkDeliverableReceipt } from "~/atum/WorkDeliverableReceipt";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -73,6 +74,8 @@ import {
 import { offerAtumRightPanel } from "../atum/rightPanel";
 import { atumOpenThreadFrom, offerAtumOpenThread } from "../atum/openThread";
 import { atumDraftOverlayStyle } from "../atum/bannerAnchor";
+import { WorkCreateMenu, WorkSessionChips } from "../atum/WorkSessionChips";
+import { useWorkStarter } from "../atum/useWorkStarter";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
 import * as Schema from "effect/Schema";
@@ -3236,7 +3239,25 @@ export default function ChatView(props: ChatViewProps) {
     });
   };
   const onWorktreeSetupWorkLocallyStable = useStableCallback(onWorktreeSetupWorkLocally);
-  const onComposerSendStable = useStableCallback(onSend);
+  const showWorkStarters =
+    atumWork &&
+    isDraftHeroState &&
+    activeProjectIsScratch &&
+    !embedded &&
+    serverConfig?.environment.capabilities.workStarters === true;
+  const workStarter = useWorkStarter({
+    shown: showWorkStarters,
+    canOperate: canOperateThread && !activeEnvironmentUnavailable && !isSendBusy,
+    thread: routeThreadRef,
+    projectId: activeProject?.id,
+    runtimeMode,
+    readModel: () => composerRef.current?.getSendContext().selectedModelSelection,
+    isCurrentThread: () => currentRouteThreadKeyRef.current === routeThreadKey,
+  });
+  const onComposerSendStable = useStableCallback((...args: Parameters<typeof onSend>) => {
+    if (!workStarter.isStarting()) return onSend(...args);
+    return Promise.resolve();
+  });
   const sendPreviewAnnotation = (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
@@ -3374,13 +3395,29 @@ export default function ChatView(props: ChatViewProps) {
       .join(" · ") || null;
   // The end of the timeline holds the thread's present and next turns: what it is doing now,
   // its lifecycle status, guest messages awaiting you, then your queued messages.
+  const driveRun = atumWork
+    ? serverProjection?.runs.findLast(
+        (run) => run.status === "completed" && run.workDeliverableId !== undefined,
+      )
+    : undefined;
   const timelineFooter =
     pendingHandoff === null &&
+    driveRun === undefined &&
     !hasThreadNow &&
     threadStatusLine === null &&
     pendingGuestMessageCount === 0 &&
     !hasQueuedTurns ? null : (
       <>
+        {driveRun?.workDeliverableId ? (
+          <WorkDeliverableReceipt
+            key={driveRun.workDeliverableId}
+            identity={{
+              threadId: driveRun.threadId,
+              runId: driveRun.id,
+              artifactId: driveRun.workDeliverableId,
+            }}
+          />
+        ) : null}
         {pendingHandoff === null ? null : (
           <div className="chat-content-lane">
             <HandoffRow
@@ -3883,7 +3920,15 @@ export default function ChatView(props: ChatViewProps) {
                             ) : null}
                             {!composerMounted ? null : (
                               <ChatComposer
-                                canOperateThread={canOperateThread}
+                                canOperateThread={canOperateThread && !workStarter.pending}
+                                workCreateAction={
+                                  showWorkStarters ? (
+                                    <WorkCreateMenu
+                                      disabled={workStarter.disabled}
+                                      onChoose={workStarter.choose}
+                                    />
+                                  ) : null
+                                }
                                 reportedModelSelection={reportedModelSelection}
                                 multipleModelSelections={multipleModelSelections}
                                 supportsMultipleModels={
@@ -4113,6 +4158,12 @@ export default function ChatView(props: ChatViewProps) {
                           </div>
                         </div>
                       </ComposerSurface.Shell>
+                      {showWorkStarters ? (
+                        <WorkSessionChips
+                          disabled={workStarter.disabled}
+                          onChoose={workStarter.choose}
+                        />
+                      ) : null}
                       {isDraftHeroState && composerBannerItems.length > 0 ? (
                         // Out of flow, like the headline, so a notice never moves the centered composer.
                         // Short windows pin the composer to the bottom, where an out-of-flow notice
