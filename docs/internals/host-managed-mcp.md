@@ -102,8 +102,9 @@ reaches attachment admission.
 
 Work keeps the registry and upstream credentials in process memory. Providers
 get an opaque URL on a separate IPv4 loopback socket. The listener forwards
-Streamable HTTP requests only to allowed origins, supplies Authorization at
-request time, and refuses redirects. Its POST deadline defaults to 180,000 ms.
+Streamable HTTP requests only to allowed origins, preserves `Mcp-Name` on tool
+calls, supplies Authorization at request time, and refuses redirects. Its POST
+deadline defaults to 180,000 ms.
 `toolTimeoutMs` accepts an integer from 1,000 to 7,200,000 ms (two hours).
 An expired deadline or an aborted provider HTTP request closes the upstream
 request, including a streaming response. An upstream failure or deadline
