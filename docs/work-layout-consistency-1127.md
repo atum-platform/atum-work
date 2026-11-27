@@ -37,16 +37,23 @@ Atum's colours.
 
 `scripts/atum-work/theme.mjs` now copies the Kit's T3 theme file instead of generating a theme with CSS.
 
+## Round 2: the three fixes lost with the theme CSS
+
+Same flag, as components rather than theme CSS:
+
+| Fix                           | Change                                                                                                                                                                                                    | Where                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Work-mode rows read as Chat's | In Work mode the card is title and time on one line, then where the thread runs; no favicon, folder chip or pin (Work names one folder). 60 px instead of 78. Code mode keeps T3's card.                  | `apps/web/src/components/sidebar/SidebarThreadRow.tsx` (`chatLikeCard`)        |
+| Empty thread below the banner | The banner lane is a CSS anchor and the empty thread's overlay starts at its bottom, so a provider notice no longer covers the greeting. An empty lane is zero high. Threads with messages are unchanged. | `apps/web/src/atum/bannerAnchor.ts`, `chat/ChatBannerLane.tsx`, `ChatView.tsx` |
+| Neutral notices               | Alerts take the hairline border and no hue tint behind the glass; the variant still colours icon and text.                                                                                                | `apps/web/src/components/ui/alert.tsx`                                         |
+
+Evidence: `r2-*` in the evidence folder (before = round 1's client, after = round 2's, same binary).
+
 ## Desktop follow-ups (atum-desktop)
 
-1. Once a runtime from this branch is pinned, remove `WorkRosterControls` (the title band's +): New lives in
-   the view's plus menu.
-2. Extend `parseWorkSidebar` / `WorkSidebarSnapshot` (`apps/desktop/shared/matrix-work.ts`) with the optional
-   `thread` and show "name · repo · branch" in zone B (`app/work/work-band.tsx`, `WorkTitle`). Older runtimes
-   send no `thread`; keep "Work" then.
-3. Not in this branch, also lost with the theme CSS: Work-mode thread rows read as Chat's (title and time,
-   no folder chip), the composer overlay starting below the provider banner, the alert tint. Each needs its
-   own component change in the fork.
+Done in atum-desktop `feat/work-thread-title` (stacked on PR #147): the title shows "name · repo · branch"
+from the report's `thread`, and the band's + goes away when the runtime reports it (a runtime that sends
+`thread` has the plus menu). Older runtimes keep "Work" and the band's +.
 
 ## Verification (2026-11-27, Asia/Ho_Chi_Minh)
 

@@ -133,6 +133,7 @@ import { observeVisibleAnimation } from "~/lib/visibleAnimation";
 import { useThreadHasUnsentDraft } from "../../composerDraftStore";
 import { ThreadDetailsIssueRows } from "../chat/ThreadDetailsIssueRows";
 import { IssueGlyph, issueStatePresentation } from "../issue/issuePresentation";
+import { isAtumWorkBuild, useActiveAtumSurfaceMode } from "~/atum/surfaceMode";
 
 // The fields thread rows show. Provider status pushes refresh `checkedAt`,
 // status and auth on every provider; leaving those out keeps each
@@ -684,6 +685,10 @@ function ThreadRenameInput(props: {
 const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowProps) {
   const gt = useGT();
   const messages = useMessages();
+  // Work mode's cards read as Chat's rows: title and time, then where the thread runs; no folder chip
+  // (Work names one folder). Code mode keeps T3's card.
+  const atumSurfaceMode = useActiveAtumSurfaceMode();
+  const chatLikeCard = isAtumWorkBuild && atumSurfaceMode === "work";
   const {
     isRenaming,
     onCancelRename,
@@ -1526,7 +1531,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       // that have not rendered yet, so a hint off by a pixel lands it a pixel short per row above.
       className={cn(
         "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_78px]",
-        metaLineEmpty && "[contain-intrinsic-size:auto_60px]",
+        (metaLineEmpty || chatLikeCard) && "[contain-intrinsic-size:auto_60px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1555,17 +1560,19 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             className={cn(
               "relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)",
               metaLineEmpty && "h-auto",
+              chatLikeCard &&
+                "flex h-auto min-h-15 flex-wrap content-center items-center gap-x-1.5",
             )}
           >
-            <div className="flex h-5 min-w-0 items-center gap-1.5">
-              {draftIndicator}
-              {props.project ? (
+            <div className={chatLikeCard ? "contents" : "flex h-5 min-w-0 items-center gap-1.5"}>
+              {chatLikeCard ? null : draftIndicator}
+              {props.project && !chatLikeCard ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
               ) : null}
               {/* Left of the status slot, the pin would slide when hover swaps the
                 label for the wider row controls. */}
-              {pinIndicator}
-              {props.projectDisplayName ? (
+              {chatLikeCard ? null : pinIndicator}
+              {chatLikeCard ? null : props.projectDisplayName ? (
                 <span
                   className={cn("min-w-0 flex-1 truncate font-normal text-secondary-label text-xs")}
                 >
@@ -1580,6 +1587,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 <span
                   className={cn(
                     "group/sidebar-status-slot relative ml-auto flex h-5 min-w-8 shrink-0 items-stretch justify-end text-xs",
+                    chatLikeCard && "order-2",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1714,7 +1722,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               )}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
-            <div className="mt-1 flex min-w-0 items-center gap-1.5">
+            <div
+              className={cn(
+                "flex min-w-0 items-center gap-1.5",
+                chatLikeCard ? "order-1 flex-1" : "mt-1",
+              )}
+            >
               {title}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
@@ -1723,7 +1736,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : null}
               {titleLineIcons}
             </div>
-            {metaLine}
+            {chatLikeCard && metaLine !== null ? (
+              <div className="order-3 basis-full">{metaLine}</div>
+            ) : (
+              metaLine
+            )}
           </div>
         </TooltipTrigger>
         {detailsTooltip}

@@ -28,6 +28,15 @@ const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-fore
   },
 });
 
+/**
+ * Atum's notices are neutral cards (Kit): the hairline border, and no hue tint behind the glass. The variant
+ * still colours the icon and text.
+ */
+const ATUM_ALERT_CLASS =
+  import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+    ? "border-border [--alert-glass-tint:transparent]!"
+    : undefined;
+
 function alertChildSlot(child: React.ReactElement): string | undefined {
   const propsSlot = (child.props as Record<string, string | undefined>)["data-slot"];
   if (propsSlot) {
@@ -79,7 +88,7 @@ function Alert({
 
   return (
     <div
-      className={cn(alertVariants({ surface, variant }), className)}
+      className={cn(alertVariants({ surface, variant }), ATUM_ALERT_CLASS, className)}
       data-slot="alert"
       data-variant={variant ?? "default"}
       role="alert"

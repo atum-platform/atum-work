@@ -11,6 +11,7 @@ import {
   ProviderStatusBanner,
 } from "./ProviderStatusBanner";
 import { dismissThreadErrorBannerForSession, ThreadErrorBanner } from "./ThreadErrorBanner";
+import { atumBannerLaneStyle } from "../../atum/bannerAnchor";
 
 /**
  * The banners pinned above the timeline. The dismiss handlers are built here from plain
@@ -42,7 +43,10 @@ export function ChatBannerLane(props: {
     setThreadErrorBannerDismissTick,
   } = props;
   return (
-    <div className="chat-banner-lane pointer-events-none absolute top-0 z-30 flex flex-col">
+    <div
+      className="chat-banner-lane pointer-events-none absolute top-0 z-30 flex flex-col"
+      style={atumBannerLaneStyle}
+    >
       <ProviderStatusBanner
         environmentId={props.environmentId}
         status={providerStatus}
