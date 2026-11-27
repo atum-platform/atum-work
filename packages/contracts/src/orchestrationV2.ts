@@ -862,6 +862,9 @@ export const OrchestrationV2Run = Schema.Struct({
    * the turn started, and their updates must not put an unanswered run back.
    */
   output: Schema.optional(OrchestrationV2RunOutput),
+  workDeliverableId: Schema.optionalKey(
+    Schema.String.check(Schema.isPattern(/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/u)),
+  ),
 });
 export type OrchestrationV2Run = typeof OrchestrationV2Run.Type;
 

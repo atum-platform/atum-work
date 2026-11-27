@@ -8,23 +8,12 @@ The launch response's `workStarter` contains `format` and a path relative to the
 
 ## S1 result contract
 
-Work and Desktop exchange this interface in the trusted local host process after a run settles and the authored output is validated. The authoring runtime provides an explicit output reference. Desktop resolves each relative path under the run's private output directory using the authenticated run binding, or resolves an opaque handle issued under the same binding.
+Work reuses the inherited Desktop sidecar IPC channel. A Claude turn in a Word Scratch session gets its own private output directory and the absolute paths for the bundled memo helper. Work requests a Desktop pin before dispatch using the thread, run and artifact IDs. A Drive admission failure still allows local authoring.
 
-```ts
-interface WorkAuthoringOutput {
-  readonly threadId: string;
-  readonly runId: string;
-  readonly artifactId: string;
-  readonly format: "docx" | "xlsx" | "pptx" | "svg" | "html";
-  readonly file: WorkOutputFile;
-  readonly preview?: { readonly mimeType: "image/png"; readonly file: WorkOutputFile };
-}
+The memo helper writes to the output slot Work assigned for the turn. Work records the artifact ID on the run only after checking the bounded DOCX archive and finding editable Word text. The durable finalization worker verifies the completed run and validates the file again before sending `work-deliverable-settled` with the same IDs and `{ path: "Memo.docx", format: "docx", preview: null }`. Desktop resolves the relative path under its pinned directory and owns byte identity, placement, sync and the final Drive receipt. The renderer asks the existing preload for status and opens the saved file by ID.
 
-type WorkOutputFile = { readonly relativePath: string } | { readonly handle: string };
-```
-
-S1 uses `docx`. The settled output must be a regular file with matching format, bounded size, and a successful format validation. A path in conversation text or a changed-file card is insufficient. Strip user or provider authority from the Desktop message. Keep output references local, pin their byte identity when placing, and use `artifactId` with the run to reconcile retries. Desktop owns the final Drive receipt and sync state. A preview is an optional validated PNG, separate from the editable payload.
+The local pilot ran Claude Haiku 4.5 through Work with an uploaded meeting-notes fixture. After restarting during finalization, the outbox emitted a settlement for the original completed run with no additional generation. LibreOffice opened the 37,251-byte DOCX and rendered two pages. The editable document has four Word headings and one native table with four rows. Claude inferred an owner for the Friday review where the fixture had left the owner unspecified. The proof covers Work's local production and IPC emission. Installed Drive sync and opening from a second signed-in client remain acceptance checks.
 
 The launch tests cover all four formats, receipt replay, and rejection outside managed Scratch. Browser fixtures exercise both entry points, draft promotion, and rendering the blank DOCX through the native viewer in light and dark.
 
-The settled authoring result producer, signed runtime, installed provider acceptance, Drive placement and sync, and post-save memory actions require the corresponding rollout slices. The existing model picker shows the selected model for the new session.
+The signed runtime, installed provider acceptance, Drive placement and sync, and post-save memory actions require the corresponding rollout slices. The existing model picker shows the selected model for the new session.

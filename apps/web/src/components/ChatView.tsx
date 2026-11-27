@@ -1,6 +1,7 @@
 import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
+import { WorkDeliverableReceipt } from "~/atum/WorkDeliverableReceipt";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -3394,13 +3395,29 @@ export default function ChatView(props: ChatViewProps) {
       .join(" · ") || null;
   // The end of the timeline holds the thread's present and next turns: what it is doing now,
   // its lifecycle status, guest messages awaiting you, then your queued messages.
+  const driveRun = atumWork
+    ? serverProjection?.runs.findLast(
+        (run) => run.status === "completed" && run.workDeliverableId !== undefined,
+      )
+    : undefined;
   const timelineFooter =
     pendingHandoff === null &&
+    driveRun === undefined &&
     !hasThreadNow &&
     threadStatusLine === null &&
     pendingGuestMessageCount === 0 &&
     !hasQueuedTurns ? null : (
       <>
+        {driveRun?.workDeliverableId ? (
+          <WorkDeliverableReceipt
+            key={driveRun.workDeliverableId}
+            identity={{
+              threadId: driveRun.threadId,
+              runId: driveRun.id,
+              artifactId: driveRun.workDeliverableId,
+            }}
+          />
+        ) : null}
         {pendingHandoff === null ? null : (
           <div className="chat-content-lane">
             <HandoffRow
