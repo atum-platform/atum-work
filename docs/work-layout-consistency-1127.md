@@ -48,6 +48,22 @@ Atum's colours.
    no folder chip), the composer overlay starting below the provider banner, the alert tint. Each needs its
    own component change in the fork.
 
-## Verification
+## Verification (2026-11-27, Asia/Ho_Chi_Minh)
 
-See the lane's final report for the checks table. Screenshots: `~/.atum/operations/evidence/work-consistency-1127/`.
+| Check     | Command                                                                                                                         | Result                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| typecheck | `vp run typecheck` in `apps/web`                                                                                                | rc 0, 0 errors                                                                                                                                                                      |
+| lint      | `vp lint <changed .ts/.tsx/.mjs>`                                                                                               | rc 0                                                                                                                                                                                |
+| format    | `vp fmt --check <changed files>`                                                                                                | clean (`brand.rules.json` was unformatted on base; now formatted)                                                                                                                   |
+| unit      | `vp test run --project unit src/atum src/themePalette.test.ts src/themeBoot.test.ts src/hooks`                                  | 24 files, 208 passed                                                                                                                                                                |
+| browser   | `vp test run --project browser src/atum/SidebarReport.browser.test.tsx src/themePalette.browser.test.ts src/components/sidebar` | 14 files, 57 passed                                                                                                                                                                 |
+| wider     | `Sidebar.browser`, `Sidebar.shortcuts.browser`, `ChatView.browser`; `reactCompilerCoverage`, `ChatView.logic`                   | 1 ChatView browser test timed out under load and passes alone; `reactCompilerCoverage` fails on `routes/__root.tsx` (logical assignment bailout), a file this branch does not touch |
+| brand     | `brand-map.mjs`, `brand.mjs --check`, `node --test scripts/atum-work/brand.test.mjs`                                            | regenerated (5 splash entries), check rc 0, 1/1 pass                                                                                                                                |
+| secrets   | `gitleaks git --log-opts=origin/feat/work-runtime-0.1.16..HEAD --redact`                                                        | no leaks                                                                                                                                                                            |
+| knip hook | pre-commit `knip:check`                                                                                                         | skipped: red on base (11 unused files, none from this branch)                                                                                                                       |
+
+Live: the installed 0.1.19 runtime (before) and the same binary with this branch's Atum client (after), served
+with `t3 serve`, light and dark: `~/.atum/operations/evidence/work-consistency-1127/` (README there).
+Measured after: search 32 px at the panel's 8 px gutter, 8 px radius, 14 px, filled; plus menu with the three
+items; gear at the foot's right edge; the report's `thread` = `{title, repo, branch}`; with no theme yet,
+`data-theme-id=atum` and the ink accent instead of stock blue and `#000`.
