@@ -27,6 +27,36 @@
     },
     {
       "file": "index.html",
+      "from": "const DARK_BACKGROUND = \"#000000\";",
+      "to": "const DARK_BACKGROUND = \"#1f2025\";",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "            background: \"#ffffff\",\n            foreground: \"#262626\",\n            accent: \"#4f46e5\",",
+      "to": "            background: \"#ffffff\",\n            foreground: \"#1b1d22\",\n            accent: \"#1b1d22\",",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "            background: \"#000000\",\n            foreground: \"#f5f5f5\",\n            accent: \"#818cf8\",",
+      "to": "            background: \"#1f2025\",\n            foreground: \"#ecedf0\",\n            accent: \"#ecedf0\",",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "      html.dark body {\n        background: #000000;\n        color: #f5f5f5;",
+      "to": "      html.dark body {\n        background: #1f2025;\n        color: #ecedf0;",
+      "count": 1
+    },
+    {
+      "file": "index.html",
+      "from": "        --boot-error-bg: #000000;",
+      "to": "        --boot-error-bg: #1f2025;",
+      "count": 1
+    },
+    {
+      "file": "index.html",
       "from": "\"T3 Code",
       "to": "\"Atum",
       "count": 1
@@ -41,12 +71,6 @@
       "file": "public/manifest.webmanifest",
       "from": "\"short_name\": \"T3 Code\"",
       "to": "\"short_name\": \"Work\"",
-      "count": 1
-    },
-    {
-      "file": "src/atum/pickerRail.logic.ts",
-      "from": " T3 ",
-      "to": " Atum ",
       "count": 1
     },
     {

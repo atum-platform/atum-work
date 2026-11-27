@@ -63,6 +63,10 @@
       "types": "./src/model.ts",
       "import": "./src/model.ts"
     },
+    "./atumModels": {
+      "types": "./src/atumModels.ts",
+      "import": "./src/atumModels.ts"
+    },
     "./advertisedEndpoint": {
       "types": "./src/advertisedEndpoint.ts",
       "import": "./src/advertisedEndpoint.ts"

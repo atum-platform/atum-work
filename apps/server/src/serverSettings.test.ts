@@ -139,6 +139,46 @@ function strictSecretReferencePaths(
 }
 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings", (it) => {
+  it.effect("reloads Atum model preferences and the saved route after service restart", () =>
+    Effect.gen(function* () {
+      const provider = ProviderInstanceId.make("atum-managed");
+      const luna = "atum-managed:nguyet-thuc";
+      const terra = "atum-managed:nhat-thuc";
+      const opus = "atum-managed:opus";
+      const defaultModelSelection = createModelSelection(provider, luna);
+      const settingsLayer = ServerSettingsModule.layer.pipe(
+        Layer.provide(ServerSecretStore.layer),
+        Layer.provide(ManagedPolicy.layerTest()),
+      );
+      yield* Effect.gen(function* () {
+        const service = yield* ServerSettingsModule.ServerSettingsService;
+        yield* service.updateSettings({
+          defaultModelSelection,
+          setModelFavorites: [{ provider, model: opus, favorite: true }],
+          setModelsHidden: [{ provider, model: terra, hidden: true }],
+          setProviderModelOrder: { provider, modelOrder: [opus, luna, terra] },
+        });
+      }).pipe(Effect.provide(Layer.fresh(settingsLayer)));
+      const saved = yield* Effect.gen(function* () {
+        const service = yield* ServerSettingsModule.ServerSettingsService;
+        return yield* service.getSettings;
+      }).pipe(Effect.provide(Layer.fresh(settingsLayer)));
+      assert.deepEqual(saved.defaultModelSelection, defaultModelSelection);
+      assert.deepEqual(saved.favorites, [{ provider, model: opus }]);
+      assert.deepEqual(saved.providerModelPreferences?.[provider], {
+        hiddenModels: [terra],
+        modelOrder: [opus, luna, terra],
+      });
+    }).pipe(
+      Effect.provide(
+        Layer.merge(
+          SqlitePersistence.layerMemory,
+          ServerConfig.layerTest(process.cwd(), { prefix: "t3code-atum-model-prefs-" }),
+        ),
+      ),
+    ),
+  );
+
   it.effect("serializes concurrent model preference edits without cancelling duplicate adds", () =>
     Effect.gen(function* () {
       const service = yield* ServerSettingsModule.ServerSettingsService;

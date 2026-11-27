@@ -11,12 +11,17 @@ export interface WorkSubmitAccessBridge {
   reportSurfaceMode?(
     snapshot: import("../../atum/surfaceMode").SurfaceModeSnapshot | null,
   ): Promise<void>;
-  /** The thread list's right edge, so the host's title band can line its bell up with it. */
+  /**
+   * The thread list's right edge, so the host's title band can line its bell up with it; T3's history; the
+   * open thread's right panel; and the open thread's name, repo and branch for the title bar (null: none open).
+   */
   reportSidebar?(snapshot: {
     open: boolean;
     edge: number;
     back?: boolean;
     forward?: boolean;
+    rightPanel?: "open" | "closed";
+    thread: import("../../atum/openThread").AtumOpenThread | null;
   }): Promise<void>;
   /** Threads asking for the person and threads finished unseen, for the host's rail badge. */
   reportAttention?(snapshot: { waiting: number; finished: number }): Promise<void>;

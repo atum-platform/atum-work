@@ -94,6 +94,7 @@ function forward(
           "accept",
           "content-type",
           "mcp-method",
+          "mcp-name",
           "mcp-protocol-version",
           "mcp-session-id",
           "last-event-id",

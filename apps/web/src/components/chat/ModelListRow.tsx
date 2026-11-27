@@ -17,8 +17,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
   slug: string;
   name: string;
   subProvider?: string | undefined;
-  /** Atum's own line after the name, as its agent chats' picker writes it (Atum builds only). */
-  tagline?: string | undefined;
   instanceId: ProviderInstanceId;
   driverKind: ProviderDriverKind;
   providerDisplayName: string;
@@ -87,12 +85,6 @@ export const ModelListRow = memo(function ModelListRow(props: {
         {props.subProvider ? (
           <span className="min-w-0 shrink truncate text-xs text-muted-foreground/70">
             {props.subProvider}
-          </span>
-        ) : null}
-        {props.tagline ? (
-          // Zero basis: the tagline gives way before the model's name does.
-          <span className="min-w-0 flex-1 basis-0 truncate text-xs text-muted-foreground">
-            {props.tagline}
           </span>
         ) : null}
         {props.showNewBadge ? (

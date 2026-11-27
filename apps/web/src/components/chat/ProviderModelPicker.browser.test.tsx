@@ -1,5 +1,6 @@
 import {
   DEFAULT_CLIENT_SETTINGS,
+  DEFAULT_UNIFIED_SETTINGS,
   ProviderDriverKind,
   ProviderInstanceId,
   type ModelSelection,
@@ -13,6 +14,7 @@ import "~/index.css";
 
 import { render } from "../../../test/render";
 import { __setClientSettingsForTests } from "../../hooks/useSettings";
+import { getAppModelOptionsForInstance } from "../../modelSelection";
 import {
   brandProviderInstanceEntries,
   deriveProviderInstanceEntries,
@@ -365,8 +367,8 @@ it("hides an enabled delegated provider from tabs and model search", async () =>
         checkedAt: "2026-01-01T00:00:00.000Z",
         models: [
           {
-            slug: "luna",
-            name: instanceId === owner ? "Luna" : "Delegated Luna",
+            slug: "nguyet-thuc",
+            name: "Old ACP label",
             isCustom: false,
             capabilities: {},
           },
@@ -382,14 +384,14 @@ it("hides an enabled delegated provider from tabs and model search", async () =>
     <ProviderModelPicker
       environmentId={null}
       activeInstanceId={owner}
-      model="luna"
+      model="nguyet-thuc"
       lockedProvider={null}
       instanceEntries={entries}
       modelOptionsByInstance={new Map(entries.map((entry) => [entry.instanceId, entry.models]))}
       onInstanceModelChange={vi.fn()}
     />,
   );
-  await screen.getByRole("button", { name: "Luna", exact: true }).click();
+  await screen.getByRole("button", { name: "GPT-6 Luna", exact: true }).click();
   await expect
     .element(page.getByRole("button", { name: "Atum Delegated", exact: true }))
     .not.toBeInTheDocument();
@@ -397,4 +399,76 @@ it("hides an enabled delegated provider from tabs and model search", async () =>
   await expect
     .element(page.getByRole("option", { name: /Delegated Luna/ }))
     .not.toBeInTheDocument();
+});
+
+it("uses native expansion and search for Atum and selects the original ACP slug", async () => {
+  const instanceId = ProviderInstanceId.make("atum-managed");
+  const luna = "atum-managed:nguyet-thuc";
+  const opus = "atum-managed:opus";
+  const entries = deriveProviderInstanceEntries([
+    {
+      instanceId,
+      driver: ProviderDriverKind.make("acpRegistry"),
+      displayName: "Old ACP provider",
+      enabled: true,
+      installed: true,
+      version: null,
+      status: "ready",
+      auth: { status: "authenticated" },
+      checkedAt: "2026-01-01T00:00:00.000Z",
+      models: [opus, "atum-managed:sonnet", luna, "atum-managed:nhat-thuc"].map((slug) => ({
+        slug,
+        name: "Old ACP label",
+        isCustom: false,
+        capabilities: null,
+      })),
+      slashCommands: [],
+      skills: [],
+    },
+  ]);
+  const onInstanceModelChange = vi.fn();
+  await using screen = await render(
+    <ProviderModelPicker
+      environmentId={null}
+      activeInstanceId={instanceId}
+      model={luna}
+      lockedProvider={null}
+      instanceEntries={entries}
+      modelOptionsByInstance={
+        new Map(
+          entries.map((entry) => [
+            entry.instanceId,
+            getAppModelOptionsForInstance(DEFAULT_UNIFIED_SETTINGS, entry, luna),
+          ]),
+        )
+      }
+      onInstanceModelChange={onInstanceModelChange}
+    />,
+  );
+  await screen.getByRole("button", { name: "GPT-6 Luna", exact: true }).click();
+  await expect.element(page.getByRole("button", { name: "Atum", exact: true })).toBeVisible();
+  for (const name of ["GPT-6 Luna", "GPT-6.1 Terra", "Sonnet 5.5"]) {
+    await expect.element(page.getByRole("option").filter({ hasText: name })).toBeVisible();
+  }
+  const expandedModel = page.getByRole("option", { name: /Opus 5.5/ });
+  await expect.element(expandedModel).not.toBeInTheDocument();
+  await page.getByText("Show more", { exact: true }).click();
+  await expect.element(expandedModel).toBeVisible();
+  await page.getByText("Show less", { exact: true }).click();
+  await expect.element(expandedModel).not.toBeInTheDocument();
+  await page.getByRole("combobox").fill("Opus");
+  await expandedModel.click();
+  expect(onInstanceModelChange).toHaveBeenCalledWith(instanceId, opus);
+
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    favorites: [{ provider: instanceId, model: opus }],
+  });
+  using _settings = {
+    [Symbol.dispose]: () => __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS),
+  };
+  await screen.getByRole("button", { name: "GPT-6 Luna", exact: true }).click();
+  await page.getByRole("combobox").fill("");
+  await page.getByRole("button", { name: "Favorites", exact: true }).click();
+  await expect.element(expandedModel).toBeVisible();
 });

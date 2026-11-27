@@ -1,0 +1,29 @@
+{
+  "version": "2026-11-27.1",
+  "provider": "Atum",
+  "backend": "OpenRouter",
+  "shortlist": [
+    { "alias": "nguyet-thuc", "model": "openai/gpt-6-luna", "name": "GPT-6 Luna" },
+    { "alias": "nhat-thuc", "model": "openai/gpt-6.1-terra", "name": "GPT-6.1 Terra" },
+    { "alias": "sonnet", "model": "anthropic/claude-sonnet-5.5", "name": "Sonnet 5.5" }
+  ],
+  "showMore": [
+    { "alias": "opus", "model": "anthropic/claude-opus-5.5", "name": "Opus 5.5" },
+    {
+      "alias": "gemini-pro",
+      "model": "google/gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview"
+    },
+    { "alias": "grok", "model": "x-ai/grok-4.7", "name": "Grok 4.7" },
+    { "alias": "kimi", "model": "moonshotai/kimi-k3.1-pro", "name": "Kimi K3.1 Pro" },
+    { "alias": "qwen", "model": "qwen/qwen3.8-2.4t-a95b", "name": "Qwen 3.8 2.4T A95B" },
+    {
+      "alias": "deepseek",
+      "model": "deepseek/deepseek-v4.1-flash-1017",
+      "name": "DeepSeek V4.1 Flash"
+    },
+    { "alias": "glm-plus", "model": "z-ai/glm-5.3-flashx", "name": "GLM 5.3 FlashX" },
+    { "alias": "gemini", "model": "google/gemini-3.8-flash", "name": "Gemini 3.8 Flash" },
+    { "alias": "glm", "model": "z-ai/glm-5.3-flash", "name": "GLM 5.3 Flash" }
+  ]
+}

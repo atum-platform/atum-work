@@ -18,13 +18,7 @@
     "/src/i18n/translations/",
     "routeTree\\.gen\\.ts$"
   ],
-  "extensions": [
-    ".ts",
-    ".tsx",
-    ".html",
-    ".json",
-    ".webmanifest"
-  ],
+  "extensions": [".ts", ".tsx", ".html", ".json", ".webmanifest"],
   "files": [
     {
       "file": "gt.config.json",
@@ -46,6 +40,36 @@
       "file": "index.html",
       "from": "<img id=\"boot-shell-logo\" src=\"/apple-touch-icon.png\" alt=\"Atum\" />",
       "to": "<span role=\"status\" aria-label=\"Opening Work\" style=\"width:22px;height:22px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;opacity:.65;animation:atum-loading .8s linear infinite\"></span><style>@keyframes atum-loading{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){[aria-label=\"Opening Work\"]{animation:none!important}}</style>"
+    },
+    {
+      "file": "index.html",
+      "from": "const DARK_BACKGROUND = \"#000000\";",
+      "to": "const DARK_BACKGROUND = \"#1f2025\";",
+      "why": "Atum's palette (atum-work/theme/atum.json) for the unthemed splash, so Work never flashes stock T3's black and indigo before its theme loads."
+    },
+    {
+      "file": "index.html",
+      "from": "            background: \"#ffffff\",\n            foreground: \"#262626\",\n            accent: \"#4f46e5\",",
+      "to": "            background: \"#ffffff\",\n            foreground: \"#1b1d22\",\n            accent: \"#1b1d22\",",
+      "why": "Atum's palette (atum-work/theme/atum.json) for the unthemed splash, so Work never flashes stock T3's black and indigo before its theme loads."
+    },
+    {
+      "file": "index.html",
+      "from": "            background: \"#000000\",\n            foreground: \"#f5f5f5\",\n            accent: \"#818cf8\",",
+      "to": "            background: \"#1f2025\",\n            foreground: \"#ecedf0\",\n            accent: \"#ecedf0\",",
+      "why": "Atum's palette (atum-work/theme/atum.json) for the unthemed splash, so Work never flashes stock T3's black and indigo before its theme loads."
+    },
+    {
+      "file": "index.html",
+      "from": "      html.dark body {\n        background: #000000;\n        color: #f5f5f5;",
+      "to": "      html.dark body {\n        background: #1f2025;\n        color: #ecedf0;",
+      "why": "Atum's palette (atum-work/theme/atum.json) for the unthemed splash, so Work never flashes stock T3's black and indigo before its theme loads."
+    },
+    {
+      "file": "index.html",
+      "from": "        --boot-error-bg: #000000;",
+      "to": "        --boot-error-bg: #1f2025;",
+      "why": "Atum's palette (atum-work/theme/atum.json) for the unthemed splash, so Work never flashes stock T3's black and indigo before its theme loads."
     },
     {
       "file": "vite.config.ts",
@@ -177,9 +201,7 @@
     {
       "from": "T3 ",
       "to": "Atum ",
-      "skip": [
-        "../../packages/client-runtime/src/errors/transport.ts"
-      ],
+      "skip": ["../../packages/client-runtime/src/errors/transport.ts"],
       "why": "Last: catches the remaining prose (T3 server, T3 home, T3 process, T3 could not ...). The transport regex matches legacy server text and must stay."
     }
   ],

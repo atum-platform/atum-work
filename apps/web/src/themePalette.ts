@@ -35,6 +35,7 @@ import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
 import { applyThemeBackground } from "./themeBackground";
 import { applyThemeCss } from "./themeCss";
 import { themeServerEnvironmentThemesAtom } from "./state/server";
+import { atumPaletteTheme } from "./atum/atumPalette";
 
 export { EMBER_THEME, GROVE_THEME, IRIS_THEME, OCEAN_THEME, T3_CHAT_THEME, THEME_COLOR_ROLES };
 export type { ThemeAppearance, ThemeColorRole, ThemeColors, ThemeDefinition, ThemeVariants };
@@ -1740,6 +1741,18 @@ export function applyThemeColorPreview(
   setThemePreviewAppearance(appearance);
 }
 
+let atumFallbackDefinition: ThemeDefinition | null | undefined;
+
+/** The Atum build paints Atum's palette, never the stock one, whenever no theme resolves (see atum/atumPalette). */
+function atumFallbackTheme(): ThemeDefinition | null {
+  if (atumFallbackDefinition === undefined) {
+    atumFallbackDefinition = atumPaletteTheme
+      ? (publishedThemeDefinitions([atumPaletteTheme])[0] ?? null)
+      : null;
+  }
+  return atumFallbackDefinition;
+}
+
 export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppearance): void {
   if (typeof document === "undefined") return;
 
@@ -1747,7 +1760,7 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
   if (!root?.style) return;
 
   setThemePreviewAppearance(null);
-  const palette = getThemeDefinition(theme);
+  const palette = getThemeDefinition(theme) ?? atumFallbackTheme();
   applyThemeCss(palette?.css);
   applyThemeBackground(palette?.id);
 

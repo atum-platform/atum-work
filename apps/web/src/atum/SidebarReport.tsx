@@ -5,12 +5,13 @@ import { useEffect } from "react";
 import { useSidebar } from "../components/ui/sidebar";
 import { observeResize } from "../lib/observeResize";
 import { useCanNavigateHistory } from "../navigationHistory";
+import { useAtumOpenThread } from "./openThread";
 import { useAtumRightPanelState } from "./rightPanel";
 
 /**
- * Tells the Atum host where the thread list ends, so its title band ends the bell at that edge as the
- * chat roster does. The edge is the visible panel's right side in this view's CSS pixels. It also says
- * whether T3's own history can step back or forward, so the window's ← → go through it first.
+ * Tells the Atum host where the thread list ends (its right edge in CSS pixels, so the title band lines up),
+ * whether T3's history can step back or forward, the open thread's right panel, and the open thread's
+ * name, repo and branch for the title bar (`thread`, null when none is open; older hosts ignore it).
  */
 export function AtumSidebarReport() {
   const shellReady = useAtomValue(primaryWorkShellReadyAtom);
@@ -18,6 +19,7 @@ export function AtumSidebarReport() {
   const back = useCanNavigateHistory("back");
   const forward = useCanNavigateHistory("forward");
   const rightPanel = useAtumRightPanelState();
+  const thread = useAtumOpenThread();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports the sidebar's laid-out edge to the native host
   useEffect(() => {
     const report = () => {
@@ -32,6 +34,7 @@ export function AtumSidebarReport() {
         back,
         forward,
         ...(rightPanel ? { rightPanel } : {}),
+        thread,
       });
     };
     const container = document.querySelector<HTMLElement>(
@@ -53,6 +56,6 @@ export function AtumSidebarReport() {
       stopObserving();
       container?.removeEventListener("transitionend", report);
     };
-  }, [open, isMobile, shellReady, back, forward, rightPanel]);
+  }, [open, isMobile, shellReady, back, forward, rightPanel, thread]);
   return null;
 }

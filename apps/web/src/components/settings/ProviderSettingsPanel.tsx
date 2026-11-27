@@ -1,3 +1,4 @@
+import { atumProviderName } from "@t3tools/shared/atumModels";
 import { isProviderSettingsVisible } from "./providerSettingsVisibility";
 import { SettingsGroup } from "./SettingsGroup";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
@@ -138,8 +139,12 @@ import {
   resolveSelectedProviderEnvironmentId,
 } from "./ProviderSettingsPanel.logic";
 
-function providerInstanceName(instance: ProviderInstanceConfig): string {
+function providerInstanceName(
+  instanceId: ProviderInstanceId,
+  instance: ProviderInstanceConfig,
+): string {
   return (
+    atumProviderName(instanceId, instance.driver) ||
     instance.displayName?.trim() ||
     providerClients.get(instance.driver)?.label ||
     String(instance.driver)
@@ -880,7 +885,7 @@ export function EnvironmentProviderSettings({
     async (instanceId: ProviderInstanceId, instance: ProviderInstanceConfig) => {
       const confirmed = await confirmProviderInstanceRemoval(
         gt("Remove the {provider} provider instance?", {
-          provider: providerInstanceName(instance),
+          provider: providerInstanceName(instanceId, instance),
         }),
       );
       if (!confirmed) return;
@@ -933,7 +938,7 @@ export function EnvironmentProviderSettings({
       !resolveProviderInstanceEnabled({ driver: driverKind });
     const confirmed = await confirmProviderInstanceRemoval(
       gt("Reset the {provider} provider to its defaults?", {
-        provider: providerInstanceName(instance),
+        provider: providerInstanceName(instanceId, instance),
       }),
       turnsOff ? ` ${gt("It will also be turned off.")}` : "",
     );

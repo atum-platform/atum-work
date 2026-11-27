@@ -44,8 +44,8 @@ builds only (`VITE_ATUM_WORK_BUILD`); upstream T3 is unchanged.
   Instant). Option ids, the values sent to providers, are unchanged; an id the file does not name
   keeps its label. Applied once in `getProviderModelCapabilities` (`providerModels.ts`), which every
   picker, chip and column reads. UI locales the file lacks (T3 has no Vietnamese) read in English.
-- **Rows.** Atum's own models carry their muted line after the check (`ModelListRow` `tagline`,
-  "Suggested · Good for everyday tasks" on Nguyệt Thực), as the desktop picker writes it.
+- **Rows.** Atum uses the same provider list and model rows as the other providers. The managed
+  catalog supplies the model names and which eligible choices appear under **Show more**.
 - **Surface.** The desktop's generated theme gives the picker the Kit's glass, untinted rail, list
   (`data-model-picker-list`, Atum builds) and thinking column, no rule under Favorites, and the
   ⌘1–⌘9 hint as plain text.
@@ -58,7 +58,6 @@ runs browser tests without the flag, where it passes.
 
 Verification: lint 0 and fmt clean on touched files; web typecheck only the pre-existing
 `providerSettingsVisibility.test.ts` error; picker browser tests 8/8 (default build); `src/atum` 10/10.
-
 
 ## Kit on T3 (sync, 2026-11-24)
 

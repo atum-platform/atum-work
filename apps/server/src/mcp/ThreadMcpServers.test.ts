@@ -51,6 +51,11 @@ it.live(
                   response.writeHead(200, { "content-type": "text/event-stream" });
                   response.write("event: message\n");
                   response.once("close", cancelled.resolve);
+                } else if (
+                  request.url === "/mcp" &&
+                  request.headers["mcp-name"] !== "fixture_tool"
+                ) {
+                  response.writeHead(400).end();
                 } else {
                   response.writeHead(200, { "content-type": "text/event-stream" });
                   response.write("event: message\n");
@@ -138,8 +143,24 @@ it.live(
 
         const url = first[0]!.url;
         const post = (url: string) =>
-          Effect.promise(() => fetch(url, { method: "POST", body: "{}" }));
+          Effect.promise(() =>
+            fetch(url, {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "mcp-method": "tools/call",
+                "mcp-name": "fixture_tool",
+              },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 1,
+                method: "tools/call",
+                params: { name: "fixture_tool" },
+              }),
+            }),
+          );
         const response = yield* post(url);
+        expect(response.status).toBe(200);
         expect(yield* Effect.promise(() => response.text())).toBe(
           'event: message\ndata: {"ok":true}\n\n',
         );

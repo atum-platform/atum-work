@@ -1,3 +1,4 @@
+import { atumProviderName, projectAtumModels } from "@t3tools/shared/atumModels";
 import { pipe } from "effect/Function";
 import {
   DEFAULT_MODEL_BY_PROVIDER,
@@ -109,7 +110,9 @@ export function deriveProviderInstanceEntries(
       isDefault,
       isAvailable: snapshot.availability !== "unavailable",
       snapshot,
-      models: snapshot.models,
+      models: atumProviderName(instanceId, driverKind)
+        ? projectAtumModels(snapshot.models)
+        : snapshot.models,
     } satisfies ProviderInstanceEntry;
   });
 }

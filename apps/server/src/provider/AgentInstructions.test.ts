@@ -17,19 +17,26 @@ const decodeSettingsPatch = Schema.decodeSync(ServerSettingsPatch);
 const decodeAgentInstructions = Schema.decodeUnknownSync(AgentInstructions);
 
 describe("agent instructions", () => {
-  it("uses the build default, inherits environment and lets a project clear it", () => {
-    const project = ProjectId.make("instructions-project");
-    expect(DEFAULT_SERVER_SETTINGS.agentInstructions).toBe(
+  it("ships a short Atum orientation without personal paths or legacy product names", () => {
+    const orientation =
       process.env.VITE_ATUM_WORK_BUILD === "1"
-        ? NodeFS.readFileSync(
+        ? DEFAULT_SERVER_SETTINGS.agentInstructions
+        : NodeFS.readFileSync(
             new URL("../../../../docs/user/agent-instructions.txt", import.meta.url),
             "utf8",
-          )
-        : "",
-    );
-    expect(
-      decodeSettingsPatch({ agentInstructions: "" }).agentInstructions,
-    ).toBe("");
+          );
+    expect(orientation).toMatch(/\S/);
+    expect(new TextEncoder().encode(orientation).byteLength).toBeLessThan(4000);
+    expect(orientation).not.toMatch(/(?:\/(?:Users|home|root)\/|[A-Z]:[\\/]Users[\\/])/i);
+    expect(orientation).not.toMatch(/\b(?:T3|Hermes)\b/i);
+  });
+
+  it("uses the build default, inherits environment and lets a project clear it", () => {
+    const project = ProjectId.make("instructions-project");
+    if (process.env.VITE_ATUM_WORK_BUILD !== "1") {
+      expect(DEFAULT_SERVER_SETTINGS.agentInstructions).toBe("");
+    }
+    expect(decodeSettingsPatch({ agentInstructions: "" }).agentInstructions).toBe("");
     const settings = { ...DEFAULT_SERVER_SETTINGS, agentInstructions: "environment" };
     expect(resolveProjectSettings(settings, project).settings.agentInstructions).toBe(
       "environment",
