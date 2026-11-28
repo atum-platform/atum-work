@@ -4,6 +4,7 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   linkOriginIsFenced,
   CommandId,
+  DEFAULT_SERVER_SETTINGS,
   isOrchestrationV2WorkActive,
   ModelSelection,
   type OrchestrationV2AppThread,
@@ -667,10 +668,11 @@ export const layerWithOptions = (
                 if (Option.getOrElse(backgroundWait, () => false)) {
                   capabilities.add("background-wait");
                 }
-                const subagent = yield* projectionStore.getThread(threadId).pipe(
-                  Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
-                  Effect.orElseSucceed(() => false),
+                const lineage = yield* projectionStore.getThread(threadId).pipe(
+                  Effect.map((thread) => thread.lineage),
+                  Effect.orElseSucceed(() => undefined),
                 );
+                const subagent = lineage?.relationshipToParent === "subagent";
                 const toolAllowList = yield* linkedThreadToolAllowList(threadId);
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
@@ -706,26 +708,42 @@ export const layerWithOptions = (
                   dropMcpCredentialReservation(threadId, existing.providerSessionId);
                 }
                 yield* mcpSessionRegistry.revokeThread(threadId);
+                const configuredInstructions =
+                  existing?.agentInstructions ??
+                  (Option.isNone(serverSettings)
+                    ? ""
+                    : yield* Effect.gen(function* () {
+                        const settings = yield* serverSettings.value.getSettings;
+                        const thread = yield* projectionStore.getThread(threadId);
+                        return resolveProjectSettings(settings, thread.projectId).settings
+                          .agentInstructions;
+                      }).pipe(Effect.orDie));
+                const presentation = yield* projectionStore
+                  .snapshotWorkPresentation(
+                    threadId,
+                    configuredInstructions,
+                    configuredInstructions === DEFAULT_SERVER_SETTINGS.agentInstructions
+                      ? configuredInstructions.replace(
+                          "Use thread_launch only",
+                          "Use t3_thread_launch only",
+                        )
+                      : configuredInstructions,
+                    DEFAULT_SERVER_SETTINGS.agentInstructions.length > 0 ? 1 : 0,
+                    lineage?.relationshipToParent === "fork" ? lineage.parentThreadId : null,
+                  )
+                  .pipe(Effect.orDie);
                 const credential = yield* mcpSessionRegistry.issue({
                   threadId,
                   providerInstanceId,
                   browserToolsAvailable,
                   capabilities,
                   subagent,
+                  workPresentation: presentation.epoch === 1,
                   ...(toolAllowList === undefined ? {} : { toolAllowList }),
                 });
                 yield* mcpSessions.set({
                   ...credential.config,
-                  agentInstructions:
-                    existing?.agentInstructions ??
-                    (Option.isNone(serverSettings)
-                      ? ""
-                      : yield* Effect.gen(function* () {
-                          const settings = yield* serverSettings.value.getSettings;
-                          const thread = yield* projectionStore.getThread(threadId);
-                          return resolveProjectSettings(settings, thread.projectId).settings
-                            .agentInstructions;
-                        }).pipe(Effect.orDie)),
+                  agentInstructions: presentation.agentInstructions,
                   hasPendingWake: projectionStore
                     .getThreadRecords(threadId, ["runs", "subagents"])
                     .pipe(

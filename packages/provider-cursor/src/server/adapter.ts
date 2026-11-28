@@ -220,7 +220,7 @@ export function cursorMcpServers(
     return undefined;
   }
   return {
-    "t3-code": {
+    [McpProviderSession.workMcpServerName(session)]: {
       type: "http",
       url: session.endpoint,
       headers: {
@@ -2865,7 +2865,9 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           if (rawText.trim() === "/compress" && turnInput.message.attachments.length === 0) {
             return { message: "/compress", prompt: undefined, runtimeInstructions: undefined };
           }
+          const mcpSession = yield* mcpSessions.read(turnInput.threadId);
           const newText = t3OrchestrationPrompt({
+            workPresentation: mcpSession?.workPresentation,
             prompt: yield* providerMessageTextWithAttachmentPaths({
               text: yield* resolveCursorSkillText(
                 rawText,
@@ -2924,7 +2926,8 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           const runtimeInstructions = buildRuntimeInstructions({
             agentFeedback: mcpServers === undefined ? "off" : (turnInput.agentFeedback ?? "off"),
             harness: "Cursor",
-            agentInstructions: (yield* mcpSessions.read(turnInput.threadId))?.agentInstructions,
+            agentInstructions: mcpSession?.agentInstructions,
+            workPresentation: mcpSession?.workPresentation,
             model: turnInput.modelSelection.model,
             runtimePolicy: turnInput.runtimePolicy,
           });

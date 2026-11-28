@@ -17,7 +17,7 @@ export async function provisionNativeCaller(input: {
   const grant = await nativeThreadGrant(input.forwardPath, input.caller.threadId);
   if (!grant) return;
   const session = (grant as typeof grant & { hermesSessionId?: string }).hermesSessionId;
-  if (!session) throw new Error("Hermes session binding unavailable");
+  if (!session) throw new Error("Atum agent session binding unavailable");
   const bound = {
     ...input.caller,
     binding: grant.binding,

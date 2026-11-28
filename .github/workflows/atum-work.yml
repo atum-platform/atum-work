@@ -8,6 +8,7 @@ on:
       - ".github/workflows/atum-work.yml"
       - "apps/server/**"
       - "apps/web/**"
+      - "packages/**"
       - "atum-work/**"
       - "native/resource-monitor/**"
       - "scripts/**"
@@ -60,7 +61,8 @@ jobs:
           node apps/web/node_modules/playwright/cli.js install --only-shell chromium
           (cd apps/web && vp test run --project unit src/components/chat/workSubmitAccess.test.ts src/components/chat/composerSubmission.test.ts src/atum/pickerLabels.logic.test.ts)
           (cd apps/web && vp test run --project browser src/components/chat/workSubmitAccess.browser.test.tsx)
-          (cd apps/server && vp test run src/cloud/publicConfig.test.ts src/telemetry/AnalyticsService.test.ts src/serverSettings.test.ts src/mcp/McpHttpServer.test.ts)
+          (cd apps/server && vp test run src/cloud/publicConfig.test.ts src/telemetry/AnalyticsService.test.ts src/serverSettings.test.ts src/mcp/McpHttpServer.test.ts src/provider/AgentInstructions.test.ts)
+          (cd apps/server && vp test run src/provider/AgentContextBudget.test.ts -t "advertises an Atum tool catalog")
       - name: Build and smoke the standalone archive
         if: ${{ github.event.pull_request.draft != true && hashFiles('atum-work/brand.json') != '' }}
         shell: bash

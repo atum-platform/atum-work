@@ -1,3 +1,4 @@
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import type { AgentFeedbackMode } from "@t3tools/contracts";
 import type { V2TurnStartParams__AdditionalContextEntry } from "effect-codex-app-server/schema";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
@@ -34,6 +35,7 @@ const toolInstructions = (availability: boolean | T3CodeToolAvailability): strin
 
 export interface CodexRuntimeInfo {
   readonly agentFeedback?: AgentFeedbackMode;
+  readonly workPresentation?: boolean | undefined;
   readonly model: string;
   readonly agentInstructions?: string | undefined;
   readonly modelName?: string | undefined;
@@ -45,32 +47,35 @@ export function buildCodexAdditionalContext(
   runtime: CodexRuntimeInfo,
   toolsAvailable: boolean | T3CodeToolAvailability = true,
 ): Record<string, V2TurnStartParams__AdditionalContextEntry> {
-  const tools = toolInstructions(toolsAvailable);
+  const present = (text: string) => (runtime.workPresentation ? workInstructionText(text) : text);
+  const tools = present(toolInstructions(toolsAvailable));
+  const prefix = runtime.workPresentation ? "atum_work" : "t3_code";
   // Split values to fit per-entry caps; number keys because Codex emits them in key order.
   return {
     ...Object.fromEntries(
       T3_CODE_ORCHESTRATION_SECTIONS.map((section, index) => [
-        `t3_code_orchestration_${String(index + 1).padStart(2, "0")}`,
-        { kind: "application" as const, value: section },
+        `${prefix}_orchestration_${String(index + 1).padStart(2, "0")}`,
+        { kind: "application" as const, value: present(section) },
       ]),
     ),
     ...(runtime.agentInstructions
       ? {
-          t3_agent_instructions: {
+          [runtime.workPresentation ? "atum_agent_instructions" : "t3_agent_instructions"]: {
             kind: "application" as const,
             value: runtime.agentInstructions,
           },
         }
       : {}),
-    t3_code_runtime: {
+    [`${prefix}_runtime`]: {
       kind: "application",
       value: buildRuntimeInstructions({
         harness: "Codex",
+        workPresentation: runtime.workPresentation,
         model: runtime.model,
         modelName: runtime.modelName,
         reasoningEffort: runtime.reasoningEffort,
       }),
     },
-    ...(tools ? { t3_code_tools: { kind: "application", value: tools } } : {}),
+    ...(tools ? { [`${prefix}_tools`]: { kind: "application", value: tools } } : {}),
   };
 }

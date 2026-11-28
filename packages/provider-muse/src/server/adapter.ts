@@ -1941,7 +1941,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
             ? {
                 mcpServers: {
                   // Muse's required default fails runs if T3 tools are unreachable; make them optional.
-                  "t3-code": {
+                  [McpProviderSession.workMcpServerName(mcpSession)]: {
                     transport: "streamableHttp",
                     mode: "optional",
                     url: mcpSession.endpoint,
@@ -2193,6 +2193,8 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
                   {
                     type: "text",
                     text: buildRuntimeInstructions({
+                      workPresentation: (yield* mcpSessions.read(turnInput.threadId))
+                        ?.workPresentation,
                       agentFeedback: hasT3Mcp ? (turnInput.agentFeedback ?? "off") : "off",
                       harness: "Muse Code",
                       agentInstructions: (yield* mcpSessions.read(turnInput.threadId))

@@ -1,4 +1,5 @@
 // No T3 imports inside the string; resolve Pi and typebox from the user's Pi install.
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import { T3_CODE_ORCHESTRATION_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
 
@@ -26,7 +27,8 @@ const URL_ENV = ${JSON.stringify(T3_MCP_URL_ENV)};
 const TOKEN_ENV = ${JSON.stringify(T3_MCP_BEARER_ENV)};
 const RUNTIME_MODE_ENV = ${JSON.stringify(T3_PI_RUNTIME_MODE_ENV)};
 const EXTENSION_PATH_ENV = ${JSON.stringify(T3_PI_MCP_EXTENSION_PATH_ENV)};
-const ORCHESTRATION_INSTRUCTIONS = ${JSON.stringify(T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim())};
+const LEGACY_ORCHESTRATION_INSTRUCTIONS = ${JSON.stringify(T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim())};
+const WORK_ORCHESTRATION_INSTRUCTIONS = ${JSON.stringify(workInstructionText(T3_CODE_ORCHESTRATION_INSTRUCTIONS).trim())};
 const PULL_REQUEST_LINKING_INSTRUCTIONS = ${JSON.stringify(PULL_REQUEST_LINKING_INSTRUCTIONS)};
 const SERVICE_TIER_COMMAND = ${JSON.stringify(PI_T3_SERVICE_TIER_COMMAND)};
 const PROTOCOL = "2025-06-18";
@@ -388,7 +390,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
   if (endpoint === undefined || token === undefined) {
     pi.on("session_start", async (_event, ctx) => {
       ctx.ui.notify(
-        "t3-code MCP unavailable: T3_MCP_URL or T3_MCP_BEARER_TOKEN is missing.",
+        "Work tools are unavailable because the MCP connection is missing.",
         "warning",
       );
     });
@@ -399,7 +401,10 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
   // bridge as the credential owner: mcp.json overrides native registrations.
   const supportsExposure = "registerMcpServer" in pi && typeof pi.registerMcpServer === "function";
   const directTools = new Set(["orchestrator_capabilities", "delegate_task", "task_status"]);
-  const ALIAS_PREFIX = "mcp__t3_code__";
+  const workPresentation = new URL(endpoint).pathname === "/mcp/agent";
+  const serverName = workPresentation ? "atum-work" : "t3-code";
+  const publicPrefix = "mcp__" + serverName + "__";
+  const ALIAS_PREFIX = "mcp__" + serverName.replaceAll("-", "_") + "__";
   let deferOptionalTools = supportsExposure;
   const isDeferred = (name: string) => deferOptionalTools && !directTools.has(name);
   // An alias follows its public tool: gone when --exclude-tools removed it,
@@ -409,8 +414,8 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
     registered: ReadonlySet<string>,
     active: ReadonlyArray<string>,
   ) =>
-    registered.has("mcp__t3-code__" + name) &&
-    (isDeferred(name) || active.includes("mcp__t3-code__" + name));
+    registered.has(publicPrefix + name) &&
+    (isDeferred(name) || active.includes(publicPrefix + name));
   let catalog: ReadonlyArray<McpTool> = [];
 
   const client = createMcpClient(endpoint, token);
@@ -420,7 +425,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
     // Preserve public names for saved loadouts and tool selectors. The alias,
     // Pi's own MCP name for T3, reserves it against Pi's configured MCP servers.
     // model-only keeps it out of codemode; it hides its own declaration.
-    const prefixes = supportsExposure ? ["mcp__t3-code__", ALIAS_PREFIX] : ["mcp__t3-code__"];
+    const prefixes = supportsExposure ? [publicPrefix, ALIAS_PREFIX] : [publicPrefix];
     readOnlyMcpTools.clear();
     for (const tool of catalog) {
       const name = tool.name;
@@ -452,12 +457,12 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
             );
             const content = mcpModelContent(result);
             if (isMcpToolError(result) && !content.some((part) => part.type === "text" && part.text.length > 0)) {
-              content.push({ type: "text", text: "MCP tool t3-code/" + name + " returned an error" });
+              content.push({ type: "text", text: "MCP tool " + serverName + "/" + name + " returned an error" });
             }
             return {
               content,
               structuredContent: mcpScriptResult(result),
-              details: { server: "t3-code", tool: name },
+              details: { server: serverName, tool: name },
               ...(isMcpToolError(result) ? { isError: true } : {}),
             };
           },
@@ -499,7 +504,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
     // Pi still applies --tools/--exclude-tools to this active loadout.
     const required = [
       ...(hasToolSearch ? ["tool_search"] : []),
-      ...(ctx.model?.api === "openai-completions" ? catalog.map((tool) => "mcp__t3-code__" + tool.name) : []),
+      ...(ctx.model?.api === "openai-completions" ? catalog.map((tool) => publicPrefix + tool.name) : []),
     ];
     const current = pi.getActiveTools();
     const missing = required.filter((name) => !current.includes(name));
@@ -524,18 +529,18 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
       await ensureStarted();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      ctx.ui.notify(\`t3-code MCP unavailable: \${message}\`, "warning");
+      ctx.ui.notify(\`Work tools are unavailable: \${message}\`, "warning");
     }
   });
 
   // Keep guidance in the system prompt so leading slash commands still expand.
   pi.on("before_agent_start", (event, ctx) => {
     reconcileDiscovery(ctx);
-    const instructions = [ORCHESTRATION_INSTRUCTIONS, PULL_REQUEST_LINKING_INSTRUCTIONS, AGENT_INSTRUCTIONS].filter(Boolean).join("\\n\\n");
+    const instructions = [workPresentation ? WORK_ORCHESTRATION_INSTRUCTIONS : LEGACY_ORCHESTRATION_INSTRUCTIONS, PULL_REQUEST_LINKING_INSTRUCTIONS, AGENT_INSTRUCTIONS].filter(Boolean).join("\\n\\n");
     const sections = event.systemPromptOptions?.sections;
     if (sections && typeof sections === "object" && event.systemPromptOptions?.forceSystemPrompt === undefined) {
       // A full prompt override bypasses Pi's later section rendering.
-      sections.t3_code_orchestration = instructions;
+      sections[workPresentation ? "atum_work_orchestration" : "t3_code_orchestration"] = instructions;
       return undefined;
     }
     return { systemPrompt: event.systemPrompt + "\\n\\n" + instructions };

@@ -232,6 +232,7 @@ import {
   mcpToolPresentation,
   normalizeMcpText,
 } from "@t3tools/provider-core/server/mcpToolPresentation";
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -1873,7 +1874,9 @@ export const layerQueryRunner: Layer.Layer<
                     Effect.timeoutOrElse({
                       duration: CLAUDE_MCP_REGISTRATION_TIMEOUT,
                       orElse: () =>
-                        Object.keys(mcpServers).some((name) => name !== "t3-code")
+                        Object.keys(mcpServers).some(
+                          (name) => name !== "t3-code" && name !== "atum-work",
+                        )
                           ? Effect.succeed(Object.keys(mcpServers))
                           : timedOut("setMcpServers")(),
                     }),
@@ -2465,13 +2468,15 @@ Text you write before a tool call may reach the user only as a one-line summary.
 `;
 
 // Native subagents start from their task, not this session's system prompt.
-const subagentDeviceInstructions: HookCallback = () =>
-  Promise.resolve({
-    hookSpecificOutput: {
-      hookEventName: "SubagentStart",
-      additionalContext: T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
-    },
-  });
+const subagentDeviceInstructions =
+  (context: string): HookCallback =>
+  () =>
+    Promise.resolve({
+      hookSpecificOutput: {
+        hookEventName: "SubagentStart",
+        additionalContext: context,
+      },
+    });
 
 export function makeClaudeQueryOptions(input: {
   readonly modelSelection: ModelSelection;
@@ -2503,10 +2508,12 @@ export function makeClaudeQueryOptions(input: {
   readonly supportedDialogKinds?: ClaudeQueryOptions["supportedDialogKinds"];
   readonly allowDangerouslySkipPermissions?: boolean;
   readonly agentInstructions?: string | undefined;
+  readonly workPresentation?: boolean | undefined;
   readonly appendSystemPromptFileText?: string;
   // Flag settings, because a user's settings.json env beats the process env in Claude Code.
   readonly toolSearchOverride?: "true";
 }): ClaudeAgentSdkQueryOptions {
+  const present = (text: string) => (input.workPresentation ? workInstructionText(text) : text);
   const compiledSelection = compileClaudeModelSelection(input.modelSelection, input.modelCatalog);
   const {
     // claudeLaunchArgDirectories reads every --add-dir into additionalDirectories.
@@ -2653,17 +2660,20 @@ export function makeClaudeQueryOptions(input: {
         ...(input.agentInstructions ? [input.agentInstructions] : []),
         buildRuntimeInstructions({
           harness: "Claude Code",
+          workPresentation: input.workPresentation,
           agentFeedback,
           runtimePolicy: { cwd: input.cwd, workspace: input.workspace },
         }) +
           (input.mcpServers === undefined
             ? ""
-            : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
-              CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
-              CLAUDE_SEND_TO_USER_INSTRUCTIONS +
-              (deviceInstructions
-                ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
-                : "")),
+            : present(
+                T3_CODE_ORCHESTRATION_INSTRUCTIONS +
+                  CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
+                  CLAUDE_SEND_TO_USER_INSTRUCTIONS +
+                  (deviceInstructions
+                    ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
+                    : ""),
+              )),
         ...launchAppendSystemPrompt,
       ].join("\n\n"),
     },
@@ -2671,7 +2681,17 @@ export function makeClaudeQueryOptions(input: {
       ? {
           hooks: {
             ...(deviceInstructions
-              ? { SubagentStart: [{ hooks: [subagentDeviceInstructions] }] }
+              ? {
+                  SubagentStart: [
+                    {
+                      hooks: [
+                        subagentDeviceInstructions(
+                          present(T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH),
+                        ),
+                      ],
+                    },
+                  ],
+                }
               : {}),
             ...(input.onStop === undefined ? {} : { Stop: [{ hooks: [input.onStop] }] }),
           },
@@ -2837,10 +2857,17 @@ export function claudeMcpQueryOverrides(input: {
     ? CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS
     : [CLAUDE_T3_MCP_TOOL_WILDCARD];
   return {
-    allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
+    allowedTools: Array.from(
+      new Set([
+        ...(input.allowedTools ?? []),
+        ...mcpAllowedTools.map((name) =>
+          session.workPresentation ? workInstructionText(name) : name,
+        ),
+      ]),
+    ),
     mcpServers: {
       ...managed,
-      "t3-code": {
+      [McpProviderSession.workMcpServerName(session)]: {
         type: "http",
         url: session.endpoint,
         headers: {
@@ -9170,7 +9197,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             const { liveQuery, toolCall } = input;
             if (
               !toolCall.toolName.startsWith("mcp__") ||
-              toolCall.toolName.startsWith("mcp__t3-code__") ||
+              /^(?:mcp__t3-code__|mcp__atum-work__)/u.test(toolCall.toolName) ||
               !claudeSupportsMcpApps(liveQuery.capabilities)
             ) {
               return undefined;
@@ -13729,6 +13756,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               : { allowedTools: mcpOverrides.allowedTools }),
             ...(Object.keys(mcpServers).length === 0 ? {} : { mcpServers }),
             agentInstructions: mcpSession?.agentInstructions,
+            workPresentation: mcpSession?.workPresentation,
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined

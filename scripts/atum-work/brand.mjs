@@ -2,6 +2,7 @@ import * as NodeAssert from "node:assert/strict";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
+import { assertWorkBrandText } from "../../packages/shared/src/workBrandCheck.ts";
 import { resolveWebIconOverrides } from "../lib/brand-assets.ts";
 
 const providerIdentity = {
@@ -72,6 +73,7 @@ export function planBrand(repo, { data, directory }) {
   if (data.agentInstructions) {
     const instructions = NodeFS.readFileSync(resolveBelow(repo, data.agentInstructions), "utf8");
     NodeAssert.ok(Buffer.byteLength(instructions, "utf8") < 4000 && instructions.trim());
+    assertWorkBrandText("agent instructions", instructions);
     const path = resolveBrandTarget(repo, "../../packages/contracts/src/settings.ts");
     const before = writes.get(path)?.before ?? NodeFS.readFileSync(path);
     const text = writes.get(path)?.after ?? before.toString("utf8");

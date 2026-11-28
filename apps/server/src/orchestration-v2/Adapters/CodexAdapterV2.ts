@@ -117,6 +117,7 @@ import * as PortScanner from "../../preview/PortScanner.ts";
 import { getCodexServiceTierOptionValue } from "../../codexModelOptions.ts";
 import { ServerConfig } from "../../config.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
+import { workToolName } from "@t3tools/shared/workToolNames";
 import { buildCodexAdditionalContext } from "../../provider/CodexDeveloperInstructions.ts";
 import {
   describeMcpElicitation,
@@ -868,6 +869,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
     readonly modelSelection: ModelSelection;
     readonly agentInstructions?: string | undefined;
+    readonly workPresentation?: boolean | undefined;
     readonly hasT3Mcp?: boolean;
     readonly agentFeedback?: AgentFeedbackMode;
     readonly browserToolsAvailable?: boolean;
@@ -931,6 +933,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
               reasoningEffort: effort ?? undefined,
               agentFeedback: input.agentFeedback ?? "off",
               agentInstructions: input.agentInstructions,
+              workPresentation: input.workPresentation,
             },
             {
               browser: input.browserToolsAvailable ?? true,
@@ -943,7 +946,12 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     const workspaceContext =
       workspaceInstructions === ""
         ? undefined
-        : { t3_code_workspace: { kind: "application" as const, value: workspaceInstructions } };
+        : {
+            [input.workPresentation ? "atum_work_workspace" : "t3_code_workspace"]: {
+              kind: "application" as const,
+              value: workspaceInstructions,
+            },
+          };
     const additionalContext =
       t3Context === undefined &&
       workspaceContext === undefined &&
@@ -1633,7 +1641,6 @@ export const CODEX_THREAD_CONFIG = {
 const CODEX_T3_MCP_TOOL_TIMEOUT_SEC = 65 * 60;
 // Holds T3 tools Codex must call directly, never from Code Mode. Calls arrive as
 // `t3-code-direct.<tool>`; t3McpToolPresentation.ts must keep resolving that form.
-const CODEX_T3_DIRECT_MCP_SERVER = "t3-code-direct";
 const CODEX_DIRECT_ONLY_T3_TOOLS = ["t3_thread_wait", "delegate_task"];
 
 /** Names of the stdio MCP servers in a `config/read` config, the ones Codex starts per thread. */
@@ -1664,6 +1671,11 @@ function codexThreadRuntimeParams(input: {
   readonly config: Readonly<Record<string, Schema.Json>>;
 } {
   const { mcpSession } = input;
+  const serverName = McpProviderSession.workMcpServerName(mcpSession);
+  const directOnly =
+    mcpSession?.workPresentation === true
+      ? CODEX_DIRECT_ONLY_T3_TOOLS.map(workToolName)
+      : CODEX_DIRECT_ONLY_T3_TOOLS;
   const t3Server =
     mcpSession === undefined
       ? undefined
@@ -1709,12 +1721,12 @@ function codexThreadRuntimeParams(input: {
         ? {}
         : {
             // Override only T3's servers so launch-argument MCP servers survive.
-            "mcp_servers.t3-code": { ...t3Server, disabled_tools: CODEX_DIRECT_ONLY_T3_TOOLS },
+            [`mcp_servers.${serverName}`]: { ...t3Server, disabled_tools: directOnly },
             // Code Mode runs a blocking wait or delegate wait as a nested call, and the model
             // keeps polling it. A second, direct-only registration makes it a plain tool call.
-            [`mcp_servers.${CODEX_T3_DIRECT_MCP_SERVER}`]: {
+            [`mcp_servers.${serverName}-direct`]: {
               ...t3Server,
-              enabled_tools: CODEX_DIRECT_ONLY_T3_TOOLS,
+              enabled_tools: directOnly,
               omit_tools_from: ["code_mode", "deferred"],
             },
           }),
@@ -7825,6 +7837,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               hasT3Mcp: mcpSession !== undefined,
               agentFeedback: turnInput.agentFeedback ?? "off",
               agentInstructions: mcpSession?.agentInstructions,
+              workPresentation: mcpSession?.workPresentation,
               browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,

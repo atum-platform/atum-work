@@ -53,7 +53,12 @@ try {
   const home = NodePath.join(temp, "home");
   NodeFS.mkdirSync(cwd);
   NodeFS.mkdirSync(home);
-  const env = { PATH: "/usr/bin:/bin", HOME: home, T3CODE_HOME: NodePath.join(home, ".work") };
+  const env = {
+    PATH: "/usr/bin:/bin",
+    HOME: home,
+    T3CODE_HOME: NodePath.join(home, ".work"),
+    ATUM_WORK_VERIFY_BRAND: "true",
+  };
   const version = NodeChildProcess.execFileSync(executable, ["--version"], {
     cwd,
     env,
@@ -181,9 +186,10 @@ try {
   NodeAssert.equal(instructions, expectedInstructions, "Fresh packaged HOME lost Atum orientation");
   console.log("Fresh packaged HOME resolves automatic B1 orientation exactly.");
   await page.waitForFunction(
-    () => ["ws-connected", "providers-ready", "threads-painted"].every(
-      (phase) => window.__atumSmokeStartupPhases.includes(phase),
-    ),
+    () =>
+      ["ws-connected", "providers-ready", "threads-painted"].every((phase) =>
+        window.__atumSmokeStartupPhases.includes(phase),
+      ),
     undefined,
     { timeout: 15_000 },
   );
@@ -197,6 +203,7 @@ try {
     timeout: 10_000,
   });
   NodeAssert.match(connectHelp, /unavailable in builds without public configuration/);
+  NodeAssert.match(stdoutForwarded.join("\n") + stderr, /Work presentation verified/);
   NodeAssert.equal(stdoutGrants, 1);
   const token = new URLSearchParams(hash.slice(1)).get("token");
   NodeAssert.ok(

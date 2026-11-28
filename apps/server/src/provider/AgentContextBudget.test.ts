@@ -1,6 +1,9 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+import { acpCompatibilityKeys, assertWorkBrandText } from "@t3tools/shared/workBrandCheck";
+import { t3AcpPromptWithInstructions } from "@t3tools/provider-core/server/orchestrationInstructions";
+import { WorkToolView } from "../mcp/WorkToolView.ts";
 import { ProviderInstanceId } from "@t3tools/contracts";
 import { McpProviderSessions } from "@t3tools/provider-core/server/McpProviderSessions";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
@@ -106,7 +109,7 @@ const toolHandlerServices = Layer.mergeAll(
 
 const utf8Bytes = (text: string) => Buffer.byteLength(text, "utf8");
 
-const claudeSystemAppend = () => {
+const claudeSystemAppend = (workPresentation = false) => {
   const { systemPrompt } = makeClaudeQueryOptions({
     modelSelection: {
       instanceId: ProviderInstanceId.make(CLAUDE_PROVIDER),
@@ -115,7 +118,10 @@ const claudeSystemAppend = () => {
     nativeThreadId: "context-budget",
     resume: false,
     cwd: null,
-    mcpServers: { "t3-code": { type: "http", url: "http://127.0.0.1/mcp" } },
+    workPresentation,
+    mcpServers: {
+      [workPresentation ? "atum-work" : "t3-code"]: { type: "http", url: "http://127.0.0.1/mcp" },
+    },
   });
   return typeof systemPrompt === "object" && "append" in systemPrompt ? systemPrompt.append : "";
 };
@@ -133,6 +139,50 @@ const codexAdditionalContext = () =>
 const layerAdvertisedTools = McpHttpServer.layerTools.pipe(
   Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
   Layer.provide(toolHandlerServices),
+);
+
+it.effect("advertises an Atum tool catalog and first-party instructions", () =>
+  Effect.gen(function* () {
+    const mcp = yield* McpServer.McpServer;
+    const names = mcp.tools.map(({ tool }) => tool.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["thread_launch", "thread_wait", "delegate_task", "preview_open"]),
+    );
+    expect(new Set(names).size).toBe(names.length);
+    for (const { tool } of mcp.tools)
+      assertWorkBrandText("tool/" + tool.name, JSON.stringify(tool));
+    assertWorkBrandText(
+      "Codex",
+      JSON.stringify(
+        buildCodexAdditionalContext(
+          { model: "fixture", workPresentation: true },
+          { browser: true, device: true },
+        ),
+      ),
+    );
+    assertWorkBrandText("Claude", claudeSystemAppend(true));
+    assertWorkBrandText(
+      "ACP",
+      t3AcpPromptWithInstructions({
+        prompt: "Fixture message",
+        state: {
+          interactionMode: "default",
+          hasT3Mcp: true,
+          hasDeviceTools: true,
+          workPresentation: true,
+        },
+      }),
+      acpCompatibilityKeys,
+    );
+  }).pipe(
+    Effect.provide(
+      McpHttpServer.layerTools.pipe(
+        Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+        Layer.provide(toolHandlerServices),
+        Layer.provide(Layer.succeed(WorkToolView, true)),
+      ),
+    ),
+  ),
 );
 
 // Claude Code loads these tools up front instead of behind ToolSearch, outside this budget.
