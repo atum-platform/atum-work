@@ -43,6 +43,7 @@ import * as SourceControlProviderRegistry from "../../../sourceControl/SourceCon
 import * as Repositories from "../../../sourceControl/SourceControlRepositoryService.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../../../vcs/VcsProcess.ts";
+import { advertisedJsonSchema } from "../../advertisedJsonSchema.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as ThreadMcpServers from "../../ThreadMcpServers.ts";
@@ -64,6 +65,9 @@ const clientLaunchHarness = (input: {
   readonly workspaceRoot?: string;
   readonly checkWorktreeBase?: ThreadLaunch.ThreadLaunchService["Service"]["checkWorktreeBase"];
   readonly hostedAppUrl?: string;
+  readonly nativeConsent?: NonNullable<
+    McpInvocationContext.McpInvocationScope["client"]
+  >["nativeConsent"];
   readonly relayAuthorization?: NonNullable<
     McpInvocationContext.McpInvocationScope["threadMcpAuthorization"]
   >;
@@ -119,6 +123,7 @@ const clientLaunchHarness = (input: {
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
+        ...(input.nativeConsent === undefined ? {} : { nativeConsent: input.nativeConsent }),
       },
       issuedAt: 0,
       ...(input.relayAuthorization === undefined
@@ -127,6 +132,16 @@ const clientLaunchHarness = (input: {
       capabilities: new Set(["orchestration" as const]),
     }),
     Layer.mock(ThreadManagement.ThreadManagementService)({
+      getThreadRecords: (threadId) =>
+        Effect.succeed({
+          runs: input.launched.flatMap((launch) =>
+            launch.threadId === threadId && launch.initialMessage
+              ? [{ userMessageId: launch.initialMessage.messageId }]
+              : [],
+          ),
+        } as Effect.Success<
+          ReturnType<ThreadManagement.ThreadManagementService["Service"]["getThreadRecords"]>
+        >),
       // A thread exists once a launch started it.
       getThreadShell: (threadId) => {
         const launch = input.launched.find((candidate) => candidate.threadId === threadId);
@@ -194,6 +209,9 @@ const clientLaunchHarness = (input: {
     Layer.mock(PeerForwarding.PeerForwarding)({}),
     Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
       namedProjectsRoot: "/projects",
+      ensureScratchProject: Effect.succeed({ projectId } as Effect.Success<
+        ManagedProjectFolders.ManagedProjectFolders["Service"]["ensureScratchProject"]
+      >),
       isScratchProject: () => Effect.succeed(false),
     }),
     DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer)),
@@ -577,6 +595,93 @@ it.live("scopes relay launches and their attachment registries by OAuth session"
       expect(JSON.stringify(launched)).not.toContain("synthetic-launch");
     }).pipe(Effect.provide(ThreadMcpServers.layer(new Set([origin.origin]))));
   }),
+);
+
+it("advertises the native retry key without exposing relay-only arguments", () => {
+  const schema = advertisedJsonSchema(ProjectToolkit.tools.t3_thread_launch);
+  expect(schema.properties).not.toHaveProperty("assistantLearning");
+  expect(schema.properties).not.toHaveProperty("assistantSessionId");
+  expect(schema.properties?.clientRequestId).toMatchObject({
+    description: expect.stringContaining("work-learning-v1"),
+  });
+});
+
+it.live("replays a visible learning launch only with its original native owner key", () =>
+  Effect.gen(function* () {
+    const session = "166db10a-7556-44b1-8fe5-267077d11b23";
+    const agent = "5d03896e-efba-46c7-915d-34bfc379d0a6";
+    const threadId = ThreadId.make("work-learning-" + agent + "-" + session);
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const consent = {
+      clientId: "native",
+      actor: "owner",
+      audience: "owner_dm" as const,
+      enabled: true,
+      expiresAt: 999_999_999,
+      binding: { owner: "owner", agent, generation: "g1", mac: "mac", consent_revision: 1 },
+    };
+    const launch = Effect.fnUntraced(function* (options: {
+      sessionId: string;
+      authorized?: boolean;
+      replay?: boolean;
+      keySuffix?: string;
+    }) {
+      const { dependencies } = clientLaunchHarness({
+        runtimeModeCeiling: "auto",
+        sessionId: options.sessionId,
+        launched,
+        ...(options.authorized ? { nativeConsent: consent } : {}),
+        relayAuthorization: ThreadMcpServers.authorizationReferences(
+          '{"relay":"Bearer synthetic"}',
+        )!,
+      });
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      return (yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Weekly update",
+          scratch: true,
+          ...(options.replay ? {} : { generateTitle: true, message: "Write a weekly update" }),
+          clientRequestId:
+            "work-learning-v1:" + session + ":" + (options.keySuffix ?? "a").repeat(64),
+          mcpServers: [
+            {
+              name: "atum-agent-tools",
+              url: "https://example.test/a/" + agent + "/mcp",
+              headersRef: "relay",
+            },
+          ],
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies))).at(-1)?.result;
+    });
+    expect(yield* launch({ sessionId: "ordinary" })).toMatchObject({
+      code: "thread_mcp_attachment_denied",
+    });
+    expect(yield* launch({ sessionId: "first", authorized: true, replay: true })).toMatchObject({
+      code: "thread_not_found",
+    });
+    expect(yield* launch({ sessionId: "first", authorized: true })).toMatchObject({ threadId });
+    expect(yield* launch({ sessionId: "renewed", authorized: true, replay: true })).toMatchObject({
+      threadId,
+    });
+    expect(yield* launch({ sessionId: "renewed", authorized: true, keySuffix: "b" })).toMatchObject(
+      {
+        code: "thread_mcp_attachment_denied",
+      },
+    );
+    expect(launched).toHaveLength(2);
+    expect(launched[0]).toMatchObject({
+      generateTitle: true,
+      initialMessage: { text: "Write a weekly update" },
+    });
+    expect(launched[1]?.initialMessage).toBeUndefined();
+    expect(launched[1]?.commandId).toBe(launched[0]?.commandId);
+  }).pipe(Effect.provide(ThreadMcpServers.layer(new Set(["https://example.test"])))),
 );
 
 it.effect("a launch key of any length or content gives a short id and never a defect", () =>

@@ -134,7 +134,22 @@ export const consentFingerprint = (grant: ForwardGrant) =>
 
 export const serializeForwardGrant = (grant: ForwardGrant) => JSON.stringify(grant);
 
-export async function bindNativeThread(path: string, threadId: string, grant: ForwardGrant) {
+export function sameLearningOwner(a: ForwardGrant, b: ForwardGrant) {
+  return (
+    a.audience === "owner_dm" &&
+    b.audience === "owner_dm" &&
+    a.binding.owner === b.binding.owner &&
+    a.binding.agent === b.binding.agent &&
+    a.binding.mac === b.binding.mac
+  );
+}
+
+export async function bindNativeThread(
+  path: string,
+  threadId: string,
+  grant: ForwardGrant,
+  learning = false,
+) {
   const directory = `${path}.threads`;
   await NodeFSP.mkdir(directory, { recursive: true, mode: 0o700 });
   const target = `${directory}/${digest(threadId)}.json`;
@@ -144,6 +159,7 @@ export async function bindNativeThread(path: string, threadId: string, grant: Fo
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     const existing = (await privateJson(target)) as ForwardGrant;
+    if (learning && sameLearningOwner(existing, grant)) return;
     if (
       existing.clientId !== grant.clientId ||
       JSON.stringify(existing.binding) !== JSON.stringify(grant.binding)

@@ -14,12 +14,11 @@ describe("Work composer handoff", () => {
     requestId: "send",
     text: "Remember this format.",
     modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "fixture"),
-    document: { threadId: "finished", runId: "run", artifactId: "doc" },
   };
-  const context = { work: true, draft: false, textOnly: true };
+  const context = { work: true, draft: true, textOnly: true };
   const readModelAccess = async () => "allowed" as const;
 
-  it("hands the selected provider and the result identity to the owner bridge", async () => {
+  it("relays a new draft with the selected provider", async () => {
     const submitLearning = vi.fn(async () => ({
       status: "started" as const,
       threadId: "work-learning-session",
@@ -30,7 +29,7 @@ describe("Work composer handoff", () => {
     expect(submitLearning).toHaveBeenCalledExactlyOnceWith(input);
   });
 
-  it("uses the local submit path only for an unbound session", async () => {
+  it("keeps existing local and offline assistant threads usable", async () => {
     const submitLearning = vi.fn(async () => ({ status: "standalone" as const }));
     const bridge = { readModelAccess, submitLearning };
     await expect(submitWorkLearning(input, context, bridge)).resolves.toEqual({
@@ -38,10 +37,25 @@ describe("Work composer handoff", () => {
     });
     await expect(
       submitWorkLearning({ ...input, threadId: "work-learning-session" }, context, bridge),
-    ).resolves.toEqual({ status: "unavailable" });
-    const { document: _document, ...existingLocalThread } = input;
-    expect(submitWorkLearning(existingLocalThread, context, bridge)).toBeUndefined();
+    ).resolves.toEqual({ status: "standalone" });
+    // A completed document supplies no reason to route the existing thread.
+    const localDocumentThread = { ...input, document: { artifactId: "completed-docx" } };
+    expect(
+      submitWorkLearning(localDocumentThread, { ...context, draft: false }, bridge),
+    ).toBeUndefined();
     expect(submitLearning).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds the composer while an assistant-backed run is active", async () => {
+    const submitLearning = vi.fn();
+    await expect(
+      submitWorkLearning(
+        { ...input, threadId: "work-learning-session" },
+        { ...context, draft: false, running: true },
+        { readModelAccess, submitLearning },
+      ),
+    ).resolves.toEqual({ status: "running" });
+    expect(submitLearning).not.toHaveBeenCalled();
   });
 });
 

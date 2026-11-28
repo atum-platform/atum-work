@@ -224,35 +224,43 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
         const consent = scope.client?.nativeConsent;
+        const key = input.clientRequestId;
+        const learningSession =
+          /^work-learning-v1:([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}):[0-9a-f]{64}$/.exec(
+            key ?? "",
+          )?.[1];
+        const isLearning = key?.startsWith("work-learning-v1:") === true;
+        const learningConsent =
+          isLearning && consent?.audience === "owner_dm" ? consent : undefined;
         if (
-          (input.assistantLearning || input.assistantSessionId) &&
-          consent?.audience !== "owner_dm"
+          isLearning &&
+          (!learningConsent ||
+            scope.thread ||
+            !learningSession ||
+            !input.scratch ||
+            input.hidden ||
+            !input.mcpServers?.length)
         )
           return yield* new OrchestratorMcpFailure({
             code: "thread_mcp_attachment_denied",
-            message: "Assistant learning requires the selected assistant's native owner consent.",
-          });
-        if (
-          (input.assistantSessionId && !input.assistantLearning) ||
-          (input.assistantLearning &&
-            (!input.scratch || input.hidden || !input.clientRequestId || !input.mcpServers))
-        )
-          return yield* new OrchestratorMcpFailure({
-            code: "invalid_request",
-            message: "Assistant learning requires a visible Scratch launch with an attachment.",
+            message:
+              "Assistant learning requires a visible Scratch launch with native owner consent.",
           });
         const context = yield* readCaller();
         const { caller } = context;
-        // A retry with the same key replays the first launch: the ids derive
-        // from the caller and the key, and the launch service replays a
-        // command it already accepted.
+        // Native learning launch keys survive OAuth renewal for the same enrolled owner.
+        const namespace = learningConsent
+          ? JSON.stringify([
+              learningConsent.binding.owner,
+              learningConsent.binding.agent,
+              learningConsent.binding.mac,
+            ])
+          : scope.requestNamespace;
         const commandId =
-          input.clientRequestId === undefined
-            ? yield* newCommandId()
-            : yield* launchCommandId(scope.requestNamespace, input.clientRequestId);
+          key === undefined ? yield* newCommandId() : yield* launchCommandId(namespace, key);
         const threadId = ThreadId.make(
-          input.assistantSessionId && consent
-            ? `work-learning-${consent.binding.agent}-${input.assistantSessionId}`
+          learningConsent
+            ? "work-learning-" + learningConsent.binding.agent + "-" + learningSession
             : commandId,
         );
         const messageId = MessageId.make(commandId);
@@ -311,6 +319,21 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const launchedModel =
           launched === null || launched.deletedAt !== null ? undefined : launched.modelSelection;
         const replaying = launchedModel !== undefined;
+        if (isLearning && replaying) {
+          const existing = yield* context.threads
+            .getThreadRecords(threadId, ["runs"])
+            .pipe(Effect.mapError(unavailable));
+          if (!existing.runs.some((run) => run.userMessageId === messageId))
+            return yield* new OrchestratorMcpFailure({
+              code: "thread_mcp_attachment_denied",
+              message: "The launch key does not match this Work thread.",
+            });
+        } else if (isLearning && input.message === undefined) {
+          return yield* new OrchestratorMcpFailure({
+            code: "thread_not_found",
+            message: "The assistant launch has not been accepted.",
+          });
+        }
         if (launched !== null && replaying && launched.projectId !== projectId)
           return yield* new OrchestratorMcpFailure({
             code: "invalid_request",
@@ -463,7 +486,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         if (forwardGrantsFile && scope.client?.nativeConsent) {
           const grant = scope.client.nativeConsent;
           yield* Effect.tryPromise({
-            try: () => bindNativeThread(forwardGrantsFile!, threadId, grant),
+            try: () => bindNativeThread(forwardGrantsFile!, threadId, grant, isLearning),
             catch: () =>
               new ForwardAdmissionError({ message: "Native thread binding unavailable" }),
           }).pipe(
@@ -539,7 +562,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
             threadId,
             launch: true,
             servers: input.mcpServers,
-            ...(input.assistantLearning ? { assistantLearning: true } : {}),
+            ...(isLearning ? { assistantLearning: true } : {}),
           },
           launch,
         );

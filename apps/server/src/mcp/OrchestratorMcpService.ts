@@ -3682,12 +3682,27 @@ const make = Effect.gen(function* () {
 
       const mode = input.mode ?? "auto";
       const key = yield* requestKey(input.clientRequestId);
-      const messageId = stableOperationMessageId({
-        scope,
-        requestKey: key,
-        operation: "thread-send",
-      });
-      const commandId = stableCommandId({ scope, requestKey: key, operation: "thread-send" });
+      // Desktop can continue locally after a lost relay receipt. Both paths
+      // dispatch the same native command, so only one user turn can commit.
+      const learningId =
+        /^work-learning-send-v1:([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})$/.exec(key)?.[1];
+      const consent = scope.client?.nativeConsent;
+      const learningSend =
+        learningId !== undefined &&
+        scope.thread === undefined &&
+        consent?.audience === "owner_dm" &&
+        input.threadId.startsWith("work-learning-" + consent.binding.agent + "-") &&
+        input.mcpServers?.length === 1;
+      const messageId = learningSend
+        ? MessageId.make(learningId)
+        : stableOperationMessageId({
+            scope,
+            requestKey: key,
+            operation: "thread-send",
+          });
+      const commandId = learningSend
+        ? CommandId.make(input.threadId + ":" + key)
+        : stableCommandId({ scope, requestKey: key, operation: "thread-send" });
       const result = yield* ThreadMcpServers.aroundDispatch(
         {
           scope,

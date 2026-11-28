@@ -3156,6 +3156,9 @@ export default function ChatView(props: ChatViewProps) {
         (run) => run.status === "completed" && run.workDeliverableId !== undefined,
       )
     : undefined;
+  const assistantWorkRunning =
+    activeThreadId?.startsWith("work-learning-") === true &&
+    (phase === "running" || phase === "connecting");
   const { onSend, captureDetachedSend } = useComposerSend({
     environmentId,
     routeThreadKey,
@@ -3168,15 +3171,7 @@ export default function ChatView(props: ChatViewProps) {
     activeProject,
     activeProjectIsScratch,
     work: atumWork && environmentId === primaryEnvironment?.environmentId,
-    ...(driveRun?.workDeliverableId === undefined
-      ? {}
-      : {
-          workDocument: {
-            threadId: driveRun.threadId,
-            runId: driveRun.id,
-            artifactId: driveRun.workDeliverableId,
-          },
-        }),
+    assistantWorkRunning,
     activeProjectDefaultModelSelection,
     activeMessageCount,
     isServerThread,
@@ -3970,6 +3965,7 @@ export default function ChatView(props: ChatViewProps) {
                                 canSteer={canSteer}
                                 canInterrupt={canInterruptRunningThread}
                                 isSendBusy={
+                                  assistantWorkRunning ||
                                   (isSendBusy && !sendQueuesBehindSetup) ||
                                   (setupQueueSendThreadKey !== null &&
                                     setupQueueSendThreadKey === activeThreadKey) ||

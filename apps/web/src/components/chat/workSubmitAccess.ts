@@ -15,12 +15,11 @@ export interface WorkLearningSubmission {
   readonly requestId: string;
   readonly text: string;
   readonly modelSelection: import("@t3tools/contracts").ModelSelection;
-  readonly document?: WorkDeliverableIdentity;
 }
 
 export type WorkLearningResult =
   | { readonly status: "started"; readonly threadId: string }
-  | { readonly status: "standalone" | "unavailable" };
+  | { readonly status: "standalone" | "unavailable" | "running" };
 
 /** The owner view's preload delegates this read to desktop main. */
 export interface WorkSubmitAccessBridge {
@@ -58,18 +57,20 @@ export interface WorkSubmitAccessBridge {
 
 export function submitWorkLearning(
   input: WorkLearningSubmission,
-  context: { readonly work: boolean; readonly draft: boolean; readonly textOnly: boolean },
+  context: {
+    readonly work: boolean;
+    readonly draft: boolean;
+    readonly running?: boolean;
+    readonly textOnly: boolean;
+  },
   bridge: WorkSubmitAccessBridge | undefined = globalThis.window?.atumWork,
 ): Promise<WorkLearningResult> | undefined {
   const bound = input.threadId.startsWith("work-learning-");
-  if (!bound && (!context.work || (!context.draft && !input.document) || !context.textOnly))
-    return undefined;
+  if (bound && context.running) return Promise.resolve({ status: "running" });
+  if (!bound && (!context.work || !context.draft || !context.textOnly)) return undefined;
   if (!bridge?.submitLearning || !context.textOnly)
-    return bound ? Promise.resolve({ status: "unavailable" }) : undefined;
-  return bridge.submitLearning(input).then(
-    (result) => (bound && result.status === "standalone" ? { status: "unavailable" } : result),
-    () => ({ status: "unavailable" }),
-  );
+    return bound ? Promise.resolve({ status: "standalone" }) : undefined;
+  return bridge.submitLearning(input).catch(() => ({ status: "unavailable" }));
 }
 
 declare global {

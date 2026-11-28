@@ -2041,39 +2041,44 @@ export const layerWsRpc = (
               : {}),
           }).pipe(
             Effect.andThen(
-              command.type === "message.dispatch" && Option.isSome(threadMcp)
-                ? threadMcp.value.requiresAssistantRelay(command.threadId).pipe(
-                    Effect.flatMap((requiresRelay) =>
-                      requiresRelay
-                        ? Effect.fail(
-                            new OrchestrationV2DispatchCommandError({
-                              commandId: command.commandId,
-                              commandType: command.type,
-                              message: "Send this message through the selected assistant.",
-                            }),
-                          )
-                        : Effect.void,
-                    ),
-                  )
-                : Effect.void,
-            ),
-            Effect.andThen(
               startup
                 .enqueueCommand(
-                  (command.type === "prepared-run.retry"
-                    ? threadLaunch.retryPreparation(command)
-                    : ThreadMessageIntake.dispatchCommand(
-                        ThreadManagementService.withCreationProvenance(command, {
-                          createdBy: "user",
-                          creationSource:
-                            "creationSource" in command ? command.creationSource : "web",
-                        }),
-                        {
-                          managesProviders:
-                            currentSession.scopes.includes(AuthProvidersManageScope),
-                        },
-                      )
-                  ).pipe(Effect.provide(intakeContext)),
+                  Effect.suspend(() => {
+                    const dispatch = (
+                      command.type === "prepared-run.retry"
+                        ? threadLaunch.retryPreparation(command)
+                        : ThreadMessageIntake.dispatchCommand(
+                            ThreadManagementService.withCreationProvenance(command, {
+                              createdBy: "user",
+                              creationSource:
+                                "creationSource" in command ? command.creationSource : "web",
+                            }),
+                            {
+                              managesProviders:
+                                currentSession.scopes.includes(AuthProvidersManageScope),
+                            },
+                          )
+                    ).pipe(Effect.provide(intakeContext));
+                    if (command.type !== "message.dispatch" || Option.isNone(threadMcp))
+                      return dispatch;
+                    return threadMcp.value.aroundStandalone(
+                      command.threadId,
+                      dispatch,
+                      threadManagement.getThreadShell(command.threadId).pipe(
+                        Effect.flatMap((shell) =>
+                          shell?.activeRunId
+                            ? Effect.fail(
+                                new OrchestrationV2DispatchCommandError({
+                                  commandId: command.commandId,
+                                  commandType: command.type,
+                                  message: "Wait for the active Work run to finish.",
+                                }),
+                              )
+                            : Effect.void,
+                        ),
+                      ),
+                    );
+                  }),
                 )
                 .pipe(
                   Effect.tap((result) =>
@@ -2081,7 +2086,11 @@ export const layerWsRpc = (
                   ),
                   Effect.map((result) => ({ sequence: result.sequence })),
                   Effect.mapError((cause) => {
-                    if (cause._tag === "EnvironmentAuthorizationError") return cause;
+                    if (
+                      cause._tag === "EnvironmentAuthorizationError" ||
+                      cause._tag === "OrchestrationV2DispatchCommandError"
+                    )
+                      return cause;
                     const detail = userFacingDispatchErrorMessage(cause);
                     return new OrchestrationV2DispatchCommandError({
                       commandId: command.commandId,

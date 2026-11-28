@@ -22,7 +22,7 @@ it("requires a valid origin list and allows IPv4 loopback HTTP for fixtures", ()
   }
 });
 
-it.effect("binds visible learning to the enrolled owner, assistant and OAuth session", () =>
+it.effect("binds visible learning to the enrolled owner, assistant and Mac", () =>
   Effect.gen(function* () {
     const relay = yield* ThreadMcpServers.ThreadMcpServers;
     const grant = {
@@ -71,17 +71,12 @@ it.effect("binds visible learning to the enrolled owner, assistant and OAuth ses
     expect(denied.code).toBe("thread_mcp_attachment_denied");
 
     const first = yield* relay.around(launch, relay.read(threadId));
-    expect(yield* relay.requiresAssistantRelay(threadId)).toBe(true);
-    expect(yield* relay.requiresAssistantRelay(ThreadId.make("work-learning-cold-thread"))).toBe(
-      true,
-    );
     const send = { scope, threadId, commandId: CommandId.make("send"), servers: launch.servers };
     const withoutAttachment = yield* relay
       .around({ ...send, servers: undefined }, Effect.void)
       .pipe(Effect.flip);
     expect(withoutAttachment.code).toBe("thread_mcp_attachment_denied");
     for (const client of [
-      { ...scope.client, sessionId: "other-relay" },
       {
         ...scope.client,
         nativeConsent: { ...grant, binding: { ...grant.binding, agent: "other" } },
@@ -107,6 +102,35 @@ it.effect("binds visible learning to the enrolled owner, assistant and OAuth ses
       .pipe(Effect.flip);
     expect(wrongEndpoint.code).toBe("invalid_request");
     expect(yield* relay.around(send, relay.read(threadId))).toEqual(first);
+
+    const localDispatch = vi.fn();
+    const whenLocal = Effect.sync(() => localDispatch()).pipe(Effect.andThen(relay.read(threadId)));
+    expect(
+      yield* relay.aroundStandalone(threadId, whenLocal, Effect.fail("busy")).pipe(Effect.flip),
+    ).toBe("busy");
+    expect(localDispatch).not.toHaveBeenCalled();
+    expect(yield* relay.read(threadId)).toEqual(first);
+    expect(yield* relay.aroundStandalone(threadId, whenLocal, Effect.void)).toEqual([]);
+    expect(localDispatch).toHaveBeenCalledOnce();
+
+    const renewed = {
+      ...scope,
+      client: {
+        ...scope.client,
+        sessionId: "renewed-relay",
+        nativeConsent: {
+          ...grant,
+          binding: { ...grant.binding, consent_revision: 2, generation: "g2" },
+        },
+      },
+    };
+    const attachAgain = { ...send, scope: renewed, commandId: CommandId.make("next-idle-send") };
+    const prepare = vi.fn();
+    const reattached = yield* relay.around(attachAgain, relay.read(threadId), (topologyChanged) =>
+      Effect.sync(() => prepare(topologyChanged)),
+    );
+    expect(prepare).toHaveBeenCalledWith(true);
+    expect(reattached).toHaveLength(1);
   }).pipe(Effect.provide(ThreadMcpServers.layer(new Set(["https://relay.example"])))),
 );
 

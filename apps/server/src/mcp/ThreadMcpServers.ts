@@ -16,7 +16,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import type { McpInvocationScope } from "./McpInvocationContext.ts";
-import { consentFingerprint } from "./toolkits/atum/forwardAdmission.ts";
+import { sameLearningOwner } from "./toolkits/atum/forwardAdmission.ts";
 
 // Effect redacts this header in HTTP traces by default.
 export const AUTHORIZATION_HEADER = "x-api-key";
@@ -43,7 +43,9 @@ interface Registration {
 
 interface ThreadRegistration {
   readonly ownerSessionId: string;
-  readonly assistantConsent?: string;
+  readonly assistantConsent?: NonNullable<
+    NonNullable<McpInvocationScope["client"]>["nativeConsent"]
+  >;
   readonly servers: ReadonlyArray<Registration>;
   readonly accepted: Set<CommandId>;
 }
@@ -61,7 +63,11 @@ export class ThreadMcpServers extends Context.Service<
   ThreadMcpServers,
   {
     readonly read: (threadId: ThreadId) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
-    readonly requiresAssistantRelay: (threadId: ThreadId) => Effect.Effect<boolean>;
+    readonly aroundStandalone: <A, E, R, CheckError>(
+      threadId: ThreadId,
+      dispatch: Effect.Effect<A, E, R>,
+      assertIdle: Effect.Effect<void, CheckError, R>,
+    ) => Effect.Effect<A, E | CheckError, R>;
     readonly around: <A, E, R>(
       attachment: Attachment,
       dispatch: Effect.Effect<A, E, R>,
@@ -196,13 +202,26 @@ export const layer = (origins: ReadonlySet<string>) =>
         read: Effect.fn("ThreadMcpServers.read")((threadId: ThreadId) =>
           Effect.sync(() => (threads.get(threadId)?.servers ?? []).map(({ provider }) => provider)),
         ),
-        requiresAssistantRelay: Effect.fn("ThreadMcpServers.requiresAssistantRelay")(
-          (threadId: ThreadId) =>
-            Effect.sync(
-              () =>
-                threadId.startsWith("work-learning-") ||
-                threads.get(threadId)?.assistantConsent !== undefined,
-            ),
+        aroundStandalone: Effect.fn("ThreadMcpServers.aroundStandalone")(
+          <A, E, R, CheckError>(
+            threadId: ThreadId,
+            dispatch: Effect.Effect<A, E, R>,
+            assertIdle: Effect.Effect<void, CheckError, R>,
+          ) => {
+            if (!threadId.startsWith("work-learning-") && !threads.get(threadId)?.assistantConsent)
+              return dispatch;
+            return lock.withLock(
+              threadId,
+              Effect.gen(function* () {
+                yield* assertIdle;
+                const previous = threads.get(threadId);
+                if (!previous?.servers.length) return yield* dispatch;
+                // Preserve the owner and deduplication ledger, but revoke the local tool routes.
+                replace(threadId, { ...previous, servers: [] });
+                return yield* dispatch;
+              }),
+            );
+          },
         ),
         around: Effect.fn("ThreadMcpServers.around")(
           <A, E, R>(
@@ -228,21 +247,21 @@ export const layer = (origins: ReadonlySet<string>) =>
               input.threadId,
               Effect.gen(function* () {
                 const previous = threads.get(input.threadId);
-                const assistantConsent = input.assistantLearning
-                  ? consent && consentFingerprint(consent)
-                  : previous?.assistantConsent;
+                const assistantConsent =
+                  input.assistantLearning || previous?.assistantConsent ? consent : undefined;
                 if (
-                  (previous !== undefined && assistantConsent !== previous.assistantConsent) ||
-                  (assistantConsent !== undefined &&
-                    (consent === undefined ||
-                      assistantConsent !== consentFingerprint(consent) ||
-                      input.servers?.length !== 1))
+                  (previous !== undefined &&
+                    Boolean(assistantConsent) !== Boolean(previous.assistantConsent)) ||
+                  (previous?.assistantConsent !== undefined &&
+                    (assistantConsent === undefined ||
+                      !sameLearningOwner(previous.assistantConsent, assistantConsent))) ||
+                  (assistantConsent !== undefined && input.servers?.length !== 1)
                 )
                   return yield* attachmentDenied();
                 if (
                   previous === undefined
                     ? !input.launch
-                    : previous.ownerSessionId !== client.sessionId
+                    : previous.ownerSessionId !== client.sessionId && assistantConsent === undefined
                 )
                   return input.servers === undefined ? yield* dispatch : yield* attachmentDenied();
                 if (previous?.accepted.has(input.commandId)) return yield* dispatch;
