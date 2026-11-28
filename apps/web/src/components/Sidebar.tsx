@@ -73,6 +73,7 @@ import {
   ChevronDownIcon,
   FolderIcon,
   FolderPlusIcon,
+  FunnelIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -171,6 +172,7 @@ import {
   resolveThreadRouteTarget,
 } from "../threadRoutes";
 import type { SidebarThreadSummary } from "../types";
+import { isAtumWorkBuild } from "~/atum/surfaceMode";
 import { cn } from "~/lib/utils";
 import { ProjectEnvironmentBadge } from "./ProjectEnvironmentBadge";
 import { ProjectRowActions } from "./ProjectComboboxRow";
@@ -3117,7 +3119,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       />
                     }
                   >
-                    {scopedProjectGroups.length > 1 ? (
+                    {isAtumWorkBuild ? (
+                      // Atum draws Chat's filter (atum-desktop roster-filter-button): a funnel, filled
+                      // while a scope is on, the same 28 px button beside the search and the plus.
+                      <FunnelIcon
+                        className={cn("size-4", scopedProjectGroups.length > 0 && "fill-current")}
+                        data-atum-project-filter={scopedProjectGroups.length > 0 ? "on" : "off"}
+                      />
+                    ) : scopedProjectGroups.length > 1 ? (
                       <span className="flex shrink-0">
                         {scopedProjectGroups.slice(0, 2).map((project, index) => (
                           <span
