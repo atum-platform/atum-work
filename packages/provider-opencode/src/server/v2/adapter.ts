@@ -65,6 +65,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as OpenCode2Client from "./OpenCode2Client.ts";
 import * as OpenCode2Server from "./OpenCode2Server.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
+import { openRouterFreeError } from "../openRouterFreePolicy.ts";
 import { readableProviderErrorMessage } from "../providerErrorMessage.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
@@ -3006,7 +3007,11 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           return yield* endExecution(state, turn, {
             status: "failed",
             failure: makeProviderFailure({
-              message: readableProviderErrorMessage(message, status, response?.body),
+              message: openRouterFreeError(
+                instanceId,
+                readableProviderErrorMessage(message, status, response?.body),
+                response?.body,
+              ),
               code: type,
               class: isUsageLimit(event.data.error) ? "usage_limit" : "provider_error",
               resetAt: claudeUsageLimit(message)?.resetAt ?? null,
