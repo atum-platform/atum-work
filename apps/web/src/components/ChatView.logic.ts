@@ -457,12 +457,14 @@ export function buildLocalDraftThread(
   draftThread: DraftThreadState,
   fallbackModelSelection: ModelSelection,
   resolve: MessageResolver = m,
+  /** The unsent draft's name; Atum's Work mode says "New session". */
+  title: string = resolve(msg("New thread")),
 ): Thread {
   const timestamp = DateTime.makeUnsafe(draftThread.createdAt);
   return presentThreadShell(draftThread.environmentId, {
     id: threadId,
     projectId: draftThread.projectId,
-    title: resolve(msg("New thread")),
+    title,
     providerInstanceId: fallbackModelSelection.instanceId,
     modelSelection: fallbackModelSelection,
     runtimeMode: draftThread.runtimeMode,

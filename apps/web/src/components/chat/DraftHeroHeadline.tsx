@@ -4,9 +4,10 @@ import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/c
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { T, useGT, Var } from "gt-react";
-import { FolderPlusIcon } from "lucide-react";
+import { ChevronDownIcon, FolderIcon, FolderOpenIcon, FolderPlusIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { openCommandPalette } from "~/commandPaletteBus";
 import { shortcutLabelForCommand } from "~/keybindings";
@@ -44,7 +45,7 @@ import {
   useComboboxFilter,
 } from "../ui/combobox";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { InlineButton } from "../ui/button";
+import { Button, InlineButton } from "../ui/button";
 import { DraftProjectName } from "./DraftProjectName";
 import { DraftHeroProjectHeading } from "./DraftHeroProjectHeading";
 import { TriageDraftHero } from "./TriageDraftHero";
@@ -52,6 +53,7 @@ import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
 import { WorkDraftHero } from "../../atum/WorkPresentation";
 
 const ADD_PROJECT_VALUE = "add-project";
+const NO_PROJECT_VALUE = "no-project";
 
 interface PickerItem {
   readonly value: string;
@@ -62,12 +64,15 @@ interface DraftHeroHeadlineProps {
   readonly draftId: DraftId | null;
   readonly activeProjectRef: ScopedProjectRef | null;
   readonly activeProjectTitle: string | null;
+  /** Work mode draws the project chip under the composer, in this element (Cowork-style, owner 2026-11-28). */
+  readonly workProjectSlot?: HTMLElement | null;
 }
 
 export function DraftHeroHeadline({
   draftId,
   activeProjectRef,
   activeProjectTitle,
+  workProjectSlot = null,
 }: DraftHeroHeadlineProps) {
   const gt = useGT();
   const projects = useProjects();
@@ -125,7 +130,8 @@ export function DraftHeroHeadline({
   const activeProjectKey = activeProjectGroup?.projectKey ?? "";
   const hasResolvedProject = activeProjectTitle !== null;
   const canChooseProject = projectPickerEntries.length > 0;
-  const shouldShowProjectMenu = canChooseProject;
+  // Work always offers the chip: with no project yet it still opens Choose a folder.
+  const shouldShowProjectMenu = canChooseProject || workMode;
   const menuEntries = projectPickerEntries.filter(
     ({ targetProject }) =>
       !isScratchProject(targetProject, scratchWorkspaceRootFor(targetProject.environmentId)),
@@ -148,7 +154,13 @@ export function DraftHeroHeadline({
   const pickerItems: readonly PickerItem[] = useOrderWhileOpen(
     [
       ...menuEntries.map(({ group }) => ({ value: group.projectKey, label: group.displayName })),
-      { value: ADD_PROJECT_VALUE, label: gt("Add project") },
+      ...(workMode && scratchWorkspaceRoot !== null && !isScratchDraft
+        ? [{ value: NO_PROJECT_VALUE, label: gt("No project") }]
+        : []),
+      {
+        value: ADD_PROJECT_VALUE,
+        label: workMode ? gt("Choose a folder…") : gt("Add project"),
+      },
     ],
     (item) => item.value,
     pickerOpen,
@@ -160,6 +172,7 @@ export function DraftHeroHeadline({
       : pickerItems.filter(
           (item) =>
             item.value !== ADD_PROJECT_VALUE &&
+            item.value !== NO_PROJECT_VALUE &&
             pickerFilter.contains(item, pickerSearch, (candidate) => candidate.label),
         );
   const selectedPickerItem = pickerItems.find((item) => item.value === activeProjectKey) ?? null;
@@ -228,6 +241,10 @@ export function DraftHeroHeadline({
           openAddProject();
           return;
         }
+        if (item.value === NO_PROJECT_VALUE) {
+          void startScratch();
+          return;
+        }
         const entry = projectEntryByKey.get(item.value);
         if (!entry || item.value === activeProjectKey) {
           return;
@@ -235,28 +252,50 @@ export function DraftHeroHeadline({
         selectProject(entry.targetProject, entry.group.projectKey);
       }}
     >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <ComboboxTrigger
-              render={<InlineButton tone="picker" />}
-              data-draft-project-trigger=""
-              className="pointer-events-auto min-w-0 max-w-full align-baseline"
-            />
-          }
+      {workMode ? (
+        <ComboboxTrigger
+          render={<Button type="button" size="sm-pill" variant="ghost" />}
+          data-draft-project-trigger=""
+          data-atum-work-project-chip=""
+          className="pointer-events-auto min-w-0 max-w-full"
         >
+          {activeProjectGroup && !isScratchDraft ? (
+            <ProjectFavicon project={activeProjectGroup} className="size-4 shrink-0" />
+          ) : (
+            <FolderIcon aria-hidden />
+          )}
           <DraftProjectName
             value={
-              isScratchDraft ? gt("No project") : (activeProjectTitle ?? gt("Choose a project"))
+              activeProjectTitle && !isScratchDraft ? activeProjectTitle : gt("Project or folder")
             }
             singleLine
           />
-        </TooltipTrigger>
-        {activeProjectTitle && !isScratchDraft ? (
-          <TooltipPopup side="top">{activeProjectTitle}</TooltipPopup>
-        ) : null}
-      </Tooltip>
-      <ComboboxPopup align="center" className="w-72 overflow-hidden">
+          <ChevronDownIcon aria-hidden />
+        </ComboboxTrigger>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <ComboboxTrigger
+                render={<InlineButton tone="picker" />}
+                data-draft-project-trigger=""
+                className="pointer-events-auto min-w-0 max-w-full align-baseline"
+              />
+            }
+          >
+            <DraftProjectName
+              value={
+                isScratchDraft ? gt("No project") : (activeProjectTitle ?? gt("Choose a project"))
+              }
+              singleLine
+            />
+          </TooltipTrigger>
+          {activeProjectTitle && !isScratchDraft ? (
+            <TooltipPopup side="top">{activeProjectTitle}</TooltipPopup>
+          ) : null}
+        </Tooltip>
+      )}
+      <ComboboxPopup align={workMode ? "start" : "center"} className="w-72 overflow-hidden">
         <ComboboxSearchInput
           aria-label={gt("Search projects")}
           placeholder={gt("Search projects...")}
@@ -282,7 +321,13 @@ export function DraftHeroHeadline({
             return (
               <ComboboxItem key={item.value} hideIndicator value={item}>
                 {item.value === ADD_PROJECT_VALUE ? (
-                  <FolderPlusIcon className="size-4 shrink-0" />
+                  workMode ? (
+                    <FolderOpenIcon className="size-4 shrink-0" />
+                  ) : (
+                    <FolderPlusIcon className="size-4 shrink-0" />
+                  )
+                ) : item.value === NO_PROJECT_VALUE ? (
+                  <FolderIcon className="size-4 shrink-0" />
                 ) : entry ? (
                   <ProjectFavicon project={entry.group} className="size-4 shrink-0" />
                 ) : null}
@@ -360,9 +405,12 @@ export function DraftHeroHeadline({
     );
   }
 
-  if (workMode && !isScratchDraft) {
+  if (workMode) {
     return (
-      <WorkDraftHero project={hasResolvedProject || canChooseProject ? projectSelector : null} />
+      <>
+        <WorkDraftHero />
+        {workProjectSlot ? createPortal(projectSelector, workProjectSlot) : null}
+      </>
     );
   }
 

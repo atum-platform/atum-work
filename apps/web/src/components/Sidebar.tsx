@@ -119,6 +119,7 @@ import {
   getSidebarProjectSettingsKey,
   type SidebarProjectSnapshot,
 } from "../sidebarProjectGrouping";
+import { useWorkLanguage, useWorkProjectFolders } from "../atum/workProjects";
 import { resolveProjectExpanded, useUiStateStore } from "../uiStateStore";
 import {
   getThreadKeysToDeselectAfterDelete,
@@ -999,7 +1000,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       );
     },
   });
-  const boringSidebarEnabled = useClientSettings((settings) => settings.boringSidebarEnabled);
+  // Work mode groups sessions by project (owner 2026-11-28); Code mode keeps the Labs toggle.
+  const boringSidebarEnabled = useWorkProjectFolders(
+    useClientSettings((settings) => settings.boringSidebarEnabled),
+  );
+  const workLanguage = useWorkLanguage();
   const folderRowsMultiline = useClientSettings((settings) => settings.boringSidebarMultilineRows);
   const newThreadContext = useHandleNewThread();
   // Row callbacks capture only the handler; the rest of the context changes with the route.
@@ -3442,6 +3447,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <T>Show all projects</T>
                   </button>
                 </>
+              ) : workLanguage ? (
+                <T>No sessions yet</T>
               ) : (
                 <T>No threads yet</T>
               )}

@@ -2,10 +2,11 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/model
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { ContextMenuSource } from "@t3tools/contracts";
 import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
-import { msg, T, useGT, useMessages, Var } from "gt-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { memo } from "react";
 
 import { cn } from "~/lib/utils";
+import { useWorkLanguage } from "../../atum/workProjects";
 import { contextMenuSourceOf } from "../../contextMenuSource";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import { useUiStateStore } from "../../uiStateStore";
@@ -53,6 +54,10 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   const gt = useGT();
   const m = useMessages();
   const { group, collapsed, hiddenThreads } = props;
+  const work = useWorkLanguage();
+  const newLabel = work
+    ? gt("New session in {project}", { project: group.displayName })
+    : gt("New thread in {project}", { project: group.displayName });
   const rowId = sidebarFolderRowId(group.projectKey);
   const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
   const dot = collapsed
@@ -119,18 +124,14 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
                 data-sidebar-action-for={rowId}
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={gt("New thread in {project}", { project: group.displayName })}
+                aria-label={newLabel}
                 onClick={() => props.onNewThread(group)}
               />
             }
           >
             <SquarePenIcon aria-hidden />
           </TooltipTrigger>
-          <TooltipPopup>
-            <T>
-              New thread in <Var>{group.displayName}</Var>
-            </T>
-          </TooltipPopup>
+          <TooltipPopup>{newLabel}</TooltipPopup>
         </Tooltip>
       </span>
     </li>
