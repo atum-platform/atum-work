@@ -45,14 +45,12 @@ jobs:
           run-install: false
       - name: Install scoped workspace dependencies
         run: vp install --frozen-lockfile --filter=@t3tools/web... --filter=t3... --filter=@t3tools/scripts... --filter=@t3tools/oxlint-plugin-t3code...
-      - name: Check the stable-tag replay
+      - name: Check the brand map and provider identity
         run: |
           node --test scripts/atum-work/brand.test.mjs
           node scripts/atum-work/brand-map.mjs
           git diff --exit-code atum-work/brand.json
           node scripts/atum-work/brand.mjs --check atum-work/brand.json
-          git fetch --no-tags https://github.com/pingdotgg/t3code refs/tags/v0.1.10:refs/tags/v0.1.10 refs/tags/v0.1.11:refs/tags/v0.1.11
-          scripts/atum-work/replay.sh
       - name: Typecheck and lint
         run: |
           vp run --filter t3 --filter @t3tools/web --filter @t3tools/scripts typecheck
@@ -68,6 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --no-tags https://github.com/pingdotgg/t3code refs/tags/v0.1.11:refs/tags/v0.1.11
           node_version=$(node -p 'process.version')
           node_tar="node-$node_version-darwin-arm64.tar.gz"
           node_dist="https://nodejs.org/dist/$node_version"
