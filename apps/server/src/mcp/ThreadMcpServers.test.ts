@@ -22,6 +22,91 @@ it("requires a valid origin list and allows IPv4 loopback HTTP for fixtures", ()
   }
 });
 
+it.effect("binds visible learning to the enrolled owner, assistant and OAuth session", () =>
+  Effect.gen(function* () {
+    const relay = yield* ThreadMcpServers.ThreadMcpServers;
+    const grant = {
+      clientId: "native",
+      actor: "owner",
+      audience: "owner_dm" as const,
+      enabled: true,
+      expiresAt: 999_999_999,
+      binding: {
+        owner: "owner",
+        agent: "selected",
+        generation: "g1",
+        mac: "mac",
+        consent_revision: 1,
+      },
+    };
+    const scope = {
+      environmentId: EnvironmentId.make("fixture"),
+      capabilities: new Set(["orchestration"] as const),
+      issuedAt: 0,
+      requestNamespace: "fixture",
+      client: { sessionId: "relay", label: "Relay", access: "full-access", nativeConsent: grant },
+      thread: undefined,
+      threadMcpAuthorization: ThreadMcpServers.authorizationReferences(
+        '{"relay":"Bearer synthetic"}',
+      )!,
+    } satisfies McpInvocationScope;
+    const threadId = ThreadId.make("visible-work");
+    const launch = {
+      scope,
+      threadId,
+      commandId: CommandId.make("launch"),
+      launch: true,
+      assistantLearning: true,
+      servers: [
+        {
+          name: "atum-agent-tools",
+          url: "https://relay.example/a/selected/mcp",
+          headersRef: "relay",
+        },
+      ],
+    } as const;
+    const denied = yield* relay
+      .around({ ...launch, scope: { ...scope, client: undefined } }, Effect.void)
+      .pipe(Effect.flip);
+    expect(denied.code).toBe("thread_mcp_attachment_denied");
+
+    const first = yield* relay.around(launch, relay.read(threadId));
+    expect(yield* relay.requiresAssistantRelay(threadId)).toBe(true);
+    const send = { scope, threadId, commandId: CommandId.make("send"), servers: launch.servers };
+    const withoutAttachment = yield* relay
+      .around({ ...send, servers: undefined }, Effect.void)
+      .pipe(Effect.flip);
+    expect(withoutAttachment.code).toBe("thread_mcp_attachment_denied");
+    for (const client of [
+      { ...scope.client, sessionId: "other-relay" },
+      {
+        ...scope.client,
+        nativeConsent: { ...grant, binding: { ...grant.binding, agent: "other" } },
+      },
+      {
+        ...scope.client,
+        nativeConsent: { ...grant, binding: { ...grant.binding, owner: "other" } },
+      },
+    ]) {
+      const error = yield* relay
+        .around({ ...send, scope: { ...scope, client } }, Effect.void)
+        .pipe(Effect.flip);
+      expect(error.code).toBe("thread_mcp_attachment_denied");
+    }
+    const wrongEndpoint = yield* relay
+      .around(
+        {
+          ...send,
+          servers: [{ ...launch.servers[0], url: "https://relay.example/a/other/mcp" }],
+        },
+        Effect.void,
+      )
+      .pipe(Effect.flip);
+    expect(wrongEndpoint.code).toBe("invalid_request");
+    expect(yield* relay.around(send, relay.read(threadId))).toEqual(first);
+  }).pipe(Effect.provide(ThreadMcpServers.layer(new Set(["https://relay.example"])))),
+);
+
 it.live(
   "isolates OAuth owners and rotates credentials without changing provider registrations",
   () =>

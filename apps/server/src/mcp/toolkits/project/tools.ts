@@ -171,6 +171,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
     ),
     clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
     mcpServers: Schema.optional(OrchestratorMcpThreadServers),
+    assistantLearning: Schema.optional(Schema.Literal(true)),
     /** Set by a linked environment launching its agent's delegated task here; ignored otherwise. */
     delegatedFrom: Schema.optional(OrchestrationV2DelegatedFrom),
     /** Set by a linked environment whose workflow run this thread is a step of; ignored otherwise. */

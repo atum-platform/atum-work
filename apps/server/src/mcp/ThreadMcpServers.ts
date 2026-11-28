@@ -16,6 +16,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import type { McpInvocationScope } from "./McpInvocationContext.ts";
+import { consentFingerprint } from "./toolkits/atum/forwardAdmission.ts";
 
 // Effect redacts this header in HTTP traces by default.
 export const AUTHORIZATION_HEADER = "x-api-key";
@@ -42,6 +43,7 @@ interface Registration {
 
 interface ThreadRegistration {
   readonly ownerSessionId: string;
+  readonly assistantConsent?: string;
   readonly servers: ReadonlyArray<Registration>;
   readonly accepted: Set<CommandId>;
 }
@@ -51,6 +53,7 @@ interface Attachment {
   readonly threadId: ThreadId;
   readonly commandId: CommandId;
   readonly launch?: true;
+  readonly assistantLearning?: true;
   readonly servers?: OrchestratorMcpThreadServers | undefined;
 }
 
@@ -58,6 +61,7 @@ export class ThreadMcpServers extends Context.Service<
   ThreadMcpServers,
   {
     readonly read: (threadId: ThreadId) => Effect.Effect<ReadonlyArray<ManagedMcpServer>>;
+    readonly requiresAssistantRelay: (threadId: ThreadId) => Effect.Effect<boolean>;
     readonly around: <A, E, R>(
       attachment: Attachment,
       dispatch: Effect.Effect<A, E, R>,
@@ -192,6 +196,10 @@ export const layer = (origins: ReadonlySet<string>) =>
         read: Effect.fn("ThreadMcpServers.read")((threadId: ThreadId) =>
           Effect.sync(() => (threads.get(threadId)?.servers ?? []).map(({ provider }) => provider)),
         ),
+        requiresAssistantRelay: Effect.fn("ThreadMcpServers.requiresAssistantRelay")(
+          (threadId: ThreadId) =>
+            Effect.sync(() => threads.get(threadId)?.assistantConsent !== undefined),
+        ),
         around: Effect.fn("ThreadMcpServers.around")(
           <A, E, R>(
             input: Attachment,
@@ -199,6 +207,13 @@ export const layer = (origins: ReadonlySet<string>) =>
             beforeUpdate?: (topologyChanged: boolean) => Effect.Effect<void, E, R>,
           ) => {
             const { client, thread } = input.scope;
+            const consent = client?.nativeConsent;
+            const previousLearning = threads.get(input.threadId)?.assistantConsent;
+            if (
+              (input.assistantLearning || previousLearning) &&
+              (consent?.audience !== "owner_dm" || !input.servers?.length || thread !== undefined)
+            )
+              return Effect.fail(attachmentDenied());
             if (client === undefined || thread !== undefined || client.access === "read-only")
               return input.servers === undefined ? dispatch : Effect.fail(attachmentDenied());
             if (input.servers === undefined && !input.launch && !threads.has(input.threadId))
@@ -207,6 +222,17 @@ export const layer = (origins: ReadonlySet<string>) =>
               input.threadId,
               Effect.gen(function* () {
                 const previous = threads.get(input.threadId);
+                const assistantConsent = input.assistantLearning
+                  ? consent && consentFingerprint(consent)
+                  : previous?.assistantConsent;
+                if (
+                  (previous !== undefined && assistantConsent !== previous.assistantConsent) ||
+                  (assistantConsent !== undefined &&
+                    (consent === undefined ||
+                      assistantConsent !== consentFingerprint(consent) ||
+                      input.servers?.length !== 1))
+                )
+                  return yield* attachmentDenied();
                 if (
                   previous === undefined
                     ? !input.launch
@@ -228,6 +254,9 @@ export const layer = (origins: ReadonlySet<string>) =>
                     target.hash ||
                     target.search ||
                     !authorization ||
+                    (assistantConsent !== undefined &&
+                      (name !== "atum-agent-tools" ||
+                        target.pathname !== `/a/${consent?.binding.agent}/mcp`)) ||
                     name === "t3-code" ||
                     name.startsWith("t3-code-") ||
                     entries.some((entry) => entry.provider.name === name)
@@ -250,6 +279,7 @@ export const layer = (origins: ReadonlySet<string>) =>
                 }
                 const next = {
                   ownerSessionId: client.sessionId,
+                  ...(assistantConsent === undefined ? {} : { assistantConsent }),
                   servers: input.servers === undefined ? (previous?.servers ?? []) : entries,
                   accepted: previous?.accepted ?? new Set<CommandId>(),
                 };

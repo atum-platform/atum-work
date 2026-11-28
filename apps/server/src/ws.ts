@@ -130,6 +130,7 @@ import * as McpSignIn from "./mcpApps/McpSignIn.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
+import { ThreadMcpServers } from "./mcp/ThreadMcpServers.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as Workflows from "./workflows/Workflows.ts";
@@ -1452,6 +1453,7 @@ export const layerWsRpc = (
   Layer.effectContext(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
+      const threadMcp = yield* Effect.serviceOption(ThreadMcpServers);
       const sql = yield* SqlClient.SqlClient;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
@@ -2038,6 +2040,23 @@ export const layerWsRpc = (
               ? { "orchestration_v2.source_thread_id": command.sourceThreadId }
               : {}),
           }).pipe(
+            Effect.andThen(
+              command.type === "message.dispatch" && Option.isSome(threadMcp)
+                ? threadMcp.value.requiresAssistantRelay(command.threadId).pipe(
+                    Effect.flatMap((requiresRelay) =>
+                      requiresRelay
+                        ? Effect.fail(
+                            new OrchestrationV2DispatchCommandError({
+                              commandId: command.commandId,
+                              commandType: command.type,
+                              message: "Send this message through the selected assistant.",
+                            }),
+                          )
+                        : Effect.void,
+                    ),
+                  )
+                : Effect.void,
+            ),
             Effect.andThen(
               startup
                 .enqueueCommand(

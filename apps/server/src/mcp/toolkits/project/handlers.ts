@@ -223,6 +223,19 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
     (input, { runtimeMode, interactionMode, linkOrigin }) =>
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
+        if (input.assistantLearning && scope.client?.nativeConsent?.audience !== "owner_dm")
+          return yield* new OrchestratorMcpFailure({
+            code: "thread_mcp_attachment_denied",
+            message: "Assistant learning requires the selected assistant's native owner consent.",
+          });
+        if (
+          input.assistantLearning &&
+          (!input.scratch || input.hidden || !input.clientRequestId || !input.mcpServers)
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Assistant learning requires a visible Scratch launch with an attachment.",
+          });
         const context = yield* readCaller();
         const { caller } = context;
         // A retry with the same key replays the first launch: the ids derive
@@ -511,7 +524,14 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           }),
         );
         const result = yield* ThreadMcpServers.aroundDispatch(
-          { scope, commandId, threadId, launch: true, servers: input.mcpServers },
+          {
+            scope,
+            commandId,
+            threadId,
+            launch: true,
+            servers: input.mcpServers,
+            ...(input.assistantLearning ? { assistantLearning: true } : {}),
+          },
           launch,
         );
         const thread = result.projection.thread;
