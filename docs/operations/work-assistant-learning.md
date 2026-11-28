@@ -16,5 +16,7 @@ local launch plus standalone status for a disconnected draft. Local parity
 reported existing TypeScript and Knip errors and stopped during the broad
 suites when disk space fell below 300 MiB. The stable-tag replay conflict in
 `PullRequestThreadDialog.tsx` is tracked separately.
+The browser fixture uses a fake preload and Work shell projection. The
+Desktop and Hermes fixtures exercise the transport and native tools separately.
 
 The advertised MCP tool list measures 62,686 bytes after adding the launch flag and session identity. Round 1 measured 62,448 bytes. The system prompt measurements are 6,245 bytes for Claude and 7,639 bytes for Codex.

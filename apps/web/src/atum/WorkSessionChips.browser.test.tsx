@@ -195,6 +195,7 @@ it.each(["started", "standalone"] as const)(
     );
     const submitLearning = vi.fn(async (input: WorkLearningSubmission) => {
       if (status === "standalone") return { status };
+      // oxlint-disable-next-line t3code/no-manual-effect-runtime-in-tests -- This fake preload publishes the relay's shell from outside the browser's RPC runtime.
       await Effect.runPromise(
         publishFakeThread({
           id: attachedId,
