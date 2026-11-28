@@ -15,7 +15,8 @@ import type {
   AnyProviderDriver,
   ProviderUsageReaderEnv,
 } from "@t3tools/provider-core/server/driver";
-import { KiroDriver, type KiroDriverEnv } from "@t3tools/provider-kiro/server";
+import type { KiroDriverEnv } from "@t3tools/provider-kiro/server";
+import { AtumKiroDriver } from "./Drivers/AtumKiroDriver.ts";
 
 export type BuiltInDriversEnv =
   | AcpRegistryDriverEnv
@@ -38,7 +39,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
   FxDriver,
   OpenCodeDriver,
   AntigravityDriver,
-  KiroDriver,
+  AtumKiroDriver,
   PiDriver,
   MuseDriver,
   AcpRegistryDriver,
