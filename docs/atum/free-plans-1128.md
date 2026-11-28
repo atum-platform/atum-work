@@ -82,6 +82,6 @@ status check leaves the isolated server off until its database has an active Ope
 
 Local verification uses fake CLIs, replayed provider events and synthetic
 OpenRouter credentials. The Kiro tests exercise both browser methods with
-closed stdin and 2 GiB available. The official OpenCode installer was verified
+closed stdin and mock the native disk-capacity check at 2 GiB. The official OpenCode installer was verified
 in a temporary directory. A live browser login and an installed-app check
 remain owner acceptance steps.

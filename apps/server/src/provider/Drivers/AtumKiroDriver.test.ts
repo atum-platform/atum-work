@@ -1,3 +1,5 @@
+// Mock the native capacity check, which Effect FileSystem does not expose.
+// @effect-diagnostics-next-line nodeBuiltinImport:off
 import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
