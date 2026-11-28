@@ -17,6 +17,7 @@ import {
 
 import { isAtumWorkBuild, useActiveAtumSurfaceMode } from "~/atum/surfaceMode";
 import { runAtumBandCommand } from "~/atum/workCommands";
+import { useWorkLanguage } from "~/atum/workProjects";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
@@ -164,8 +165,9 @@ const ATUM_PANEL_SEARCH_CLASS =
 
 /**
  * Atum's plus menu in zone D, in place of T3's pencil (layout r2 section 4): New thread, New thread in a
- * worktree, Add project. They run the same commands the desktop title band ran (`workCommands`), so New
- * lives in one place once the band drops its own plus.
+ * worktree, Add project. They run the same commands the desktop title band ran (`workCommands`); the band
+ * dropped its own plus (owner 2026-11-28), so this is Work's one New. Work mode speaks of sessions and has
+ * no worktrees (Cowork-style, owner 2026-11-28); Code mode keeps T3's words.
  */
 function AtumNewMenu({
   newThreadShortcutLabel,
@@ -175,6 +177,7 @@ function AtumNewMenu({
   disabled: boolean;
 }) {
   const gt = useGT();
+  const work = useWorkLanguage();
   return (
     <Menu>
       <MenuTrigger render={<SidebarHeaderIconButton data-atum-new-menu="" label={gt("New")} />}>
@@ -183,13 +186,15 @@ function AtumNewMenu({
       <MenuPopup align="end" side="bottom">
         <MenuItem disabled={disabled} onClick={() => void runAtumBandCommand("chat.new")}>
           <SquarePenIcon />
-          {gt("New thread")}
+          {work ? gt("New session") : gt("New thread")}
           {newThreadShortcutLabel ? <MenuShortcut>{newThreadShortcutLabel}</MenuShortcut> : null}
         </MenuItem>
-        <MenuItem disabled={disabled} onClick={() => void runAtumBandCommand("chat.newWorktree")}>
-          <GitBranchIcon />
-          {gt("New thread in a worktree")}
-        </MenuItem>
+        {work ? null : (
+          <MenuItem disabled={disabled} onClick={() => void runAtumBandCommand("chat.newWorktree")}>
+            <GitBranchIcon />
+            {gt("New thread in a worktree")}
+          </MenuItem>
+        )}
         <MenuItem onClick={() => void runAtumBandCommand("project.add")}>
           <FolderPlusIcon />
           {gt("Add project")}

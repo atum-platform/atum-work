@@ -89,6 +89,7 @@ import {
   replaceTextRange,
 } from "../../composer-logic";
 import { DEFAULT_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
+import { useWorkLanguage } from "../../atum/workProjects";
 import { deriveComposerSendState, getAntigravitySendBlockReason } from "../ChatView.logic";
 import { threadHasStarted } from "../../lib/chatThreadActions";
 import {
@@ -523,6 +524,7 @@ const NO_PROVIDER_SLASH_COMMANDS: ServerProvider["slashCommands"] = [];
 export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps) {
   const gt = useGT();
   const m = useMessages();
+  const workLanguage = useWorkLanguage();
   const {
     composerDraftTarget,
     environmentId,
@@ -3960,10 +3962,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   "Type your own answer, or leave this blank to use the selected option",
                                 )
                           : projectSelectionRequired
-                            ? gt("Choose a project above to start a thread")
+                            ? workLanguage
+                              ? gt("Choose a project or folder to start")
+                              : gt("Choose a project above to start a thread")
                             : showProviderUnavailable
                               ? gt("Enable a provider in Settings to send a message")
-                              : (offeredPromptSuggestion ?? m(DEFAULT_COMPOSER_PLACEHOLDER))
+                              : (offeredPromptSuggestion ??
+                                (workLanguage
+                                  ? gt("How can I help today?")
+                                  : m(DEFAULT_COMPOSER_PLACEHOLDER)))
                     }
                     placeholderSuffix={
                       offeredPromptSuggestion !== null ? (

@@ -20,6 +20,7 @@ import type { TurnDiffFileChange } from "../types";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { workFileKind, workApprovalChoices, type WorkFileKind } from "./WorkPresentation.logic";
+import { workGreeting } from "./workProjects.logic";
 
 /**
  * The assistant at work: a thin orbit, nucleus and one travelling electron in currentColor
@@ -234,8 +235,16 @@ export function AtumMark({ className }: { className?: string }) {
   );
 }
 
-export function WorkDraftHero(props: { project: React.ReactNode | null }) {
+export function WorkDraftHero() {
   const gt = useGT();
+  // The hour the home opened: a greeting does not change under the reader's eyes.
+  const [hour] = useState(() => new Date().getHours());
+  // Cowork-style (owner 2026-11-28): a greeting over the one composer; the project sits under it.
+  const greeting = {
+    morning: gt("Good morning"),
+    afternoon: gt("Good afternoon"),
+    evening: gt("Good evening"),
+  }[workGreeting(hour)];
   return (
     <div
       className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 text-center"
@@ -243,14 +252,8 @@ export function WorkDraftHero(props: { project: React.ReactNode | null }) {
     >
       <AtumMark className="mb-2" />
       <h1 className="text-2xl font-semibold tracking-tight text-foreground" data-atum-display="">
-        {gt("What should we work on?")}
+        {greeting}
       </h1>
-      {props.project ? (
-        <p className="flex items-center gap-1 text-sm text-muted-foreground">
-          {gt("Files in")} <span className="inline-flex min-w-0">{props.project}</span>{" "}
-          {gt("are in reach.")}
-        </p>
-      ) : null}
     </div>
   );
 }

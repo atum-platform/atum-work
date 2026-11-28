@@ -65,6 +65,7 @@ import { armFreshSession, disarmFreshSession, useFreshSessionArmed } from "./cha
 import { cancelHeldComposerSend, useComposerSendHeld } from "./chat/preparingComposerImages";
 import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
+import { useWorkLanguage } from "../atum/workProjects";
 import {
   isAtumWorkBuild,
   isWorkModeHiddenSurface,
@@ -862,6 +863,7 @@ export default function ChatView(props: ChatViewProps) {
       })
     : null;
   const draftFallback = draftModelResolution?.fallback ? draftModelResolution : null;
+  const workLanguage = useWorkLanguage();
   const localDraftThread = draftThread
     ? buildLocalDraftThread(
         threadId,
@@ -869,6 +871,7 @@ export default function ChatView(props: ChatViewProps) {
         (draftFallback ? draftFallback.selection : draftDefaultModelSelection) ??
           NO_PROVIDER_MODEL_SELECTION,
         messages,
+        ...(workLanguage ? [gt("New session")] : []),
       )
     : undefined;
   const isServerThread = serverThread !== null;
@@ -3254,6 +3257,8 @@ export default function ChatView(props: ChatViewProps) {
     activeProjectIsScratch &&
     !embedded &&
     serverConfig?.environment.capabilities.workStarters === true;
+  // Work's project chip under the composer: DraftHeroHeadline portals its picker here (owner 2026-11-28).
+  const [workProjectSlot, setWorkProjectSlot] = useState<HTMLElement | null>(null);
   const workStarter = useWorkStarter({
     shown: showWorkStarters,
     canOperate: canOperateThread && !activeEnvironmentUnavailable && !isSendBusy,
@@ -3882,6 +3887,7 @@ export default function ChatView(props: ChatViewProps) {
                           draftId={draftId}
                           activeProjectRef={activeProjectRef}
                           activeProjectTitle={activeProject?.title ?? null}
+                          workProjectSlot={workProjectSlot}
                         />
                       </div>
                     </div>
@@ -4167,6 +4173,13 @@ export default function ChatView(props: ChatViewProps) {
                           </div>
                         </div>
                       </ComposerSurface.Shell>
+                      {atumWork && isDraftHeroState && !embedded ? (
+                        <div
+                          ref={setWorkProjectSlot}
+                          className="flex min-w-0 items-center px-1 pt-2"
+                          data-atum-work-project-row=""
+                        />
+                      ) : null}
                       {showWorkStarters ? (
                         <WorkSessionChips
                           disabled={workStarter.disabled}
