@@ -553,6 +553,8 @@ export const OrchestrationV2AppThread = Schema.Struct({
   tags: Schema.optional(StoredThreadTags),
   /** Omit from app lists while retaining normal lifecycle and direct access. */
   hidden: Schema.optional(Schema.Boolean),
+  /** Server-stamped capability restriction for a scheduled Claude launch. */
+  unattended: Schema.optional(Schema.Literal(true)),
   lastVisitedAt: Schema.NullOr(Schema.DateTimeUtc).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
@@ -2409,6 +2411,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   projectId: ProjectId,
   title: Schema.String,
   hidden: OrchestrationV2AppThread.fields.hidden,
+  unattended: OrchestrationV2AppThread.fields.unattended,
   providerInstanceId: ProviderInstanceId,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -3322,6 +3325,7 @@ export const OrchestrationV2Command = Schema.Union([
     projectId: ProjectId,
     title: TrimmedNonEmptyString,
     hidden: Schema.optional(Schema.Boolean),
+    unattended: OrchestrationV2AppThread.fields.unattended,
     titleRenamed: Schema.optional(Schema.Boolean),
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,

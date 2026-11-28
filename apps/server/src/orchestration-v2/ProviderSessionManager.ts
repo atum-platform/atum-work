@@ -251,6 +251,7 @@ export interface ProviderSessionManagerV2Shape {
     readonly providerSessionId: ProviderSessionId;
     readonly modelSelection: ModelSelection;
     readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+    readonly unattended?: true;
     readonly resumeFromSession?: OrchestrationV2ProviderSession;
     readonly initialNativeThreadId?: string;
     readonly initialProviderItemIdentityVersion?: 2;
@@ -3273,6 +3274,13 @@ export const layerWithOptions = (
               if (live !== undefined) yield* releaseForLinkedEnvironments(live);
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
+                if (input.unattended && existing.runtime.driver !== "claudeAgent") {
+                  return yield* new ProviderSessionOpenError({
+                    instanceId: input.modelSelection.instanceId,
+                    providerSessionId: input.providerSessionId,
+                    cause: "Unattended launch is supported only for Claude providers.",
+                  });
+                }
                 const attached = existing.attachedThreadIds.has(input.threadId);
                 if (!attached && !existing.supportsMultipleProviderThreads) {
                   return yield* new ProviderSessionOpenError({
@@ -3301,11 +3309,17 @@ export const layerWithOptions = (
                     }),
                 ),
               );
+              if (input.unattended && adapter.driver !== "claudeAgent") {
+                return yield* new ProviderSessionOpenError({
+                  instanceId: input.modelSelection.instanceId,
+                  providerSessionId: input.providerSessionId,
+                  cause: "Unattended launch is supported only for Claude providers.",
+                });
+              }
               const openedWithLinkedEnvironments = yield* readLinkedEnvironments;
-              const prepared = yield* prepareMcpSession(
-                input.threadId,
-                input.modelSelection.instanceId,
-              );
+              const prepared = input.unattended
+                ? { mcpCredentialId: undefined, issued: false }
+                : yield* prepareMcpSession(input.threadId, input.modelSelection.instanceId);
               const mcpCredentialId = prepared.mcpCredentialId;
               let reservationDropped = mcpCredentialId === undefined;
               const dropReservation = Effect.sync(() => {
