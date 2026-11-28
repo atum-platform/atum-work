@@ -10,4 +10,11 @@ The composer displays a localized standalone status for an unbound local launch 
 
 Focused fixtures cover the owner composer handoff, standalone dispatch, owner and assistant mismatch, unavailable attachment credentials, and endpoint stability during rotation. Existing Hermes prompt snapshots retain their original bytes. A new Work session and a new chat session read the learned memory and skills from the same profile.
 
+The browser fixture clicked the normal composer submit button in both cases. It
+verified the returned thread route for a connected assistant and the native
+local launch plus standalone status for a disconnected draft. Local parity
+reported existing TypeScript and Knip errors and stopped during the broad
+suites when disk space fell below 300 MiB. The stable-tag replay conflict in
+`PullRequestThreadDialog.tsx` is tracked separately.
+
 The advertised MCP tool list measures 62,686 bytes after adding the launch flag and session identity. Round 1 measured 62,448 bytes. The system prompt measurements are 6,245 bytes for Claude and 7,639 bytes for Codex.

@@ -222,9 +222,9 @@ it.each(["started", "standalone"] as const)(
     await using _app = await render(<AppRoot router={router} />, { router: false });
     const editor = page.getByTestId("composer-editor");
     await expect.element(editor).toHaveTextContent("Remember the weekly update format.");
-    await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
-    await editor.click();
-    await userEvent.keyboard("{Enter}");
+    const send = page.getByRole("button", { name: "Submit message", exact: true });
+    await expect.element(send).toBeEnabled();
+    await send.click();
 
     await vi.waitFor(() =>
       expect(submitLearning).toHaveBeenCalledExactlyOnceWith(
