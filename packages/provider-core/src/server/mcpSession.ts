@@ -27,12 +27,20 @@ export interface McpProviderSessionConfig {
   readonly browserToolsAvailable: boolean;
   /** Snapshot at session creation; settings edits apply to fresh sessions. */
   readonly agentInstructions?: string | undefined;
+  /** Versioned with the conversation, including on provider resume. */
+  readonly workPresentation?: boolean;
   readonly capabilities?: ReadonlySet<string>;
   /** Present when the server lets this credential list and call only these tools. */
   readonly toolAllowList?: ReadonlySet<string>;
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
   /** True while a delegated task this thread started will wake it with its result. */
   readonly hasPendingWake?: Effect.Effect<boolean>;
+}
+
+export function workMcpServerName(
+  session: Pick<McpProviderSessionConfig, "workPresentation"> | undefined,
+): string {
+  return session?.workPresentation === true ? "atum-work" : "t3-code";
 }
 
 export function withAgentDeviceEnvironment(

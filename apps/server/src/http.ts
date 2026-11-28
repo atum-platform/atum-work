@@ -56,6 +56,7 @@ import {
   browserApiCorsAllowedMethods,
   DESKTOP_RENDERER_ORIGINS,
   MCP_HTTP_PATH,
+  WORK_AGENT_MCP_PATH,
 } from "./httpCors.ts";
 import { requestUrl } from "./requestUrl.ts";
 
@@ -317,7 +318,8 @@ export const layerBrowserApiCors = Layer.unwrap(
         const withWildcardCors = wildcardCors(httpEffect);
         const withDevCors = devCors ? devCors(httpEffect) : undefined;
         return Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) => {
-          if (request.url.split("?", 1)[0] === MCP_HTTP_PATH) return httpEffect;
+          const path = request.url.split("?", 1)[0];
+          if (path === MCP_HTTP_PATH || path === WORK_AGENT_MCP_PATH) return httpEffect;
           if (!withDevCors) return withWildcardCors;
           if (request.headers.origin !== undefined) return withDevCors;
           if (request.method === "OPTIONS") {

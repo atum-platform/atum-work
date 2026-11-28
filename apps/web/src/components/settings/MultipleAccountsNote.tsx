@@ -37,14 +37,16 @@ export function MultipleAccountsNote({
         <p>
           <T>
             We do not recommend managing multiple <Var>{providerName}</Var> accounts in T3 Code.{" "}
-            <a
-              href={MULTIPLE_ACCOUNTS_FAQ_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              More info
-            </a>
+            {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? null : (
+              <a
+                href={MULTIPLE_ACCOUNTS_FAQ_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                More info
+              </a>
+            )}
           </T>
         </p>
       </AlertDescription>

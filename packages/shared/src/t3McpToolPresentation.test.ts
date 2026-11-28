@@ -8,6 +8,27 @@ import {
 } from "./t3McpToolPresentation.ts";
 
 describe("resolveT3McpToolPresentation", () => {
+  it("presents the same action and icon for local and relayed Work activity", () => {
+    const threadWait = resolveT3McpToolDefinition("mcp__t3-code-direct__t3_thread_wait");
+    expect(threadWait?.summaryAction).toBe("thread-wait");
+    for (const name of [
+      "mcp__atum-work__thread_wait",
+      "atum-work-direct.thread_wait",
+      "mcp__atum_work__thread_wait",
+      "@atum-work/thread_wait",
+      "atum-work-example_thread_wait completed",
+    ]) {
+      expect(resolveT3McpToolDefinition(name)).toEqual(threadWait);
+    }
+    for (const [tool, icon] of [
+      ["preview_open", "browser"],
+      ["device_open", "device"],
+      ["pull_request_read", "pull-request"],
+    ] as const) {
+      expect(resolveT3McpToolDefinition("atum-work." + tool)?.icon).toBe(icon);
+    }
+  });
+
   it("recognizes every T3 tool across provider prefixes and completion suffixes", () => {
     for (const tool of T3_MCP_TOOL_NAMES) {
       const presentation = resolveT3McpToolPresentation(tool);

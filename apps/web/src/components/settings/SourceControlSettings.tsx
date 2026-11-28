@@ -520,7 +520,9 @@ export function SourceControlSettingsPanel() {
                 onChanged={handleScan}
               />
             ) : null}
-            {credentials.appSignIn && item.appSignIn === true ? (
+            {import.meta.env.VITE_ATUM_WORK_BUILD !== "1" &&
+            credentials.appSignIn &&
+            item.appSignIn === true ? (
               <div className="flex items-center gap-3 text-2xs text-muted-foreground">
                 <span aria-hidden className="h-px flex-1 bg-border" />
                 <T>Or use your own credentials</T>

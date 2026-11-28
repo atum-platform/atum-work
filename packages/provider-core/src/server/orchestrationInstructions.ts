@@ -1,3 +1,4 @@
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 
 // Codex truncates entries over 4,000 bytes; keep each section self-contained and below that limit.
@@ -70,6 +71,7 @@ Investigate with read-only actions and do not edit files or otherwise execute th
 export interface T3AcpInstructionState {
   readonly interactionMode: ProviderInteractionMode;
   readonly hasT3Mcp: boolean;
+  readonly workPresentation?: boolean | undefined;
   readonly hasDeviceTools: boolean;
 }
 
@@ -101,7 +103,9 @@ export function t3AcpPromptWithInstructions(input: {
         ]
       : []),
   ];
-  return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
+  const tag = input.state.workPresentation ? "atum_work_instructions" : "t3_code_instructions";
+  const guidance = instructions.join("\n\n");
+  return `<${tag}>\n${input.state.workPresentation ? workInstructionText(guidance) : guidance}\n</${tag}>\n\n<user_request>\n${input.prompt}\n</user_request>`;
 }
 
 const orchestrationInstructions = (hasDeviceTools: boolean) =>
@@ -109,16 +113,13 @@ const orchestrationInstructions = (hasDeviceTools: boolean) =>
     ? `${T3_CODE_ORCHESTRATION_INSTRUCTIONS}\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS}\n`
     : T3_CODE_ORCHESTRATION_INSTRUCTIONS;
 
-function prependT3OrchestrationInstructions(prompt: string, instructions: string): string {
-  return `<t3_code_orchestration_instructions>${instructions.trim()}</t3_code_orchestration_instructions>\n\n<user_request>\n${prompt}\n</user_request>`;
-}
-
 /** For providers whose instructions ride on the prompt, so a compacted conversation loses them. */
 export function t3OrchestrationPrompt(input: {
   readonly prompt: string;
   readonly hasT3Mcp: boolean;
   readonly hasDeviceTools: boolean;
   readonly orchestrationDelivered: boolean;
+  readonly workPresentation?: boolean | undefined;
   readonly deviceInstructionsDelivered: boolean;
   /** Guidance for this provider's own tools, sent until `providerInstructionsDelivered`. */
   readonly providerInstructions?: string;
@@ -133,14 +134,20 @@ export function t3OrchestrationPrompt(input: {
         : undefined,
     input.providerInstructionsDelivered === true ? undefined : input.providerInstructions,
   ].flatMap((part) => (part === undefined ? [] : [part.trim()]));
-  return instructions.length === 0
-    ? input.prompt
-    : prependT3OrchestrationInstructions(input.prompt, instructions.join("\n\n"));
+  if (instructions.length === 0) return input.prompt;
+  const tag = input.workPresentation
+    ? "atum_work_orchestration_instructions"
+    : "t3_code_orchestration_instructions";
+  const guidance = instructions.join("\n\n").trim();
+  return `<${tag}>${input.workPresentation ? workInstructionText(guidance) : guidance}</${tag}>\n\n<user_request>\n${input.prompt}\n</user_request>`;
 }
 
 export function t3OrchestrationSystemPrompt(
   hasT3Mcp: boolean,
   hasDeviceTools: boolean,
+  workPresentation = false,
 ): string | undefined {
-  return hasT3Mcp ? orchestrationInstructions(hasDeviceTools) : undefined;
+  if (!hasT3Mcp) return undefined;
+  const guidance = orchestrationInstructions(hasDeviceTools);
+  return workPresentation ? workInstructionText(guidance) : guidance;
 }

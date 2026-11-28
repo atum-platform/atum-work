@@ -132,7 +132,7 @@ const ProjectCloneTool = Tool.make("t3_project_clone", {
 const ThreadLaunchTool = Tool.make("t3_thread_launch", {
   ...shared,
   description:
-    "Create a top-level thread in its workspace before starting. Task in `message`. Omit `projectId`, model and modes to inherit yours (outside a thread, pass `projectId` or `scratch`); modes cannot exceed yours. On error or lost reply, reuse `clientRequestId`. Follow it with `t3_thread_read` or `t3_thread_wait`. Mention it with its `link`.",
+    "Launch a top-level thread. Task in `message`. Inherit project, model and modes by default. Outside a thread, pass `projectId` or `scratch`. Modes cannot exceed yours. Reuse `clientRequestId` after errors or lost replies. Use `t3_thread_read` or `t3_thread_wait`. Cite its `link`.",
   parameters: Schema.Struct({
     environmentId: OrchestratorMcpEnvironmentTarget,
     projectId: Schema.optional(ProjectId),
@@ -145,7 +145,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
     title: TrimmedNonEmptyString,
     hidden: Schema.optional(
       Schema.Boolean.annotate({
-        description: "Omit this thread from app lists. It remains usable by thread ID.",
+        description: "Hide from app lists. Reachable by ID.",
       }),
     ),
     generateTitle: Schema.optional(Schema.Boolean),
@@ -155,7 +155,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
     workspaceStrategy: Schema.optional(
       OrchestrationV2ThreadLaunchWorkspaceStrategy.annotate({
         description:
-          "'worktree': new checkout from `baseRef`. Honor a requested base. Otherwise, independent work uses the default branch as `remote/branch` (e.g. `origin/main`) with `startFromOrigin: true`; with no remote, use the local default branch. Required unpublished commits and dependent or stacked work use their local base with `startFromOrigin: false`. 'existing_worktree': bind `worktreePath`, a project worktree. 'root': project checkout, the default, not your worktree. Uncommitted edits are not copied.",
+          "'worktree': checkout from `baseRef` with no uncommitted edits. Honor a requested base. Else use the default `remote/branch` with `startFromOrigin: true`, or the local default if no remote. For dependent work or unpublished commits use the local base with `startFromOrigin: false`. 'existing_worktree': bind project `worktreePath`. 'root' (default): project checkout.",
       }),
     ),
     message: Schema.optional(

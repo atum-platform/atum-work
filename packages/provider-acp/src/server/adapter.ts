@@ -1114,11 +1114,12 @@ function acpMcpContext(
       httpServers: mcpOverHttp === true ? managedHttp : [],
     };
   }
+  const name = McpProviderSession.workMcpServerName(session);
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
     servers: [
       {
-        name: "t3-code",
+        name,
         command: self.command,
         args: [...selfInvocationArgs(self, ["acp-mcp-bridge"])],
         env: [
@@ -1130,13 +1131,13 @@ function acpMcpContext(
       ...managedStdio,
     ],
     // Native ACP serves only T3. Use one compatible transport for all servers when adding managed tools.
-    acpServers: managed.length === 0 ? [{ type: "acp", name: "t3-code", serverId: "t3-code" }] : [],
+    acpServers: managed.length === 0 ? [{ type: "acp", name, serverId: "t3-code" }] : [],
     httpServers:
       mcpOverHttp === true
         ? [
             {
               type: "http",
-              name: "t3-code",
+              name,
               url: session.endpoint,
               headers: [
                 { name: "Authorization", value: session.authorizationHeader },
@@ -9181,6 +9182,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
+            workPresentation: mcpSession?.workPresentation,
             hasT3Mcp: mcpSession !== undefined,
             hasDeviceTools: mcpSession?.capabilities?.has("device") === true,
           } satisfies T3AcpInstructionState;
@@ -9228,6 +9230,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             agentFeedback: instructionState.hasT3Mcp ? (turnInput.agentFeedback ?? "off") : "off",
             harness: flavor.runtimeHarness ?? driver,
             agentInstructions: mcpSession?.agentInstructions,
+            workPresentation: mcpSession?.workPresentation,
             model: turnInput.modelSelection.model,
             runtimePolicy: turnInput.runtimePolicy,
             pullRequestLinking:

@@ -2,6 +2,7 @@ import * as NodeAssert from "node:assert/strict";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
+import { assertWorkBrandText } from "../../packages/shared/src/workBrandCheck.ts";
 import { resolveWebIconOverrides } from "../lib/brand-assets.ts";
 
 const providerIdentity = {
@@ -40,6 +41,14 @@ export function readBrandMap(path) {
   return { data: JSON.parse(NodeFS.readFileSync(path, "utf8")), directory: NodePath.dirname(path) };
 }
 
+/** Work's square badge uses the three canonical eclipse circles at small sizes. */
+export function assertWorkMark(mark) {
+  NodeAssert.match(mark, /viewBox="0 0 64 64"/);
+  NodeAssert.match(mark, /<circle cx="32" cy="32" r="28\.5" fill="#EFEEEA"/);
+  NodeAssert.match(mark, /<circle cx="29\.5" cy="34\.5" r="25\.5" fill="#141311"/);
+  NodeAssert.match(mark, /<circle cx="49\.5" cy="14\.5" r="4\.8" fill="#EFEEEA"/);
+}
+
 export function planBrand(repo, { data, directory }) {
   assertProviderIdentity(repo);
   NodeAssert.ok(Array.isArray(data.strings) && data.strings.length > 0, "Brand map needs strings");
@@ -72,6 +81,7 @@ export function planBrand(repo, { data, directory }) {
   if (data.agentInstructions) {
     const instructions = NodeFS.readFileSync(resolveBelow(repo, data.agentInstructions), "utf8");
     NodeAssert.ok(Buffer.byteLength(instructions, "utf8") < 4000 && instructions.trim());
+    assertWorkBrandText("agent instructions", instructions);
     const path = resolveBrandTarget(repo, "../../packages/contracts/src/settings.ts");
     const before = writes.get(path)?.before ?? NodeFS.readFileSync(path);
     const text = writes.get(path)?.after ?? before.toString("utf8");
@@ -101,9 +111,24 @@ export function planBrand(repo, { data, directory }) {
       after.length > 0 && !before.equals(after),
       `Asset replacement made no change: ${file}`,
     );
+    if (file === "src/components/T3Wordmark.tsx") assertWorkMark(after.toString("utf8"));
     writes.set(path, { before, after });
   }
 
+  if (data.icons) {
+    const manifest = resolveBrandTarget(repo, "public/manifest.webmanifest");
+    const manifestBytes = writes.get(manifest)?.after ?? NodeFS.readFileSync(manifest, "utf8");
+    assertWorkBrandText("web manifest", JSON.stringify(JSON.parse(manifestBytes)));
+    const shell = resolveBrandTarget(repo, "index.html");
+    const html = writes.get(shell)?.after ?? NodeFS.readFileSync(shell, "utf8");
+    for (const [field, match] of [
+      ["title", /<title>([^<]+)<\/title>/.exec(html)?.[1]],
+      ["splash", /id="boot-shell-card" aria-label="([^"]+)"/.exec(html)?.[1]],
+      ["loading", /role="status" aria-label="([^"]+)"/.exec(html)?.[1]],
+    ]) {
+      assertWorkBrandText("web shell " + field, match ?? "");
+    }
+  }
   return writes;
 }
 

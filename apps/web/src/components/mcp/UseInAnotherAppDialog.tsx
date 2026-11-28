@@ -510,7 +510,15 @@ function GateScreen({
             <p className="text-sm text-muted-foreground">{turnOnHere.reason}</p>
           ) : (
             <div className="space-y-2 text-sm">
-              <CommandBlock command="t3 connect link" />
+              {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? (
+                <p>
+                  <T>
+                    Open Sharing & access on <Var>{name}</Var> to connect this environment.
+                  </T>
+                </p>
+              ) : (
+                <CommandBlock command="t3 connect link" />
+              )}
               <p>
                 <T>
                   Restart T3 Code on <Var>{name}</Var>.

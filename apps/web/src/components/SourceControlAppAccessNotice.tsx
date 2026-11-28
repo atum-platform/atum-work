@@ -34,7 +34,10 @@ export function SourceControlAppAccessNotice(props: {
       : (readHostCredentialSettings(settings, definition.kind).signIns[host] ?? "").length > 0,
   );
   const access = useEnvironmentQuery(
-    definition !== undefined && appSignIn?.hosts.includes(host) && signedIn
+    import.meta.env.VITE_ATUM_WORK_BUILD !== "1" &&
+      definition !== undefined &&
+      appSignIn?.hosts.includes(host) &&
+      signedIn
       ? sourceControlEnvironment.appAccess({
           environmentId: props.environmentId,
           input: { provider: definition.kind, host, repository: props.repository },

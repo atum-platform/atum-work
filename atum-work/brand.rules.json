@@ -15,6 +15,7 @@
     "/__tests__/",
     "test-fixtures",
     "testUtils",
+    "/work(?:ToolNames|BrandCheck)\\.ts$",
     "/src/i18n/translations/",
     "routeTree\\.gen\\.ts$"
   ],
@@ -171,6 +172,71 @@
       "from": "connectorName=T3%20Code",
       "to": "connectorName=Atum%20Work",
       "why": "Names the connector the person adds in Claude."
+    },
+    {
+      "file": "src/lib/bootError.ts",
+      "from": "https://t3.codes/download",
+      "to": "https://atumplatform.com/download"
+    },
+    {
+      "file": "src/legalLinks.ts",
+      "from": "https://t3.codes/privacy-policy",
+      "to": "https://atumplatform.com/privacy"
+    },
+    {
+      "file": "src/branding.ts",
+      "from": "https://t3.codes/download",
+      "to": "https://atumplatform.com/download"
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.",
+      "to": "This environment was unlinked. Open Sharing & access on the host to connect it again."
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": "Run `t3 connect link` on the host, then restart T3 Code there.",
+      "to": "Open Sharing & access on the host to configure the connection."
+    },
+    {
+      "file": "src/components/settings/LinkedEnvironmentsSettings.tsx",
+      "from": "From Sharing & access there, or t3 pair",
+      "to": "From Sharing & access on that computer"
+    },
+    {
+      "file": "src/components/settings/settingsSearch.ts",
+      "from": "t3 connect",
+      "to": "connect"
+    },
+    {
+      "file": "src/components/settings/SettingsFontPreviews.tsx",
+      "from": "t3code\\x1b",
+      "to": "workspace\\x1b"
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "openclaw mcp add t3code",
+      "to": "openclaw mcp add atum-work"
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "openclaw mcp login t3code",
+      "to": "openclaw mcp login atum-work"
+    },
+    {
+      "file": "src/components/ServerUpdateAction.tsx",
+      "from": "Reconnected on t3@{version}.",
+      "to": "Reconnected on version {version}."
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": "On {host}, check Settings > Sharing & access or run `t3 connect status`.",
+      "to": "On {host}, check Settings > Sharing & access."
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/server.ts",
+      "from": "The t3@{version} update",
+      "to": "The update to {version}"
     }
   ],
   "tokens": [

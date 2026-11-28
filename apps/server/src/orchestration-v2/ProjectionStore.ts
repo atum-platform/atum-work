@@ -665,6 +665,16 @@ export interface ProjectionStoreV2Shape {
   readonly findGuestShareThreadId: (
     shareId: GuestShareId,
   ) => Effect.Effect<ThreadId | null, ProjectionStoreV2Error>;
+  readonly snapshotWorkPresentation: (
+    threadId: ThreadId,
+    instructions: string,
+    legacyInstructions: string,
+    epoch: number,
+    parentThreadId: ThreadId | null,
+  ) => Effect.Effect<
+    { readonly epoch: number; readonly agentInstructions: string },
+    ProjectionStoreReadError
+  >;
   readonly getThread: (
     threadId: ThreadId,
   ) => Effect.Effect<OrchestrationV2AppThread, ProjectionStoreV2Error>;
@@ -9901,6 +9911,31 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       listOlderSettledThreads: readOnReader(listOlderSettledThreads),
       getThreadShell: readOnReader(getThreadShell),
       findGuestShareThreadId: readOnReader(findGuestShareThreadId),
+      snapshotWorkPresentation: (
+        threadId,
+        instructions,
+        legacyInstructions,
+        epoch,
+        parentThreadId,
+      ) =>
+        sql<{ readonly epoch: number; readonly agent_instructions: string }>`
+          INSERT INTO work_thread_presentation (thread_id, epoch, agent_instructions)
+          SELECT ${threadId}, COALESCE(parent.epoch, ${epoch}),
+            COALESCE(parent.agent_instructions,
+              CASE WHEN COALESCE(parent.epoch, ${epoch}) = 0 THEN ${legacyInstructions} ELSE ${instructions} END)
+          FROM (SELECT 1) LEFT JOIN work_thread_presentation AS parent ON parent.thread_id = ${parentThreadId}
+          WHERE 1
+          ON CONFLICT(thread_id) DO UPDATE SET agent_instructions =
+            COALESCE(work_thread_presentation.agent_instructions,
+              CASE WHEN epoch = 0 THEN ${legacyInstructions} ELSE excluded.agent_instructions END)
+          RETURNING epoch, agent_instructions
+        `.pipe(
+          Effect.map(([row]) => ({
+            epoch: row!.epoch,
+            agentInstructions: row!.agent_instructions,
+          })),
+          Effect.mapError((cause) => new ProjectionStoreReadError({ threadId, cause })),
+        ),
       getThread: readOnReader(getThread),
       findThread: readOnReader(findThread),
       getSettlementCandidates: readOnReader(getSettlementCandidates),

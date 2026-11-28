@@ -1,0 +1,23 @@
+#!/bin/sh
+# The host continues to launch the packaged server by its original executable.
+set -eu
+if [ "${1:-}" != work ]; then
+  printf '%s\n' 'Usage: atum work [pair|thread|--version]' >&2
+  exit 2
+fi
+shift
+case "${1:-}" in
+  ''|-h|--help|help)
+    printf '%s\n' 'Atum Work' 'Usage: atum work [pair|thread|--version]' \
+      '  pair     Create a pairing link for this installation' \
+      '  thread   List, start, send to, or read Work threads' \
+      '  --version  Print the installed Work version'
+    ;;
+  pair|thread|--version)
+    exec "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/t3" "$@"
+    ;;
+  *)
+    printf '%s\n' 'Unknown Work command. Run atum work --help.' >&2
+    exit 2
+    ;;
+esac

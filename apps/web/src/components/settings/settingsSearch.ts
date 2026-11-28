@@ -1689,6 +1689,8 @@ export function settingsForThisPlatform(
   const platform = typeof navigator === "undefined" ? "" : navigator.platform;
   return items.filter(
     (item) =>
+      (import.meta.env.VITE_ATUM_WORK_BUILD !== "1" ||
+        (item.id !== "mobile-app" && item.id !== "cli-command")) &&
       (isElectron || item.desktopOnly !== true) &&
       (!item.releaseChannelOnly || isElectron || HOSTED_APP_CHANNEL !== null) &&
       (!item.macOnly || isMacPlatform(platform)) &&

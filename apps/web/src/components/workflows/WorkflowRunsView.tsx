@@ -176,14 +176,16 @@ export function WorkflowRunsView({
               Definitions
             </button>
             , or ask an agent to.{" "}
-            <a
-              href={WORKFLOWS_GUIDE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Read the guide
-            </a>
+            {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? null : (
+              <a
+                href={WORKFLOWS_GUIDE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Read the guide
+              </a>
+            )}
           </T>
         }
       />,

@@ -19,6 +19,7 @@ import * as Shell from "@opencode/schema/shell";
 import { Mcp } from "@opencode/schema/mcp";
 import {
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  ThreadId,
   isOrchestrationV2WorkActive,
   parseGoalCommand,
   type ChatAttachment,
@@ -66,6 +67,7 @@ import * as OpenCode2Client from "./OpenCode2Client.ts";
 import * as OpenCode2Server from "./OpenCode2Server.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
 import { readableProviderErrorMessage } from "../providerErrorMessage.ts";
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import { t3OrchestrationSystemPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
@@ -426,14 +428,18 @@ interface PendingRequest {
 const rule = (action: string, effect: Rule["effect"]): Rule => ({ action, resource: "*", effect });
 
 /** OpenCode hides tools for names over 64 chars and rejects names over 100; hash long thread IDs. */
-export const t3McpServerName = Effect.fn("t3McpServerName")(function* (threadId: string) {
-  const name = `t3-code-${threadId.replaceAll(/[^a-zA-Z0-9_-]/g, "_")}`;
+export const t3McpServerName = Effect.fn("t3McpServerName")(function* (
+  threadId: string,
+  workPresentation = false,
+) {
+  const prefix = workPresentation ? "atum-work" : "t3-code";
+  const name = `${prefix}-${threadId.replaceAll(/[^a-zA-Z0-9_-]/g, "_")}`;
   if (name.length <= 64) return name;
   const crypto = yield* Digest.Digest;
   const digest = yield* crypto
     .digest(Digest.sha256, new TextEncoder().encode(threadId))
     .pipe(Effect.orDie);
-  return `t3-code-${Hex.encode(digest).slice(0, 16)}`;
+  return `${prefix}-${Hex.encode(digest).slice(0, 16)}`;
 });
 
 // Last match wins: deny all threads' T3 servers, then allow only this thread's.
@@ -442,6 +448,7 @@ const mcpRules = (mcpServerName: string | null): ReadonlyArray<Rule> =>
     ? []
     : [
         { action: "t3-code-*", resource: "*", effect: "deny" },
+        { action: "atum-work-*", resource: "*", effect: "deny" },
         { action: `${mcpServerName}_*`, resource: "*", effect: "allow" },
       ];
 
@@ -834,8 +841,8 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
   const crypto = yield* Digest.Digest;
   const driver = OPENCODE_PROVIDER;
   let nativeGoalSupport: boolean | undefined;
-  const mcpServerNameFor = (threadId: string) =>
-    t3McpServerName(threadId).pipe(Effect.provideService(Digest.Digest, crypto));
+  const mcpServerNameFor = (threadId: string, workPresentation = false) =>
+    t3McpServerName(threadId, workPresentation).pipe(Effect.provideService(Digest.Digest, crypto));
 
   const borrow = Effect.gen(function* () {
     const lent = yield* Deferred.make<
@@ -1500,7 +1507,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         turnItem.type === "dynamic_tool" ? htmlRenderFromToolItem(turnItem) : undefined;
       const pages = openCodeCodeModeHtmlRenders(
         result?.metadata,
-        yield* mcpServerNameFor(turn.input.threadId),
+        state.mcp?.name ?? (yield* mcpServerNameFor(turn.input.threadId)),
       );
       for (const { index, input } of pages) {
         const pageId = `${nativeId}:${HTML_RENDER_TOOL_NAME}:${index}`;
@@ -1515,7 +1522,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           turnItem: {
             ...itemBase(state, turn, pageId, "completed", startedAt, updatedAt, updatedAt),
             type: "dynamic_tool",
-            toolName: `t3-code.${HTML_RENDER_TOOL_NAME}`,
+            toolName: `${state.mcp?.name ?? "t3-code"}.${HTML_RENDER_TOOL_NAME}`,
             input: { title: page.title, height: page.height },
             output: { htmlRender: page },
           },
@@ -4101,7 +4108,12 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         policy,
         paths,
         policy.runtimeMode === "full-access" ? [] : thread.grants,
-        appThreadId === null ? null : yield* mcpServerNameFor(appThreadId),
+        appThreadId === null
+          ? null
+          : yield* mcpServerNameFor(
+              appThreadId,
+              (yield* mcpSessions.read(ThreadId.make(appThreadId)))?.workPresentation,
+            ),
       );
     });
 
@@ -4372,7 +4384,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
     ) {
       const mcpSession = yield* mcpSessions.read(turnInput.threadId);
       const directory = turnInput.runtimePolicy.cwd ?? host.paths.cwd;
-      const name = yield* mcpServerNameFor(turnInput.threadId);
+      const name = yield* mcpServerNameFor(turnInput.threadId, mcpSession?.workPresentation);
       // An external server may not reach T3's MCP endpoint, as with 1.x.
       const wanted =
         mcpSession === undefined || connection.external
@@ -4423,12 +4435,19 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           agentFeedback: mcpAvailable ? (turnInput.agentFeedback ?? "off") : "off",
           harness: "OpenCode",
           agentInstructions: mcpSession?.agentInstructions,
+          workPresentation: mcpSession?.workPresentation,
           model: turnInput.modelSelection.model,
           runtimePolicy: turnInput.runtimePolicy,
         }),
-        t3OrchestrationSystemPrompt(mcpAvailable, mcpSession?.capabilities?.has("device") === true),
+        t3OrchestrationSystemPrompt(
+          mcpAvailable,
+          mcpSession?.capabilities?.has("device") === true,
+          mcpSession?.workPresentation,
+        ),
         mcpAvailable
-          ? "To wait for a background shell you started (tests, a build), call `t3_background_wait` with its shell ID before you end your turn. Do not mark work you leave running, or PRs."
+          ? (mcpSession?.workPresentation ? workInstructionText : (text: string) => text)(
+              "To wait for a background shell you started (tests, a build), call `t3_background_wait` with its shell ID before you end your turn. Do not mark work you leave running, or PRs.",
+            )
           : undefined,
       ]
         .filter((part) => part !== undefined && part.length > 0)
@@ -4436,7 +4455,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       if (instructions !== state.instructions) {
         yield* client.session.instructions.entry.put({
           sessionID: Session.ID.make(sessionId),
-          key: INSTRUCTIONS_KEY,
+          key: mcpSession?.workPresentation ? "atum-work" : INSTRUCTIONS_KEY,
           value: instructions,
         });
         state.instructions = instructions;

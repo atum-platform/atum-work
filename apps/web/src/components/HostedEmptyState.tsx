@@ -51,7 +51,7 @@ export function HostedEmptyState() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            {localEnvironmentOff ? (
+            {localEnvironmentOff || import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? (
               <Button render={<Link to="/settings/connections" />} size="sm">
                 <T>Open Environments</T>
               </Button>

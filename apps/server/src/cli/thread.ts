@@ -60,7 +60,7 @@ export class ThreadServerNotRunningError extends Schema.TaggedError<ThreadServer
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
-    return `No running T3 Code server uses ${this.baseDir}. Start T3 Code, then retry.`;
+    return `No running Atum Work server uses ${this.baseDir}. Start Atum Work, then retry.`;
   }
 }
 
@@ -71,7 +71,7 @@ export class ThreadServerUnreachableError extends Schema.TaggedError<ThreadServe
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
     const reason = this.cause instanceof Error ? ` ${this.cause.message}` : "";
-    return `Could not reach the T3 Code server at ${this.origin}.${reason}`;
+    return `Could not reach the Atum Work server at ${this.origin}.${reason}`;
   }
 }
 
@@ -92,7 +92,7 @@ class ThreadToolMissingError extends Schema.TaggedError<ThreadToolMissingError>(
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
-    return `This T3 Code server has no ${this.tool} tool. Update T3 Code, then retry.`;
+    return `This Atum Work server has no ${this.tool} tool. Update Atum Work, then retry.`;
   }
 }
 
@@ -111,7 +111,7 @@ export class ThreadProjectNotFoundError extends Schema.TaggedError<ThreadProject
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
-    return `No T3 Code project matches '${this.identifier}'. Pass a project id or a path inside a project.`;
+    return `No Atum Work project matches '${this.identifier}'. Pass a project id or a path inside a project.`;
   }
 }
 
@@ -124,7 +124,7 @@ export class ThreadNeedsInputError extends Schema.TaggedError<ThreadNeedsInputEr
   override readonly [Runtime.errorExitCode] = 2;
 
   override get message(): string {
-    return `Thread ${this.threadId} is waiting for an answer. Open it in T3 Code to respond.`;
+    return `Thread ${this.threadId} is waiting for an answer. Open it in Atum Work to respond.`;
   }
 }
 
@@ -210,7 +210,7 @@ const makeThreadTools = (session: McpToolSession, origin: string) => {
   const unexpected = (tool: string) =>
     new ThreadToolFailedError({
       tool,
-      detail: `The server sent an unexpected ${tool} result. Update the t3 CLI to match the server.`,
+      detail: `The server sent an unexpected ${tool} result. Update the Work CLI to match the server.`,
     });
   return {
     call: Effect.fn("cli.thread.callTool")(function* <S extends Schema.Decoder<unknown>>(

@@ -375,6 +375,10 @@ export function collectChannelSwitchTargets(
       skip(blocked);
       continue;
     }
+    if (import.meta.env.VITE_ATUM_WORK_BUILD === "1" && move.selfUpdate === "boot-service") {
+      skip(resolve(msg("update the Work installation on that host")));
+      continue;
+    }
     // Service launchers only accept newer versions, so leaving for an older release is manual.
     if (
       move.selfUpdate === "boot-service" &&

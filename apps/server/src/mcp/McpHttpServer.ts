@@ -6,6 +6,7 @@ import {
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -24,6 +25,7 @@ import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effec
 import { HttpBody, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
   AuthSessionId,
+  DEFAULT_SERVER_SETTINGS,
   DeviceToolError,
   OrchestratorMcpFailure,
   PreviewAutomationError,
@@ -114,7 +116,11 @@ import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { MessageToolkit } from "./toolkits/message/tools.ts";
 import * as MessageHandlers from "./toolkits/message/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
-import { MCP_HTTP_PATH } from "../httpCors.ts";
+import { MCP_HTTP_PATH, WORK_AGENT_MCP_PATH } from "../httpCors.ts";
+import { assertWorkBrandText } from "@t3tools/shared/workBrandCheck";
+import { buildCodexAdditionalContext } from "../provider/CodexDeveloperInstructions.ts";
+import { canonicalWorkToolName, workToolName } from "@t3tools/shared/workToolNames";
+import { projectWorkTool, WorkToolView } from "./WorkToolView.ts";
 import { requestUrl } from "../requestUrl.ts";
 
 const mcpResourceMetadataUrl = (request: HttpServerRequest.HttpServerRequest) =>
@@ -143,7 +149,7 @@ const unauthorized = (input: {
   return HttpServerResponse.jsonUnsafe(
     {
       error: "invalid_mcp_credential",
-      message: "A valid T3 Code MCP credential is required.",
+      message: "A valid Work MCP credential is required.",
     },
     {
       status: 401,
@@ -419,6 +425,11 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
     if (request.headers.origin !== undefined) return HttpServerResponse.empty({ status: 403 });
     const admitted = yield* authenticateRequest(request);
     if (HttpServerResponse.isHttpServerResponse(admitted)) return admitted;
+    if (
+      request.url.split("?", 1)[0] === WORK_AGENT_MCP_PATH &&
+      admitted.thread?.workPresentation !== true
+    )
+      return HttpServerResponse.empty({ status: 403 });
     if (yield* isUndefinedNotification(request)) return HttpServerResponse.empty({ status: 202 });
     const linkExpiresAt = admitted.client?.linkExpiresAt;
     return yield* httpEffect.pipe(
@@ -1268,6 +1279,24 @@ const withToolAnalytics =
  * here, so a tool added later is refused for that credential until it is named in the list. The refusal
  * happens before the handler, so nothing a refused tool reads or changes is touched.
  */
+const withWorkToolView = Effect.fnUntraced(function* <A, E, R>(
+  registration: Effect.Effect<A, E, R>,
+) {
+  if (!(yield* WorkToolView)) return yield* registration;
+  const server = yield* McpServer.McpServer;
+  const view = McpServer.McpServer.of({
+    ...server,
+    addTool: Effect.fn("McpServer.addTool")(function* (options) {
+      const tool = projectWorkTool(options.tool);
+      if (server.tools.some((entry) => entry.tool.name === tool.name)) {
+        return yield* Effect.die(new Error(`Duplicate Work MCP tool name: ${tool.name}`));
+      }
+      return yield* server.addTool({ ...options, tool });
+    }),
+  });
+  return yield* registration.pipe(Effect.provideService(McpServer.McpServer, view));
+});
+
 const withToolAllowList = Effect.fn("McpHttpServer.withToolAllowList")(function* <A, E, R>(
   registration: Effect.Effect<A, E, R>,
 ) {
@@ -1288,12 +1317,18 @@ const withToolAllowList = Effect.fn("McpHttpServer.withToolAllowList")(function*
                     new McpSchema.CallToolResult({
                       isError: true,
                       structuredContent: {
-                        error: { _tag: "McpToolNotAllowed", tool: name },
+                        error: {
+                          _tag: "McpToolNotAllowed",
+                          tool:
+                            Option.getOrUndefined(scope)?.thread?.workPresentation === true
+                              ? workToolName(name)
+                              : name,
+                        },
                       },
                       content: [
                         {
                           type: "text",
-                          text: "This session's T3 credential does not include that tool.",
+                          text: "This session’s credential does not include that tool.",
                         },
                       ],
                     }),
@@ -1386,10 +1421,12 @@ export const toolkitRegistration = <Tools extends Record<string, Tool.Any>, EX, 
   handlers: McpToolAccess.HandlersLayer<Tools, EX, RX>,
 ) =>
   Layer.effectDiscard(
-    withToolAnalytics(
-      withToolSpans(
-        withToolAllowList(
-          withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+    withWorkToolView(
+      withToolAnalytics(
+        withToolSpans(
+          withToolAllowList(
+            withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+          ),
         ),
       ),
     ),
@@ -1407,9 +1444,9 @@ const imageToolRegistration = <Tools extends Record<string, Tool.Any>, A, E, R, 
   register: Effect.Effect<A, E, R>,
   handlers: McpToolAccess.HandlersLayer<Tools, EX, RX>,
 ) =>
-  Layer.effectDiscard(withToolAnalytics(withToolSpans(withToolAllowList(register)))).pipe(
-    Layer.provide(McpToolAccess.HandlersLayer.layer(handlers)),
-  );
+  Layer.effectDiscard(
+    withWorkToolView(withToolAnalytics(withToolSpans(withToolAllowList(register)))),
+  ).pipe(Layer.provide(McpToolAccess.HandlersLayer.layer(handlers)));
 
 export const layerHtmlToolkit = Layer.mergeAll(
   toolkitRegistration(HtmlRenderToolkit, HtmlHandlers.layerRender),
@@ -1519,14 +1556,51 @@ export const layerInProcessMcpServer = McpServer.middleware<{
   { global: true },
 ).pipe(Layer.provideMerge(McpServer.McpServer.layer));
 
-export const layerMcpTransport = <RA, RE, RR>(registrations: Layer.Layer<RA, RE, RR>) =>
+// The packaged smoke test opts in. Check the registered catalog and prompt builder
+// from the running executable, including the compiled settings default.
+const layerVerifyPackagedBrand = Layer.effectDiscard(
+  Effect.gen(function* () {
+    if (!(yield* Config.Boolean("ATUM_WORK_VERIFY_BRAND").pipe(Config.withDefault(false)))) return;
+    const { tools } = yield* McpServer.McpServer;
+    const names = new Set(tools.map(({ tool }) => tool.name));
+    for (const required of [
+      "thread_launch",
+      "thread_wait",
+      "delegate_task",
+      "preview_open",
+      "tool_search",
+    ]) {
+      if (!names.has(required))
+        return yield* Effect.die(new Error("Missing Work tool: " + required));
+    }
+    yield* Effect.sync(() => {
+      for (const { tool } of tools) assertWorkBrandText("tool/" + tool.name, encodeJsonText(tool));
+      assertWorkBrandText("agent instructions", DEFAULT_SERVER_SETTINGS.agentInstructions);
+      const context = buildCodexAdditionalContext(
+        { model: "fixture", workPresentation: true },
+        { browser: true, device: true },
+      );
+      assertWorkBrandText("Codex server instructions", encodeJsonText(context));
+    });
+    yield* Effect.logInfo("Work presentation verified");
+  }).pipe(Effect.orDie),
+);
+
+export const layerMcpTransport = <RA, RE, RR>(
+  registrations: Layer.Layer<RA, RE, RR>,
+  workPresentation = false,
+) =>
   McpServer.layerHttp({
-    name: "T3 Code",
+    name: workPresentation ? "Atum Work" : "T3 Code",
     version: packageJson.version,
-    path: MCP_HTTP_PATH,
+    path: workPresentation ? WORK_AGENT_MCP_PATH : MCP_HTTP_PATH,
     protocols: mcpProtocols,
     allowSessionTermination: true,
-    registrations,
+    registrations: workPresentation
+      ? layerVerifyPackagedBrand.pipe(
+          Layer.provide(registrations.pipe(Layer.provide(Layer.succeed(WorkToolView, true)))),
+        )
+      : registrations,
   }).pipe(Layer.provide(layerMcpAuthMiddleware));
 
 export const layerAtumToolkit = atumConnectorConfigured()
@@ -1583,6 +1657,7 @@ const layerToolExposure = Layer.effect(
  */
 const layerDeferredListing = McpServer.visibility(
   Effect.gen(function* () {
+    const workPresentation = yield* WorkToolView;
     const exposure = yield* McpToolExposure.McpToolExposure;
     // Untraced: it runs once per tool on every list request.
     return Effect.fnUntraced(function* ({ method, target, headers }: McpServer.MiddlewareOptions) {
@@ -1591,7 +1666,10 @@ const layerDeferredListing = McpServer.visibility(
       // A credential with a tool allow-list is shown those tools and nothing else, `tool_search`
       // included, and shown them outright: there is nothing left to defer.
       if (Option.getOrUndefined(scope)?.toolAllowList !== undefined) {
-        return McpInvocationContext.toolPermitted(Option.getOrUndefined(scope), target);
+        return McpInvocationContext.toolPermitted(
+          Option.getOrUndefined(scope),
+          workPresentation ? canonicalWorkToolName(target) : target,
+        );
       }
       const providerSessionId = Option.getOrUndefined(scope)?.thread?.providerSessionId;
       if (headers[MCP_TOOL_EXPOSURE_HEADER] !== "deferred" || providerSessionId === undefined) {
@@ -1670,6 +1748,7 @@ export const layerMilestoneEvents = Layer.effectDiscard(
   Layer.provide(layerWebhookTransport),
 );
 
-export const layer = layerMcpTransport(
-  Layer.mergeAll(layerTools, layerToolSearch, layerMilestoneEvents),
+export const layer = Layer.merge(
+  layerMcpTransport(Layer.mergeAll(layerTools, layerToolSearch, layerMilestoneEvents)),
+  Layer.fresh(layerMcpTransport(Layer.merge(layerTools, layerToolSearch), true)),
 );

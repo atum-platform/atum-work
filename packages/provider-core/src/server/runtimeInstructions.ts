@@ -1,3 +1,4 @@
+import { workInstructionText } from "@t3tools/shared/workToolNames";
 import type { AgentFeedbackMode } from "@t3tools/contracts";
 
 import type { ProviderAdapterV2RuntimePolicy } from "./ProviderAdapter.ts";
@@ -18,6 +19,7 @@ If available, call link_issue for each issue you take on or file, even via CLI; 
 /** Omit model and effort when the harness manages them dynamically. */
 export function buildRuntimeInstructions(runtime: {
   readonly harness: string;
+  readonly workPresentation?: boolean | undefined;
   readonly agentFeedback?: AgentFeedbackMode;
   readonly agentInstructions?: string | undefined;
   readonly model?: string | undefined;
@@ -36,8 +38,12 @@ export function buildRuntimeInstructions(runtime: {
     modelName && modelName !== model ? `${modelName} (model slug: ${model})` : model;
   const modelInfo = model && model !== "auto" && model !== "default" ? `, as ${modelLabel}` : "";
   const effortInfo = effort ? ` with ${effort} reasoning effort` : "";
-  const runtimeInfo = `<runtime_info>In case you're asked: you are running in T3 Code through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in T3 Code's files viewer.</runtime_info>`;
-  const feedbackLine = AGENT_FEEDBACK_INSTRUCTIONS[runtime.agentFeedback ?? "off"];
+  const product = runtime.workPresentation ? "Atum Work" : "T3 Code";
+  const runtimeInfo = `<runtime_info>In case you're asked: you are running in ${product} through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in ${product}'s files viewer.</runtime_info>`;
+  const legacyFeedback = AGENT_FEEDBACK_INSTRUCTIONS[runtime.agentFeedback ?? "off"];
+  const feedbackLine = runtime.workPresentation
+    ? workInstructionText(legacyFeedback)
+    : legacyFeedback;
   const feedback = feedbackLine ? `\n${feedbackLine}` : "";
   const workspace =
     runtime.runtimePolicy === undefined ? "" : buildWorkspaceInstructions(runtime.runtimePolicy);
@@ -45,7 +51,11 @@ export function buildRuntimeInstructions(runtime: {
     runtime.pullRequestLinking === false
       ? runtimeInfo
       : `${runtimeInfo}\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`;
-  return [linked + feedback, ...(runtime.agentInstructions ? [runtime.agentInstructions] : []), ...(workspace === "" ? [] : [workspace])].join("\n\n");
+  return [
+    linked + feedback,
+    ...(runtime.agentInstructions ? [runtime.agentInstructions] : []),
+    ...(workspace === "" ? [] : [workspace]),
+  ].join("\n\n");
 }
 
 function toSingleLine(value: string): string {
