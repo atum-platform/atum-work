@@ -45,8 +45,11 @@ const starterFormats = {
 const blankDesign =
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540"/>\n';
 
+// The Desktop sidecar supplies this internal runtime path alongside its IPC channel.
+const stagedDesignSkillPath = () => process.env.ATUM_WORK_DESIGN_SKILL;
+
 export const workDesignSkill = Effect.fn("Work.readDesignSkill")(function* () {
-  const staged = process.env.ATUM_WORK_DESIGN_SKILL;
+  const staged = stagedDesignSkillPath();
   if (!staged || !NodePath.isAbsolute(staged)) return undefined;
   const skill = yield* Effect.tryPromise({
     try: () => NodeFSP.readFile(staged, "utf8"),

@@ -20,7 +20,7 @@ The signed runtime, installed provider acceptance, Drive placement and sync, and
 
 ## S6 HTML and SVG
 
-Desktop passes the path to the staged `work-design` skill in `ATUM_WORK_DESIGN_SKILL`. New Design starters install its content under both `.claude/skills` and `.agents/skills`. At turn start Work also reads the staged copy into the existing provider app context alongside the private output slot. This reaches Claude, Codex, Antigravity, and Luna on later turns, including threads created with older Design starters. Luna receives the guidance through its existing ACP prompt path.
+Desktop passes the path to the staged `work-design` skill in the private sidecar environment as `ATUM_WORK_DESIGN_SKILL`. New Design starters install its content under both `.claude/skills` and `.agents/skills`. At turn start Work also reads the staged copy into the existing provider app context alongside the private output slot. This reaches Claude, Codex, Antigravity, and Luna on later turns, including threads created with older Design starters. Luna receives the guidance through its existing ACP prompt path.
 
 Each completed design turn records its new artifact ID and selected format. Finalization rechecks that specific file and sends an explicit run-relative `Design.html` or `Design.svg` with the matching format and `preview: null`. Desktop validates the static source, renders the companion PNG, versions both files together and reports Saved when each has sync evidence. Existing Word receipts default to `docx` during replay.
 
