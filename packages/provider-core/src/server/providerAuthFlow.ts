@@ -19,6 +19,8 @@ import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 
 import type * as ProviderAuth from "./auth.ts";
@@ -539,3 +541,30 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
   );
   return controller;
 });
+
+// Login and installation output can contain browser codes and account identifiers.
+export function runBrowserLoginCommand(
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  command: string,
+  args: ReadonlyArray<string>,
+  options: { cwd: string; env: NodeJS.ProcessEnv; error: ProviderSetupError },
+) {
+  const { cwd, env, error } = options;
+  return spawner
+    .spawn(
+      ChildProcess.make(command, [...args], {
+        cwd,
+        env,
+        extendEnv: false,
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+      }),
+    )
+    .pipe(
+      Effect.flatMap((child) => child.exitCode),
+      Effect.mapError(() => error),
+      Effect.flatMap((code) => (Number(code) === 0 ? Effect.void : Effect.fail(error))),
+      Effect.scoped,
+    );
+}
