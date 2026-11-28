@@ -1079,6 +1079,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "provider-fallback",
+    title: msg("When a plan runs out"),
+    to: "/settings/providers",
+    searchTerms: [
+      msg("switch provider fallback order usage limit plan runs out automatic chatgpt claude"),
+    ],
+  },
+  {
     id: "usage-providers",
     title: msg("Usage providers"),
     to: "/settings/providers",

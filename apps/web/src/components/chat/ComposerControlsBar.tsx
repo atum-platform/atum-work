@@ -32,6 +32,7 @@ import {
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
 import { useActiveAtumSurfaceMode } from "../../atum/surfaceMode";
+import { ComposerAutoswitchStatus, ComposerSessionAutoswitchRow } from "./ComposerAutoswitch";
 
 /**
  * The composer footer controls: the model picker (which also holds effort, speed and
@@ -88,6 +89,9 @@ export function ComposerControlsBar(props: {
   onModelPickerOpenChange: (open: boolean) => void;
   modelPickerIconClassName: string | undefined;
   getModelDisabledReason: ChatComposerProps["getModelDisabledReason"];
+  /** The native resume, offered as Continue when a plan ran out mid-run. */
+  canResume: boolean;
+  onResume: () => void;
 }) {
   const {
     environmentId,
@@ -186,6 +190,7 @@ export function ComposerControlsBar(props: {
         },
       ]
     : [];
+  const autoswitchThreadRef = routeKind === "server" ? routeThreadRef : null;
   // Its own element, so typing (which rebuilds the controls around it) leaves it cached.
   const composerModelPicker = (
     <ComposerModelPicker
@@ -229,12 +234,20 @@ export function ComposerControlsBar(props: {
       }
       effortColumn={<ComposerEffortColumn traits={traitsInput} />}
       footer={
-        <ComposerPickerFooter
-          traits={traitsInput}
-          runtimeMode={compatibleRuntimeMode}
-          runtimeModeOptions={compatibleRuntimeModeOptions}
-          onRuntimeModeChange={handleRuntimeModeChange}
-        />
+        <>
+          <ComposerPickerFooter
+            traits={traitsInput}
+            runtimeMode={compatibleRuntimeMode}
+            runtimeModeOptions={compatibleRuntimeModeOptions}
+            onRuntimeModeChange={handleRuntimeModeChange}
+          />
+          <ComposerSessionAutoswitchRow
+            environmentId={environmentId}
+            threadRef={autoswitchThreadRef}
+            instanceEntries={providerInstanceEntries}
+            activeInstanceId={selectedInstanceId}
+          />
+        </>
       }
       terminalOpen={terminalOpen}
       open={modelPickerOpen}
@@ -268,6 +281,15 @@ export function ComposerControlsBar(props: {
     </ComposerControl>
   ) : (
     <>
+      {composerControlsCollapsed ? null : (
+        <ComposerAutoswitchStatus
+          environmentId={environmentId}
+          threadRef={autoswitchThreadRef}
+          instanceEntries={providerInstanceEntries}
+          canResume={props.canResume}
+          onResume={props.onResume}
+        />
+      )}
       {composerModelPicker}
 
       <>
