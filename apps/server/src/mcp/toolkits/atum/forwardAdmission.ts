@@ -134,14 +134,14 @@ export const consentFingerprint = (grant: ForwardGrant) =>
 
 export const serializeForwardGrant = (grant: ForwardGrant) => JSON.stringify(grant);
 
+export function learningOwnerKey(grant: ForwardGrant) {
+  const { owner, agent, mac } = grant.binding;
+  return JSON.stringify([owner, agent, mac]);
+}
+
 export function sameLearningOwner(a: ForwardGrant, b: ForwardGrant) {
-  return (
-    a.audience === "owner_dm" &&
-    b.audience === "owner_dm" &&
-    a.binding.owner === b.binding.owner &&
-    a.binding.agent === b.binding.agent &&
-    a.binding.mac === b.binding.mac
-  );
+  return a.audience === "owner_dm" && b.audience === "owner_dm" &&
+    learningOwnerKey(a) === learningOwnerKey(b);
 }
 
 export async function bindNativeThread(

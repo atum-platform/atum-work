@@ -18,3 +18,5 @@ native consent. The enrolled Desktop-to-relay path needs signed integration
 verification.
 
 The advertised launch description carries the relay compatibility marker.
+
+The launch and attachment registry use the same native owner identity key.

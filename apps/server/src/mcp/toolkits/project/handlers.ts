@@ -1,5 +1,6 @@
 import {
   bindNativeThread,
+  learningOwnerKey,
   forwardGrantsFile,
   ForwardAdmissionError,
 } from "../atum/forwardAdmission.ts";
@@ -250,11 +251,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const { caller } = context;
         // Native learning launch keys survive OAuth renewal for the same enrolled owner.
         const namespace = learningConsent
-          ? JSON.stringify([
-              learningConsent.binding.owner,
-              learningConsent.binding.agent,
-              learningConsent.binding.mac,
-            ])
+          ? learningOwnerKey(learningConsent)
           : scope.requestNamespace;
         const commandId =
           key === undefined ? yield* newCommandId() : yield* launchCommandId(namespace, key);

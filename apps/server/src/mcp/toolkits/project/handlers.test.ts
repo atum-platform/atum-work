@@ -139,7 +139,7 @@ const clientLaunchHarness = (input: {
               ? [{ userMessageId: launch.initialMessage.messageId }]
               : [],
           ),
-        } as Effect.Success<
+        } as unknown as Effect.Success<
           ReturnType<ThreadManagement.ThreadManagementService["Service"]["getThreadRecords"]>
         >),
       // A thread exists once a launch started it.
