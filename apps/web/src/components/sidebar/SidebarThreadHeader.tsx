@@ -15,7 +15,7 @@ import {
   type RefObject,
 } from "react";
 
-import { isAtumWorkBuild, useActiveAtumSurfaceMode } from "~/atum/surfaceMode";
+import { isAtumWorkBuild } from "~/atum/surfaceMode";
 import { runAtumBandCommand } from "~/atum/workCommands";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
@@ -59,9 +59,9 @@ export function SidebarThreadHeader({
   onClearSearch,
 }: SidebarThreadHeaderProps) {
   const gt = useGT();
-  // Work mode names one folder, so its filter is noise there; Code mode keeps it.
-  const surfaceMode = useActiveAtumSurfaceMode();
-  const showProjectScope = hasProjects && !(isAtumWorkBuild && surfaceMode === "work");
+  // Search, filter, plus in every mode (owner 2026-11-28: "Filter button now added to Chat but gone
+  // from Work?"). The list holds every project's threads in Work mode too, so the filter still narrows it.
+  const showProjectScope = hasProjects;
   const resultsVisible = isSearching && searchResultCount > 0;
   // Shrinking results can remove the active option; never leave aria-activedescendant pointing at it.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
