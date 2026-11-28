@@ -2263,6 +2263,36 @@ effectIt.effect("sends new steering text when restarting a manual continuation",
   }),
 );
 
+effectIt.effect("continues from a portable handoff when the old receipt is missing", () =>
+  Effect.gen(function* () {
+    const harness = makeLocalCommandHarness({
+      text: "",
+      manualContinuation: true,
+      nativeResumeUnsupported: true,
+      sideChat: { contextRun: "current", unsentResume: true },
+    });
+    const projection = harness.projection();
+    const handoff = projection.contextHandoffs[0]!;
+    const oldProvider = ProviderInstanceId.make("old-provider");
+    harness.setProjection({
+      ...projection,
+      runs: projection.runs.map((run) =>
+        run.id === RunId.make("stopped-run")
+          ? {
+              ...run,
+              providerInstanceId: oldProvider,
+              modelSelection: { ...run.modelSelection, instanceId: oldProvider },
+            }
+          : { ...run, contextHandoffId: handoff.id },
+      ),
+    });
+    yield* harness.start;
+    expect(harness.startTurn.mock.calls.map(([turn]) => turn.message.text)).toEqual([
+      withInlineContext(handoff.summaryText, "Continue where you left off."),
+    ]);
+  }),
+);
+
 effectIt.effect("refuses unsupported resume instead of manufacturing a user prompt", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({

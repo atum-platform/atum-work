@@ -24,33 +24,18 @@ import { isLocalLoopbackHost, isWildcardHost } from "./hostClassification.ts";
 
 const MINUTE = 60_000;
 
-export function exhaustedUsageWindow(
-  provider: ServerProvider | undefined,
-  now: number,
-  model?: string,
-) {
+export function applicableUsageWindows(provider: ServerProvider | undefined, model?: string) {
   const windows = provider?.usageLimits?.windows ?? [];
-  const exhausted = windows.filter(
+  if (model === undefined) return windows;
+  const matching = windows.filter(
     (window) =>
-      (window.usedPercent ?? 0) >= 100 &&
-      (model === undefined || window.modelIds === undefined || window.modelIds.includes(model)) &&
-      (model === undefined ||
-        window.providerIds === undefined ||
-        window.providerIds.includes(model.split("/")[0] ?? "")) &&
-      (!window.resetsAt ||
-        !Number.isFinite(Date.parse(window.resetsAt)) ||
-        Date.parse(window.resetsAt) > now),
+      (window.modelIds === undefined || window.modelIds.includes(model)) &&
+      (window.providerIds === undefined || window.providerIds.includes(model.split("/")[0] ?? "")),
   );
-  if (model === undefined) return exhausted[0];
   switch (provider?.driver) {
-    case "cursor": {
-      const api = exhausted.find((window) => window.id === "apiPercentUsed");
-      const auto = exhausted.find((window) => window.id === "autoPercentUsed");
-      return /^(auto|default|grok|composer)/.test(model) ? auto && api : api;
-    }
     case "antigravity": {
       const family = model.match(/^(gemini|claude|gpt)-/)?.[1];
-      return exhausted.find((window) => {
+      return matching.filter((window) => {
         const pool = window.id.match(/^(gemini|claude|gpt|3p)-/)?.[1];
         return (
           pool === undefined ||
@@ -61,19 +46,46 @@ export function exhaustedUsageWindow(
       });
     }
     case "codex": {
-      // Seat-based plans spend credits only past their plan windows, so the credit cap blocks only plans without them.
       const hasPlanWindows = windows.some(
         (window) => window.id === "primary" || window.id === "secondary",
       );
-      return exhausted.find((window) => window.id !== "individual" || !hasPlanWindows);
+      return matching.filter((window) => window.id !== "individual" || !hasPlanWindows);
     }
     case "opencode":
-      return exhausted.find(
+      return matching.filter(
         (window) => !window.id.startsWith("go_") || model.startsWith("opencode-go/"),
       );
     default:
-      return exhausted[0];
+      return matching;
   }
+}
+
+export function exhaustedUsageWindows(
+  provider: ServerProvider | undefined,
+  now: number,
+  model?: string,
+) {
+  const exhausted = applicableUsageWindows(provider, model).filter(
+    (window) =>
+      window.usedPercent >= 100 &&
+      (!window.resetsAt ||
+        !Number.isFinite(Date.parse(window.resetsAt)) ||
+        Date.parse(window.resetsAt) > now),
+  );
+  if (model !== undefined && provider?.driver === "cursor") {
+    const api = exhausted.find((window) => window.id === "apiPercentUsed");
+    const auto = exhausted.find((window) => window.id === "autoPercentUsed");
+    return api && (!/^(auto|default|grok|composer)/.test(model) || auto) ? [api] : [];
+  }
+  return exhausted;
+}
+
+export function exhaustedUsageWindow(
+  provider: ServerProvider | undefined,
+  now: number,
+  model?: string,
+) {
+  return exhaustedUsageWindows(provider, now, model)[0];
 }
 
 export function resolveNewThreadModelSelection(input: {

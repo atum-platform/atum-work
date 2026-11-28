@@ -201,6 +201,11 @@ import * as ProviderContinuationRequests from "@t3tools/provider-core/server/Pro
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import { ProviderSessionManagerV2 } from "./ProviderSessionManager.ts";
+import {
+  isInteractiveFallbackMessage,
+  selectProviderFallback,
+  workFallbackOrder,
+} from "./ProviderFallback.ts";
 import { ProviderSwitchServiceV2 } from "./ProviderSwitchService.ts";
 import { isAutomaticCompletionRun, queuedRunsInDeliveryOrder } from "./QueuedRunOrder.ts";
 import { isRuntimePolicyAboveCeilingError, RuntimePolicyV2 } from "./RuntimePolicy.ts";
@@ -1684,6 +1689,30 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           maxRuntimeMode: managedPolicy.limits.maxRuntimeMode,
         };
 
+  const planProviderFallback = Effect.fn("Orchestrator.planProviderFallback")(function* (
+    thread: OrchestrationV2AppThread,
+    message: Parameters<typeof isInteractiveFallbackMessage>[0],
+    requested: ModelSelection,
+  ) {
+    const snapshot = providerAdapters.getSnapshot;
+    if (snapshot === undefined || !isInteractiveFallbackMessage(message)) return undefined;
+    const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
+    const order = workFallbackOrder(settings, thread);
+    if (order.length === 0) return undefined;
+    const now = yield* DateTime.now;
+    return yield* selectProviderFallback({
+      settings,
+      thread,
+      requested,
+      order,
+      nowMs: DateTime.toEpochMillis(now),
+      snapshot,
+      latestFailure: projectionStore.getProviderQuotaFailure,
+    }).pipe(
+      Effect.mapError((cause) => new OrchestratorProjectionError({ threadId: thread.id, cause })),
+    );
+  });
+
   /** The driver when this provider runs `/goal` natively, else undefined. */
   const goalDriverFor = Effect.fn("Orchestrator.goalDriverFor")(function* (
     command: Pick<OrchestrationV2ServerCommand, "commandId" | "type">,
@@ -2567,7 +2596,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const queuedMessage = projection.messages.find(
         (candidate) => candidate.id === storedQueuedRun.userMessageId,
       );
-      const modelSelection = queuedRunModelSelection(projection, storedQueuedRun);
+      const queuedSelection = queuedRunModelSelection(projection, storedQueuedRun);
+      const fallback =
+        queuedMessage === undefined ||
+        storedQueuedRun.freshContext === true ||
+        storedQueuedRun.outputSchema !== undefined ||
+        projection.runtimeRequests.some((request) => request.status === "pending")
+          ? undefined
+          : yield* planProviderFallback(projection.thread, queuedMessage, queuedSelection);
+      const modelSelection = fallback?.selection ?? queuedSelection;
       const queuedRun = {
         ...storedQueuedRun,
         modelSelection,
@@ -2575,11 +2612,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       };
       // A limited provider would fail and consume every waiting message.
       if (
-        usageLimitHoldsQueue(
-          projection,
-          queuedRun.providerInstanceId,
-          options?.userStarted === true ? undefined : yield* DateTime.now,
-        )
+        fallback?.blocked === true ||
+        (fallback === undefined &&
+          usageLimitHoldsQueue(
+            projection,
+            queuedRun.providerInstanceId,
+            options?.userStarted === true ? undefined : yield* DateTime.now,
+          ))
       ) {
         return;
       }
@@ -2622,6 +2661,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const providerFailed =
         failureClass !== undefined &&
         failureClass !== "validation_error" &&
+        !(failureClass === "usage_limit" && fallback !== undefined) &&
         failedRun?.providerInstanceId === queuedRun.providerInstanceId;
       if (worktreeMissing || instanceDisabledForProject || providerFailed) {
         // A buffered wake prompts nothing: it replays output the CLI already produced.
@@ -2724,7 +2764,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             }),
         ),
       );
-      const followsCurrent = followsCurrentConversation(queuedMessage);
+      const followsCurrent =
+        !modelSelectionsEqual(queuedSelection, modelSelection) ||
+        followsCurrentConversation(queuedMessage);
       const freshContext = queuedRun.freshContext === true;
       // A scheduled fresh run is a side conversation, so it must not drop the fork's context.
       const supersededForkTransfer =
@@ -3242,11 +3284,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         : "Provider or model selection changed.";
       yield* writeSystemEvents(
         [
-          ...(selectionChanged
+          ...(selectionChanged || fallback !== undefined
             ? [
                 {
-                  type:
-                    queuedRun.providerInstanceId === projection.thread.providerInstanceId
+                  type: !selectionChanged
+                    ? ("thread.metadata-updated" as const)
+                    : queuedRun.providerInstanceId === projection.thread.providerInstanceId
                       ? ("thread.model-selection-updated" as const)
                       : ("thread.provider-switched" as const),
                   threadId,
@@ -3256,6 +3299,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                     ...projection.thread,
                     providerInstanceId: queuedRun.providerInstanceId,
                     modelSelection: queuedRun.modelSelection,
+                    ...(fallback === undefined ? {} : { providerFallback: fallback.preference }),
                     updatedAt: now,
                   },
                 },
@@ -5154,6 +5198,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return {
             ...thread,
             ...(command.title === undefined ? {} : { title: command.title, titleRenamed: true }),
+            ...(command.providerFallbackOrder === undefined
+              ? {}
+              : { providerFallbackOrder: command.providerFallbackOrder }),
             ...(command.limitRecovery === undefined ? {} : { limitRecovery }),
             ...(command.limitRecovery !== undefined &&
             limitRecovery?.snooze === true &&
@@ -5523,6 +5570,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             ...thread,
             providerInstanceId: command.modelSelection.instanceId,
             modelSelection: command.modelSelection,
+            ...(thread.providerFallback == null ? {} : { providerFallback: null }),
             updatedAt: now,
           };
       }
@@ -7289,6 +7337,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const recovery = projection.thread.limitRecovery;
       const now = yield* DateTime.now;
       if (
+        workFallbackOrder(yield* serverSettings.getSettings.pipe(Effect.orDie), projection.thread)
+          .length > 0 ||
         run?.id !== command.usageLimitContinuationOfRunId ||
         failure?.class !== "usage_limit" ||
         threadShellFromProjection(projection).lastErrorClass !== "usage_limit" ||
@@ -8000,6 +8050,32 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     ) {
       modelSelection = queueTailModelSelection(projection);
     }
+    const eligibleFallbackDispatch =
+      startsOrQueuesRun &&
+      !shouldQueue &&
+      !freshContext &&
+      outputSchema === undefined &&
+      !projection.runtimeRequests.some((request) => request.status === "pending") &&
+      isInteractiveFallbackMessage(command);
+    const fallback = eligibleFallbackDispatch
+      ? yield* planProviderFallback(projection.thread, command, modelSelection)
+      : undefined;
+    if (fallback !== undefined) {
+      if (fallback.blocked && command.manualContinuationOfRunId !== undefined) {
+        return yield* new OrchestratorDispatchError({
+          commandId: command.commandId,
+          commandType: command.type,
+          cause: "No connected fallback provider is available for this run.",
+        });
+      }
+      modelSelection = fallback.selection;
+      if (
+        activeProviderInstanceId !== undefined &&
+        activeProviderInstanceId !== modelSelection.instanceId
+      ) {
+        projection = yield* getProjectionWithPendingEvents(command.threadId, events);
+      }
+    }
     yield* ensureGoalCommandSupported(command, command, modelSelection.instanceId);
     // Client messages resume held queues; server continuations and scheduled tasks do not.
     // Provider failure or usage limits re-hold the queue.
@@ -8405,16 +8481,32 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       (transfer) => transfer.id !== pendingMergeBackTransfer?.id,
     );
     const now = yield* DateTime.now;
-    if (
+    const dispatchSelectionChanged =
       !modelSelectionsEqual(projection.thread.modelSelection, modelSelection) ||
-      projection.thread.providerInstanceId !== modelSelection.instanceId
-    ) {
+      projection.thread.providerInstanceId !== modelSelection.instanceId;
+    const previousFallback = projection.thread.providerFallback;
+    const fallbackPreference =
+      fallback?.preference ??
+      (previousFallback != null && dispatchSelectionChanged && command.modelSelection !== undefined
+        ? null
+        : previousFallback);
+    const fallbackPreferenceChanged =
+      fallbackPreference !== previousFallback &&
+      (fallbackPreference == null ||
+        previousFallback == null ||
+        !modelSelectionsEqual(
+          fallbackPreference.preferredSelection,
+          previousFallback.preferredSelection,
+        ) ||
+        fallbackPreference.exhaustedUntil !== previousFallback.exhaustedUntil);
+    if (dispatchSelectionChanged || fallbackPreferenceChanged) {
       yield* emit(
         events,
         command,
       )({
-        type:
-          projection.thread.providerInstanceId === modelSelection.instanceId
+        type: !dispatchSelectionChanged
+          ? "thread.metadata-updated"
+          : projection.thread.providerInstanceId === modelSelection.instanceId
             ? "thread.model-selection-updated"
             : "thread.provider-switched",
         threadId: command.threadId,
@@ -8424,6 +8516,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ...projection.thread,
           providerInstanceId: modelSelection.instanceId,
           modelSelection,
+          ...(fallbackPreferenceChanged ? { providerFallback: fallbackPreference } : {}),
           updatedAt: now,
         },
       });
@@ -17240,6 +17333,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 (cause) => new OrchestratorProjectionError({ threadId: input.threadId, cause }),
               ),
             );
+          if (
+            workFallbackOrder(yield* serverSettings.getSettings.pipe(Effect.orDie), thread).length >
+            0
+          )
+            return;
           // Stop or an explicit recovery choice can commit after the sweep reads its candidate.
           if (
             thread.limitRecovery?.runId === input.limitRecovery.runId &&

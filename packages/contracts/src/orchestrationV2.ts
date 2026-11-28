@@ -497,6 +497,24 @@ const OrchestrationV2LastTitleRegeneration = Schema.Struct({
   completedAt: Schema.DateTimeUtc,
 });
 
+const ProviderFallbackExhaustedUntil = Schema.NullOr(
+  Schema.Union([IsoDateTime, Schema.Literal("unknown")]),
+);
+
+const ProviderFallbackPreference = Schema.Struct({
+  preferredSelection: ModelSelection,
+  exhaustedUntil: ProviderFallbackExhaustedUntil,
+});
+
+export const ProviderFallbackState = Schema.Struct({
+  activeProvider: ProviderInstanceId,
+  preferredProvider: ProviderInstanceId,
+  exhaustedUntil: ProviderFallbackExhaustedUntil,
+  reason: Schema.NullOr(Schema.Literal("usage_limit")),
+  canContinue: Schema.Boolean,
+});
+export type ProviderFallbackState = typeof ProviderFallbackState.Type;
+
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
   id: ThreadId,
@@ -544,6 +562,8 @@ export const OrchestrationV2AppThread = Schema.Struct({
   snoozedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   lastSnoozeWakeAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
+  providerFallbackOrder: Schema.optional(Schema.NullOr(Schema.Array(ProviderInstanceId))),
+  providerFallback: Schema.optional(Schema.NullOr(ProviderFallbackPreference)),
   guestShare: Schema.optional(Schema.NullOr(ThreadGuestShare)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
@@ -2471,6 +2491,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   snoozedUntil: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   snoozedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
+  providerFallbackOrder: Schema.optional(Schema.NullOr(Schema.Array(ProviderInstanceId))),
+  providerFallbackState: Schema.optional(ProviderFallbackState),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -3491,6 +3513,7 @@ export const OrchestrationV2Command = Schema.Union([
     /** Reject unless no message or run has landed on this thread. */
     expectedEmpty: Schema.optional(Schema.Boolean),
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
+    providerFallbackOrder: Schema.optional(Schema.NullOr(Schema.Array(ProviderInstanceId))),
     /** Link (object) or unlink (null) a pull request; absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   }),

@@ -133,6 +133,7 @@ function layerProjectionStore(
     ProjectionStore.ProjectionStoreV2,
     ProjectionStore.ProjectionStoreV2.of({
       apply: () => Effect.void,
+      getProviderQuotaFailure: () => Effect.die("unused getProviderQuotaFailure"),
       getLimitRecoveryCandidates: () => Effect.die("unused getLimitRecoveryCandidates"),
       getLimitRecoveryWakeAt: () => Effect.die("unused getLimitRecoveryWakeAt"),
       getOpenRemoteDelegatedTasks: Effect.die("unused getOpenRemoteDelegatedTasks"),

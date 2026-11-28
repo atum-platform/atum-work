@@ -22,6 +22,7 @@ import {
   RuntimeRequestId,
   TurnItemId,
   type ModelSelection,
+  type ServerProvider,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2Run,
   type OrchestrationV2ShellSnapshot,
@@ -153,6 +154,22 @@ const orchestrationAdapter = {
   planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
   openSession: () => Effect.die("sessions are not used by lifecycle tests"),
 } as ProviderAdapter.ProviderAdapterV2["Service"];
+const fallbackProviderSnapshot = (selection: ModelSelection, driver: ProviderDriverKind) =>
+  ({
+    instanceId: selection.instanceId,
+    driver,
+    enabled: true,
+    installed: true,
+    version: "1.0.0",
+    status: "ready",
+    auth: { status: "authenticated" },
+    checkedAt: "1970-01-01T00:00:00.000Z",
+    slashCommands: [],
+    skills: [],
+    models: [{ slug: selection.model, name: selection.model, isCustom: false, capabilities: null }],
+  }) satisfies ServerProvider;
+const claudeFallbackModel = "claude-sonnet";
+
 const providerInstance = {
   instanceId: modelSelection.instanceId,
   driverKind: driver,
@@ -162,7 +179,9 @@ const providerInstance = {
   },
   displayName: "Codex test",
   enabled: true,
-  snapshot: { getSnapshot: Effect.succeed({}) } as unknown as ProviderInstance["snapshot"],
+  snapshot: {
+    getSnapshot: Effect.succeed(fallbackProviderSnapshot(modelSelection, driver)),
+  } as unknown as ProviderInstance["snapshot"],
   orchestrationAdapter,
   textGeneration: {} as ProviderInstance["textGeneration"],
 } satisfies ProviderInstance;
@@ -187,6 +206,14 @@ const claudeProviderInstance = {
   driverKind: claudeDriver,
   continuationIdentity: { driverKind: claudeDriver, continuationKey: "claude:test" },
   displayName: "Claude test",
+  snapshot: {
+    getSnapshot: Effect.succeed(
+      fallbackProviderSnapshot(
+        { instanceId: claudeInstanceId, model: claudeFallbackModel },
+        claudeDriver,
+      ),
+    ),
+  } as unknown as ProviderInstance["snapshot"],
   orchestrationAdapter: {
     ...orchestrationAdapter,
     instanceId: claudeInstanceId,
@@ -13545,6 +13572,194 @@ it.layer(layerSharedApplicationDataPlaneTest)("shared application data plane", (
       `;
       assert.equal(retiredWrites[0]?.count, 0);
     }),
+  );
+});
+
+it.layer(layerTest)("Work provider fallback", (it) => {
+  it.effect.each(["next turn", "Continue", "off"] as const)(
+    "routes after a settled quota failure with %s",
+    (scenario) =>
+      Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const events = yield* EventSink.EventSinkV2;
+        const store = yield* ProjectionStore.ProjectionStoreV2;
+        const threadId = ThreadId.make(`fallback:${scenario}`);
+        const projectId = ProjectId.make(`${threadId}:project`);
+        const now = yield* DateTime.now;
+        const reset = DateTime.add(now, { minutes: 1 });
+        const resetAt = DateTime.formatIso(reset);
+        yield* seedProject({
+          projectId,
+          title: "Fallback project",
+          workspaceRoot: process.cwd(),
+          defaultModelSelection: modelSelection,
+          createdAt: DateTime.formatIso(now),
+        });
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(`${threadId}:create`),
+          threadId,
+          projectId,
+          title: "Work",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: process.cwd(),
+          createdBy: "user",
+          creationSource: "web",
+        });
+        if (scenario !== "off") {
+          yield* orchestrator.dispatch({
+            type: "thread.metadata.update",
+            commandId: CommandId.make(`${threadId}:enable`),
+            threadId,
+            providerFallbackOrder: [alternateInstanceId, claudeInstanceId],
+          });
+        }
+        const send = (key: string, selection?: ModelSelection, manualContinuationOfRunId?: RunId) =>
+          orchestrator.dispatch({
+            type: "message.dispatch",
+            commandId: CommandId.make(`${threadId}:${key}`),
+            threadId,
+            messageId: MessageId.make(`${threadId}:${key}`),
+            text: key,
+            attachments: [],
+            ...(selection === undefined ? {} : { modelSelection: selection }),
+            ...(manualContinuationOfRunId === undefined ? {} : { manualContinuationOfRunId }),
+            dispatchMode: { type: "start_immediately" },
+            createdBy: "user",
+            creationSource: "web",
+          });
+        yield* send("Original task");
+        const started = yield* orchestrator.getThreadProjection(threadId);
+        const original = started.runs[0]!;
+        assert.equal(original.providerInstanceId, modelSelection.instanceId);
+        const itemBase = {
+          threadId,
+          runId: original.id,
+          nodeId: original.rootNodeId,
+          providerThreadId: original.providerThreadId,
+          providerTurnId: null,
+          nativeItemRef: null,
+          parentItemId: null,
+          startedAt: now,
+          completedAt: now,
+          updatedAt: now,
+        };
+        yield* events.write({
+          events: [
+            ...(scenario !== "Continue"
+              ? []
+              : [
+                  {
+                    id: EventId.make(`${threadId}:edit`),
+                    type: "turn-item.updated" as const,
+                    threadId,
+                    runId: original.id,
+                    occurredAt: now,
+                    payload: {
+                      ...itemBase,
+                      id: TurnItemId.make(`${threadId}:edit`),
+                      type: "file_change" as const,
+                      ordinal: 2,
+                      status: "completed" as const,
+                      title: "Edited a file",
+                      fileName: "example.ts",
+                    },
+                  },
+                ]),
+            {
+              id: EventId.make(`${threadId}:limit`),
+              type: "turn-item.updated",
+              threadId,
+              runId: original.id,
+              occurredAt: now,
+              payload: {
+                ...itemBase,
+                id: TurnItemId.make(`${threadId}:limit`),
+                type: "error",
+                ordinal: 3,
+                status: "failed",
+                title: "Usage limit",
+                failure: {
+                  class: "usage_limit",
+                  message: "Plan limit reached.",
+                  code: null,
+                  retryable: null,
+                  resetAt,
+                },
+              },
+            },
+            {
+              id: EventId.make(`${threadId}:cutoff`),
+              type: "run.updated",
+              threadId,
+              occurredAt: now,
+              payload: { ...original, status: "failed", startedAt: now, completedAt: now },
+            },
+          ],
+        });
+        const shell = yield* store.getThreadShell(threadId);
+        assert.equal(shell?.providerFallbackState?.canContinue, scenario === "Continue");
+        assert.equal(shell?.providerFallbackState?.exhaustedUntil, resetAt);
+        assert.lengthOf((yield* orchestrator.getThreadProjection(threadId)).runs, 1);
+
+        const nextKey = scenario === "Continue" ? "Continue" : "Next task";
+        yield* send(nextKey, modelSelection, scenario === "Continue" ? original.id : undefined);
+        const after = yield* orchestrator.getThreadProjection(threadId);
+        const next = after.runs[1]!;
+        assert.equal(
+          next.providerInstanceId,
+          scenario === "off" ? modelSelection.instanceId : claudeInstanceId,
+        );
+        if (scenario === "off") return;
+
+        assert.isNotNull(next.contextHandoffId);
+        assert.isTrue(
+          after.contextTransfers.some(
+            (transfer) =>
+              transfer.type === "provider_handoff" &&
+              transfer.sourceThreadId === threadId &&
+              transfer.targetRunId === next.id,
+          ),
+        );
+        assert.equal(
+          next.manualContinuationOfRunId,
+          scenario === "Continue" ? original.id : undefined,
+        );
+        const switched = yield* store.getThreadShell(threadId);
+        assert.deepEqual(switched?.providerFallbackState, {
+          activeProvider: claudeInstanceId,
+          preferredProvider: modelSelection.instanceId,
+          exhaustedUntil: resetAt,
+          reason: "usage_limit",
+          canContinue: false,
+        });
+        if (scenario === "Continue") {
+          const handoff = after.contextHandoffs.find((entry) => entry.id === next.contextHandoffId);
+          assert.include(handoff?.summaryText ?? "", "File change: example.ts");
+          const duplicate = yield* send("Continue again", undefined, original.id).pipe(Effect.exit);
+          assert.equal(duplicate._tag, "Failure");
+        }
+        yield* events.write({
+          events: [
+            {
+              id: EventId.make(`${threadId}:settled-fallback`),
+              type: "run.updated",
+              threadId,
+              occurredAt: now,
+              payload: { ...next, status: "completed", startedAt: now, completedAt: now },
+            },
+          ],
+        });
+        yield* TestClock.adjust("1 minute");
+        // The existing composer sends the active selection back with the next message.
+        yield* send("After reset", next.modelSelection);
+        const restored = yield* orchestrator.getThreadProjection(threadId);
+        assert.deepEqual(restored.runs[2]?.modelSelection, modelSelection);
+        assert.equal((yield* store.getThreadShell(threadId))?.providerFallbackState?.reason, null);
+      }),
   );
 });
 
