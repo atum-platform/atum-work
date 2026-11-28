@@ -1,5 +1,11 @@
 # Work brand scrub
 
+## Round 2 catalog budget
+
+- The legacy catalog measured 62,409 bytes both before and after the brand scrub. The two relay `mcpServers` fields and the `hidden` launch field account for the 685-byte difference from the fixture. Shorter descriptions for thread launch, read, send, worktree handoff, environment linking, and feedback bring the legacy catalog to 61,724 bytes against the existing fixture. The Work catalog went from 62,291 to 61,595 bytes, and the existing Work presentation test now enforces the same ceiling.
+- Both catalogs still register 94 tools in the budget fixture. The HTTP tests cover Work name dispatch through canonical grants. The Pi tests cover both namespaces and confirm that callable aliases stay out of the declaration and code-mode listings. The Pi VM fixture now supplies Node's `URL` global so it exercises route selection.
+- Local verification passed on Node 24.21.0. The budget, MCP HTTP and ACP dispatch, launch handlers, and provider instructions passed 89 server tests. Pi passed 33 tests and shared presentation passed 5. All 3 brand gate tests, brand-map validation, server typecheck, and the MCP eval dry run passed. Standalone archive smoke belongs to release assembly. The eval dry run made no model calls.
+
 ## S2 provider presentation
 
 - The local provider credential selects a versioned catalog. The new catalog registers Work names on a separate local transport, while the same handlers evaluate canonical capability and credential grants. Codex keeps its direct-only wait and delegation registration.

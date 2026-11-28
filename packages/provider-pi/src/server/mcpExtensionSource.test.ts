@@ -269,73 +269,79 @@ describe("Pi MCP tool exposure", () => {
     assert.include(bridge.getActiveTools(), "mcp__t3-code__preview_snapshot");
   });
 
-  it("keeps Pi's canonical MCP tool names callable by the model without declaring them twice", async () => {
-    const bridge = await loadMcpBridge({
-      modern: true,
-      toolSearchAvailable: true,
-      activatesOnRegistration: true,
-    });
-    const canonicalNames = [
-      "mcp__t3_code__orchestrator_capabilities",
-      "mcp__t3_code__delegate_task",
-      "mcp__t3_code__task_status",
-      "mcp__t3_code__preview_snapshot",
-    ];
-    const unreachableCanonicalNames = async () => {
-      const unreachable: string[] = [];
-      for (const name of canonicalNames) {
-        const result = await bridge.callModelTool(name, {});
-        if (result.isError === true) unreachable.push(name);
-      }
-      return unreachable;
-    };
-    const declaredCanonicalNames = () =>
-      bridge.declaredTools().filter((name) => name.startsWith("mcp__t3_code__"));
-    const event = { systemPrompt: "" };
+  it.each([false, true])(
+    "deduplicates callable MCP aliases (Work: %s)",
+    async (workPresentation) => {
+      const bridge = await loadMcpBridge({
+        modern: true,
+        toolSearchAvailable: true,
+        activatesOnRegistration: true,
+        workPresentation,
+      });
+      const publicPrefix = workPresentation ? "mcp__atum-work__" : "mcp__t3-code__";
+      const aliasPrefix = publicPrefix.replaceAll("-", "_");
+      const canonicalNames = [
+        "orchestrator_capabilities",
+        "delegate_task",
+        "task_status",
+        "preview_snapshot",
+      ].map((name) => aliasPrefix + name);
+      const unreachableCanonicalNames = async () => {
+        const unreachable: string[] = [];
+        for (const name of canonicalNames) {
+          const result = await bridge.callModelTool(name, {});
+          if (result.isError === true) unreachable.push(name);
+        }
+        return unreachable;
+      };
+      const declaredCanonicalNames = () =>
+        bridge.declaredTools().filter((name) => name.startsWith(aliasPrefix));
+      const event = { systemPrompt: "" };
 
-    await bridge.handlers.get("session_start")!(event, discoveryContext);
-    assert.deepEqual(
-      await unreachableCanonicalNames(),
-      [],
-      "model calls to these names fail with Tool not found after session start",
-    );
-    assert.deepEqual(declaredCanonicalNames(), [], "declared twice after session start");
-    assert.equal(bridge.requests.at(-1)?.method, "tools/call");
+      await bridge.handlers.get("session_start")!(event, discoveryContext);
+      assert.deepEqual(
+        await unreachableCanonicalNames(),
+        [],
+        "model calls to these names fail with Tool not found after session start",
+      );
+      assert.deepEqual(declaredCanonicalNames(), [], "declared twice after session start");
+      assert.deepEqual(bridge.requests.at(-1)?.params, { name: "preview_snapshot", arguments: {} });
 
-    bridge.restoreActiveTools([
-      "read",
-      "mcp__t3-code__orchestrator_capabilities",
-      "mcp__t3-code__delegate_task",
-      "mcp__t3-code__task_status",
-    ]);
-    await bridge.handlers.get("session_tree")!(event, discoveryContext);
-    assert.deepEqual(
-      await unreachableCanonicalNames(),
-      [],
-      "model calls to these names fail with Tool not found after an older tree loadout",
-    );
-    assert.deepEqual(declaredCanonicalNames(), [], "declared twice after an older tree loadout");
-    assert.isFalse(
-      bridge.callableTools().some((name) => name.startsWith("mcp__t3_code__")),
-      "aliases duplicate the codemode catalog",
-    );
+      bridge.restoreActiveTools([
+        "read",
+        publicPrefix + "orchestrator_capabilities",
+        publicPrefix + "delegate_task",
+        publicPrefix + "task_status",
+      ]);
+      await bridge.handlers.get("session_tree")!(event, discoveryContext);
+      assert.deepEqual(
+        await unreachableCanonicalNames(),
+        [],
+        "model calls to these names fail with Tool not found after an older tree loadout",
+      );
+      assert.deepEqual(declaredCanonicalNames(), [], "declared twice after an older tree loadout");
+      assert.isFalse(
+        bridge.callableTools().some((name) => name.startsWith(aliasPrefix)),
+        "aliases duplicate the codemode catalog",
+      );
 
-    const requestCount = bridge.requests.length;
-    bridge.restoreActiveTools(
-      bridge.getActiveTools().filter((name) => name !== "mcp__t3-code__delegate_task"),
-    );
-    const late = await bridge.callModelTool("mcp__t3_code__delegate_task", {});
-    assert.isTrue(late.isError, "an alias runs after its public tool was switched off");
-    assert.equal(bridge.requests.length, requestCount);
+      const requestCount = bridge.requests.length;
+      bridge.restoreActiveTools(
+        bridge.getActiveTools().filter((name) => name !== publicPrefix + "delegate_task"),
+      );
+      const late = await bridge.callModelTool(aliasPrefix + "delegate_task", {});
+      assert.isTrue(late.isError, "an alias runs after its public tool was switched off");
+      assert.equal(bridge.requests.length, requestCount);
 
-    bridge.restoreActiveTools(["read", "mcp__t3-code__task_status"]);
-    await bridge.handlers.get("session_tree")!(event, discoveryContext);
-    assert.deepEqual(
-      await unreachableCanonicalNames(),
-      ["mcp__t3_code__orchestrator_capabilities", "mcp__t3_code__delegate_task"],
-      "an alias stays callable while its direct public tool is off",
-    );
-  });
+      bridge.restoreActiveTools(["read", publicPrefix + "task_status"]);
+      await bridge.handlers.get("session_tree")!(event, discoveryContext);
+      assert.deepEqual(
+        await unreachableCanonicalNames(),
+        [aliasPrefix + "orchestrator_capabilities", aliasPrefix + "delegate_task"],
+        "an alias stays callable while its direct public tool is off",
+      );
+    },
+  );
 
   it.each(["legacy Pi", "disabled tool search"])(
     "keeps tool execution available with %s",

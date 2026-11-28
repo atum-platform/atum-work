@@ -9,7 +9,7 @@ import { McpProviderSessions } from "@t3tools/provider-core/server/McpProviderSe
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { McpServer } from "effect/ai";
+import { type McpSchema, McpServer } from "effect/ai";
 
 import { AssetSigner } from "../assets/AssetSigner.ts";
 import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
@@ -109,6 +109,18 @@ const toolHandlerServices = Layer.mergeAll(
 
 const utf8Bytes = (text: string) => Buffer.byteLength(text, "utf8");
 
+const toolListBytes = (tools: ReadonlyArray<{ readonly tool: McpSchema.Tool }>) =>
+  utf8Bytes(
+    JSON.stringify(
+      // The model sees these fields. outputSchema and annotations are protocol metadata.
+      tools.map(({ tool }) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      })),
+    ),
+  );
+
 const claudeSystemAppend = (workPresentation = false) => {
   const { systemPrompt } = makeClaudeQueryOptions({
     modelSelection: {
@@ -149,6 +161,7 @@ it.effect("advertises an Atum tool catalog and first-party instructions", () =>
       expect.arrayContaining(["thread_launch", "thread_wait", "delegate_task", "preview_open"]),
     );
     expect(new Set(names).size).toBe(names.length);
+    expect(toolListBytes(mcp.tools)).toBeLessThanOrEqual(budget.mcpToolListJsonBytes);
     for (const { tool } of mcp.tools)
       assertWorkBrandText("tool/" + tool.name, JSON.stringify(tool));
     assertWorkBrandText(
@@ -207,16 +220,7 @@ it.effect("agent context matches the committed budget", () =>
     const measured = {
       claudeSystemAppendBytes: utf8Bytes(claudeSystemAppend()),
       codexAdditionalContextBytes: utf8Bytes(codexAdditionalContext()),
-      // The model sees these fields. outputSchema and annotations are protocol metadata.
-      mcpToolListJsonBytes: utf8Bytes(
-        JSON.stringify(
-          mcp.tools.map(({ tool }) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema,
-          })),
-        ),
-      ),
+      mcpToolListJsonBytes: toolListBytes(mcp.tools),
     };
 
     expect(

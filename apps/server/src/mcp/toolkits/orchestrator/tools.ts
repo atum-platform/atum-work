@@ -251,7 +251,7 @@ const ThreadListTool = Tool.make("t3_thread_list", {
 
 const ThreadReadTool = Tool.make("t3_thread_read", {
   description:
-    "Read any thread by id. View `messages` (default) or `activity` (all items). Newest first; older: `beforePosition=earlierPosition`; from the start: `afterPosition=-1`, then `nextPosition`. Cut-off text: `itemId`, `textOffset=nextTextOffset`. Reading a child's final result marks it delivered. In your reply, name it as its `link` verbatim.",
+    "Read a thread by ID. `messages` (default) or `activity` (all items). Newest first. Page back with `beforePosition=earlierPosition`, or forward with `afterPosition=-1`, then `nextPosition`. Truncated text: `itemId`, `textOffset=nextTextOffset`. Marks a child's final result delivered. Cite its exact `link`.",
   parameters: OrchestratorMcpThreadReadInput,
   success: OrchestratorMcpThreadReadResult,
   failure: OrchestratorMcpFailure,
@@ -283,7 +283,7 @@ const ThreadUpdateTool = Tool.make("t3_thread_update", {
 
 const ThreadSendTool = Tool.make("t3_thread_send", {
   description:
-    "Send a message to any thread. The target cannot run with broader modes than yours. `mode:'auto'` starts an idle thread, steers a running turn, or queues. `queue`: new turn. `steer`: mid-turn update. `restart`: interrupt and restart. A send to a finished child thread starts a fresh task and returns its `taskId`. In your reply, name it as its `link` verbatim.",
+    "Message a thread within your runtime and interaction modes. `auto`: start if idle, steer or queue if running. `queue`: new turn. `steer`: update active turn. `restart`: interrupt and restart. A finished child thread starts a new task and returns `taskId`. Cite its exact `link`.",
   parameters: OrchestratorMcpThreadSendInput,
   success: OrchestratorMcpThreadSendResult,
   failure: OrchestratorMcpFailure,
@@ -336,7 +336,7 @@ const EnvironmentLinksTool = Tool.make("t3_environment_links", {
 
 const EnvironmentLinkTool = Tool.make("t3_environment_link", {
   description:
-    "Ask the user to link another machine, in a card. For a machine the user names that is not linked. Pass `hint` from their words, `environmentId` when one names it (already linked: returns `linked`), `url` only when the user gave an address. Returns `pending`; the outcome arrives as a message in this thread. Do not wait, poll, or call it again to check. Never ask for a pairing code in chat.",
+    "Open a card to link a machine the user names. Use their words for `hint` and pass `environmentId` or `url` if given. Returns `linked` if already linked, or `pending` with a later outcome in this thread. Never wait, poll, retry to check, or ask for a pairing code in chat.",
   parameters: OrchestratorMcpEnvironmentLinkInput,
   success: OrchestratorMcpEnvironmentLinkResult,
   failure: OrchestratorMcpFailure,
