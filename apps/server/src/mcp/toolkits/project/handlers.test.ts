@@ -1,5 +1,6 @@
 import * as ProviderRegistry from "../../../provider/ProviderRegistry.ts";
 import { expect, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import {
   EnvironmentId,
   GitCommandError,
@@ -46,8 +47,15 @@ import * as VcsProcess from "../../../vcs/VcsProcess.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as ThreadMcpServers from "../../ThreadMcpServers.ts";
+import type { ForwardGrant } from "../atum/forwardAdmission.ts";
 import * as ProjectHandlers from "./handlers.ts";
 import { ProjectToolkit } from "./tools.ts";
+
+vi.mock("../atum/forwardAdmission.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../atum/forwardAdmission.ts")>()),
+  forwardGrantsFile: "/test/forward-grants.json",
+  bindNativeThread: vi.fn(async () => undefined),
+}));
 
 const clientLaunchHarness = (input: {
   readonly runtimeModeCeiling: RuntimeMode;
@@ -64,6 +72,7 @@ const clientLaunchHarness = (input: {
   readonly workspaceRoot?: string;
   readonly checkWorktreeBase?: ThreadLaunch.ThreadLaunchService["Service"]["checkWorktreeBase"];
   readonly hostedAppUrl?: string;
+  readonly nativeConsent?: ForwardGrant;
   readonly relayAuthorization?: NonNullable<
     McpInvocationContext.McpInvocationScope["threadMcpAuthorization"]
   >;
@@ -119,6 +128,7 @@ const clientLaunchHarness = (input: {
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
+        ...(input.nativeConsent === undefined ? {} : { nativeConsent: input.nativeConsent }),
       },
       issuedAt: 0,
       ...(input.relayAuthorization === undefined
@@ -137,6 +147,7 @@ const clientLaunchHarness = (input: {
                 id: launch.threadId,
                 projectId: launch.projectId,
                 modelSelection: launch.modelSelection,
+                ...(launch.unattended ? { unattended: true } : {}),
                 deletedAt: null,
               } as unknown as OrchestrationV2ThreadShell),
         );
@@ -171,6 +182,7 @@ const clientLaunchHarness = (input: {
               projectId: launch.projectId,
               title: launch.title,
               modelSelection: launch.modelSelection,
+              ...(launch.unattended ? { unattended: true } : {}),
             },
             runs: [],
           },
@@ -1198,6 +1210,91 @@ const deletedProject = (id: ProjectId) => ({
   updatedAt: "2026-01-01T00:00:00.000Z",
   deletedAt: "2026-01-01T00:00:00.000Z",
 });
+
+it.effect("only a scheduled forward client can launch an unattended Claude thread", () =>
+  Effect.gen(function* () {
+    const launchWith = Effect.fnUntraced(function* (
+      driver: "claudeAgent" | "codex",
+      audience?: ForwardGrant["audience"],
+    ) {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const instanceId = ProviderInstanceId.make("test-provider");
+      const model = "fixture-model";
+      const { projectId, dependencies } = clientLaunchHarness({
+        runtimeModeCeiling: "full-access",
+        launched,
+        providers: [
+          {
+            instanceId,
+            driver: ProviderDriverKind.make(driver),
+            enabled: true,
+            installed: true,
+            status: "ready",
+            version: null,
+            auth: { status: "authenticated" },
+            checkedAt: "2026-01-01T00:00:00Z",
+            models: [{ slug: model, name: model, isCustom: false, capabilities: null }],
+            slashCommands: [],
+            skills: [],
+          },
+        ],
+        ...(audience === undefined
+          ? {}
+          : {
+              nativeConsent: {
+                clientId: "scheduled-client",
+                binding: {
+                  owner: "owner",
+                  agent: "agent",
+                  generation: "generation",
+                  mac: "mac",
+                  consent_revision: 1,
+                },
+                actor: "fixture",
+                audience,
+                expiresAt: Number.MAX_SAFE_INTEGER,
+                enabled: true,
+              },
+            }),
+      });
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const result = yield* toolkit
+        .handle("t3_thread_launch", {
+          projectId,
+          title: "Scheduled draft",
+          message: "Draft from this evidence.",
+          modelSelection: { instanceId, model },
+          unattended: true,
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
+      return { launched, result: result.at(-1)?.result };
+    });
+
+    const codex = yield* launchWith("codex", "owner_schedule");
+    expect(codex.result).toMatchObject({
+      code: "invalid_request",
+      message: expect.stringContaining("only for Claude"),
+    });
+    expect(codex.launched).toEqual([]);
+    for (const audience of [undefined, "owner_dm"] as const) {
+      const untrusted = yield* launchWith("claudeAgent", audience);
+      expect(untrusted.result).toMatchObject({
+        code: "invalid_request",
+        message: expect.stringContaining("scheduled forward grant"),
+      });
+      expect(untrusted.launched).toEqual([]);
+    }
+    const claude = yield* launchWith("claudeAgent", "owner_schedule");
+    expect(claude.launched).toHaveLength(1);
+    expect(claude.launched[0]).toMatchObject({ hidden: true, unattended: true });
+  }),
+);
 
 it.effect("deleting a project through MCP also discards its clone record", () =>
   Effect.gen(function* () {

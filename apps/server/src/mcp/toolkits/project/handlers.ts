@@ -235,6 +235,29 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const threadId = ThreadId.make(commandId);
         const messageId = MessageId.make(commandId);
         const attachments = input.attachments ?? [];
+        if (
+          input.unattended &&
+          (!forwardGrantsFile || scope.client?.nativeConsent?.audience !== "owner_schedule")
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Unattended launch requires a trusted scheduled forward grant.",
+          });
+        if (
+          input.unattended &&
+          (!input.modelSelection ||
+            !input.message?.trim() ||
+            input.message.trimStart().startsWith("/") ||
+            attachments.length > 0 ||
+            input.generateTitle ||
+            input.outputSchema !== undefined ||
+            input.mcpServers !== undefined)
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message:
+              "Unattended launch requires a Claude model and a plain-text first message, with no attachments, MCP servers, output schema or title generation.",
+          });
         if (input.generateTitle === true && !input.message?.trim() && attachments.length === 0)
           return yield* new OrchestratorMcpFailure({
             code: "invalid_request",
@@ -289,6 +312,17 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const launchedModel =
           launched === null || launched.deletedAt !== null ? undefined : launched.modelSelection;
         const replaying = launchedModel !== undefined;
+        if (
+          input.unattended &&
+          launchedModel !== undefined &&
+          (launched?.unattended !== true ||
+            launchedModel.instanceId !== input.modelSelection?.instanceId ||
+            launchedModel.model !== input.modelSelection.model)
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "The request ID must replay the original unattended Claude launch.",
+          });
         if (launched !== null && replaying && launched.projectId !== projectId)
           return yield* new OrchestratorMcpFailure({
             code: "invalid_request",
@@ -318,6 +352,16 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         if (!replaying && input.modelSelection !== undefined) {
           const { instanceId, model } = input.modelSelection;
           const registry = yield* ProviderRegistry.ProviderRegistry;
+          const providers = yield* registry.getProviders;
+          if (
+            input.unattended &&
+            providers.find((provider) => provider.instanceId === instanceId)?.driver !==
+              "claudeAgent"
+          )
+            return yield* new OrchestratorMcpFailure({
+              code: "invalid_request",
+              message: "Unattended launch is supported only for Claude providers.",
+            });
           // The thread runs in this folder, whose own provider config can add models.
           const cwd =
             input.workspaceStrategy?.type === "existing_worktree"
@@ -333,7 +377,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
               ? Effect.void
               : OrchestrationMcp.requireAdvertisedModel(provider, model);
           };
-          const checked = requireModel(yield* registry.getProviders);
+          const checked = requireModel(providers);
           yield* cwd === undefined
             ? checked
             : checked.pipe(
@@ -459,7 +503,8 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           threadId,
           projectId,
           title: input.title,
-          ...(input.hidden === true ? { hidden: true } : {}),
+          ...(input.hidden === true || input.unattended ? { hidden: true } : {}),
+          ...(input.unattended ? { unattended: true } : {}),
           ...(input.generateTitle === undefined ? {} : { generateTitle: input.generateTitle }),
           ...(input.generateTitle === true ? {} : { titleRenamed: true }),
           modelSelection,
@@ -515,6 +560,11 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           launch,
         );
         const thread = result.projection.thread;
+        if (input.unattended && thread.unattended !== true)
+          return yield* new OrchestratorMcpFailure({
+            code: "orchestration_error",
+            message: "The launch receipt did not confirm unattended isolation.",
+          });
         const run = result.projection.runs.find((run) => run.userMessageId === messageId);
         return {
           threadId: thread.id,

@@ -375,6 +375,54 @@ describe("ClaudeAdapterV2 native resume history", () => {
 });
 
 describe("ClaudeAdapterV2 runtime query policy", () => {
+  it("builds an unattended query with no tools, servers, hooks or interactive handlers", async () => {
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-unattended",
+      resume: false,
+      unattended: true,
+      cwd: "/workspace",
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      allowedTools: ["Bash"],
+      mcpServers: { "t3-code": { type: "http", url: "http://127.0.0.1/mcp" } },
+      onStop: async () => {
+        throw new Error("unexpected hook");
+      },
+      supportedDialogKinds: ["resume_return"],
+      promptSuggestions: true,
+      settings: {
+        ...DEFAULT_CLAUDE_SETTINGS,
+        launchArgs: "--dangerously-skip-permissions --plugin-dir /fixture",
+      },
+    });
+
+    assert.equal(options.permissionMode, "dontAsk");
+    assert.equal(options.permissionPrompts, "none");
+    assert.deepEqual(options.tools, []);
+    assert.deepEqual(options.disallowedTools, ["*"]);
+    assert.deepEqual(options.settingSources, []);
+    assert.deepEqual(options.settings, { disableAllHooks: true });
+    assert.isTrue(options.strictMcpConfig);
+    assert.deepEqual(options.extraArgs, { "disable-slash-commands": null, "safe-mode": null });
+    assert.isUndefined(options.allowDangerouslySkipPermissions);
+    assert.isUndefined(options.allowedTools);
+    assert.isUndefined(options.mcpServers);
+    assert.isUndefined(options.plugins);
+    assert.isUndefined(options.hooks);
+    assert.isUndefined(options.supportedDialogKinds);
+    assert.isUndefined(options.onUserDialog);
+    assert.isUndefined(options.promptSuggestions);
+    assert.isUndefined(options.canUseTool);
+    assert.deepEqual(
+      await options.onElicitation?.(
+        { serverName: "sentinel", message: "Ask a question" },
+        { signal: new AbortController().signal, requestId: "fixture" },
+      ),
+      { action: "cancel" },
+    );
+  });
+
   it.each([
     "-- --thinking-display omitted",
     "--thinking-display summarized -- --thinking-display omitted",

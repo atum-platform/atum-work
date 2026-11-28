@@ -651,7 +651,7 @@ it.effect("retains automation and sender attribution while a message waits in th
   }).pipe(Effect.provide(harness.layer));
 });
 
-it.effect("persists a hidden launch without changing its send or interrupt lifecycle", () => {
+it.effect("persists a hidden unattended launch through its send and interrupt lifecycle", () => {
   const harness = makeHarness({ runSetup: () => Effect.never });
   return Effect.gen(function* () {
     const launches = yield* ThreadLaunch.ThreadLaunchService;
@@ -666,8 +666,10 @@ it.effect("persists a hidden launch without changing its send or interrupt lifec
       createdBy: "agent",
       creationSource: "mcp",
       hidden: true,
+      unattended: true,
     });
     assert.isTrue((yield* threads.getThreadShell(threadId))?.hidden);
+    assert.isTrue((yield* threads.getThreadShell(threadId))?.unattended);
     assert.isTrue((yield* threads.getThreadProjection(threadId)).thread.hidden);
     const followUp = yield* threads.sendToThread({
       projectId,
@@ -690,6 +692,7 @@ it.effect("persists a hidden launch without changing its send or interrupt lifec
     });
     const updated = yield* threads.getThreadProjection(threadId);
     assert.isTrue(updated.thread.hidden);
+    assert.isTrue(updated.thread.unattended);
     assert.isNull(updated.thread.archivedAt);
     assert.equal(updated.runs.find((run) => run.id === firstRun.id)?.status, "interrupted");
   }).pipe(Effect.provide(harness.layer));

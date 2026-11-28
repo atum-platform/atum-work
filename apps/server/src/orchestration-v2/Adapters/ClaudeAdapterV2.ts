@@ -200,6 +200,7 @@ import { signalProcessGroup } from "@t3tools/provider-core/server/processGroup";
 import {
   claudeLocalSettingsDirectory,
   claudeSignedOutMessage,
+  hasClaudeManagedMcpConfig,
   makeClaudeEnvironment,
   mergeClaudeProcessEnvironment,
   resolveClaudeHomePath,
@@ -2479,6 +2480,7 @@ export function makeClaudeQueryOptions(input: {
   readonly nativeThreadId: string;
   readonly title?: string;
   readonly resume: boolean;
+  readonly unattended?: true;
   readonly resumeSessionAt?: string;
   readonly cwd: string | null;
   /** The thread's other folders: listed in the system prompt and granted as directories. */
@@ -2508,6 +2510,33 @@ export function makeClaudeQueryOptions(input: {
   readonly toolSearchOverride?: "true";
 }): ClaudeAgentSdkQueryOptions {
   const compiledSelection = compileClaudeModelSelection(input.modelSelection, input.modelCatalog);
+  const threadIdentity: ClaudeAgentSdkThreadIdentity = input.resume
+    ? { resume: input.nativeThreadId }
+    : { sessionId: input.nativeThreadId };
+  if (input.unattended) {
+    return {
+      ...threadIdentity,
+      ...(input.resumeSessionAt === undefined ? {} : { resumeSessionAt: input.resumeSessionAt }),
+      ...(input.cwd === null ? {} : { cwd: input.cwd }),
+      ...(input.title === undefined ? {} : { title: input.title }),
+      ...(input.settings?.binaryPath
+        ? { pathToClaudeCodeExecutable: input.settings.binaryPath }
+        : {}),
+      ...(input.environment === undefined ? {} : { env: input.environment }),
+      model: compiledSelection.apiModelId,
+      tools: [],
+      disallowedTools: ["*"],
+      permissionMode: "dontAsk",
+      permissionPrompts: "none",
+      settingSources: [],
+      settings: { disableAllHooks: true },
+      strictMcpConfig: true,
+      extraArgs: { "disable-slash-commands": null, "safe-mode": null },
+      systemPrompt: "Draft only from the evidence supplied in the user's message.",
+      includePartialMessages: true,
+      onElicitation: async () => ({ action: "cancel" }),
+    };
+  }
   const {
     // claudeLaunchArgDirectories reads every --add-dir into additionalDirectories.
     "add-dir": _launchArgAddDir,
@@ -2540,9 +2569,6 @@ export function makeClaudeQueryOptions(input: {
     input.settings === undefined ? [] : claudeLaunchArgPluginDirectories(input.settings.launchArgs);
   // A bare --plugin-dir still reaches Claude, which reports the missing path.
   if (launchArgPluginDir === null) extraArgs["plugin-dir"] = null;
-  const threadIdentity: ClaudeAgentSdkThreadIdentity = input.resume
-    ? { resume: input.nativeThreadId }
-    : { sessionId: input.nativeThreadId };
   const selectedTools = input.tools ?? CLAUDE_CODE_PRESET_TOOLS;
   const selectionSettings =
     Object.keys(compiledSelection.settings).length === 0
@@ -6295,6 +6321,13 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         const queryPolicyForTurn = Effect.fnUntraced(function* (
           turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
         ) {
+          if (turnInput.appThread.unattended) {
+            return {
+              permissionMode: "dontAsk",
+              tools: [],
+              installPermissionCallback: false,
+            } satisfies ClaudeRuntimeQueryPolicy;
+          }
           if (
             permissionModeForClaudeRuntimePolicy(turnInput.runtimePolicy) !== "bypassPermissions"
           ) {
@@ -13475,9 +13508,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         const openQuery = Effect.fnUntraced(function* (
           turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
           nativeThreadId: string,
-          queryPolicy: Effect.Success<ReturnType<typeof queryPolicyForTurn>>,
+          queryPolicy: ClaudeRuntimeQueryPolicy,
         ) {
-          const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          const unattended = turnInput.appThread.unattended;
+          const mcpSession = unattended ? undefined : yield* mcpSessions.read(turnInput.threadId);
           // Claude Code defers its goal Stop hook only for its own background tasks, so a goal
           // re-prompts in a loop while T3 work that will wake this thread is still running.
           const onStop: HookCallback = () =>
@@ -13488,9 +13522,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 return pendingWake !== undefined && (yield* pendingWake) ? { continue: false } : {};
               }),
             );
-          const { host, relay } = yield* mcpSessions.readManagedServerGroupsForThread(
-            turnInput.threadId,
-          );
+          const { host, relay } = unattended
+            ? { host: [], relay: [] }
+            : yield* mcpSessions.readManagedServerGroupsForThread(turnInput.threadId);
           const readOnlySandbox =
             sandboxPolicyKindForClaudeRuntimePolicy(turnInput.runtimePolicy) === "readOnly";
           const mcpOverrides = claudeMcpQueryOverrides({
@@ -13562,12 +13596,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             existing.nativeThreadId === nativeThreadId &&
             existing.queryPolicyKey === queryPolicyKey &&
             !existing.stopping;
-          const readLaunchSettings = readClaudeLaunchArgSettings({
-            settings: adapterOptions.settings,
-            cwd: turnInput.runtimePolicy.cwd,
-            fileSystem,
-            path,
-          });
+          const readLaunchSettings = unattended
+            ? Effect.undefined
+            : readClaudeLaunchArgSettings({
+                settings: adapterOptions.settings,
+                cwd: turnInput.runtimePolicy.cwd,
+                fileSystem,
+                path,
+              });
           let launchArgSettings = reuseLaunchSettings
             ? existing.launchArgSettings
             : yield* readLaunchSettings;
@@ -13664,18 +13700,44 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
 
           // Read before closing the live process so a bad path leaves it running.
-          const [appendSystemPromptFileText, toolSearchOverride] = yield* Effect.all(
-            [
-              readClaudeAppendSystemPromptFile({
-                settings: adapterOptions.settings,
-                cwd: turnInput.runtimePolicy.cwd,
-                fileSystem,
-                path,
-              }),
-              resolveToolSearchOverride(turnInput.runtimePolicy.cwd, launchArgSettings),
-            ],
-            { concurrency: "unbounded" },
-          );
+          const [appendSystemPromptFileText, toolSearchOverride] = unattended
+            ? ([undefined, undefined] as const)
+            : yield* Effect.all(
+                [
+                  readClaudeAppendSystemPromptFile({
+                    settings: adapterOptions.settings,
+                    cwd: turnInput.runtimePolicy.cwd,
+                    fileSystem,
+                    path,
+                  }),
+                  resolveToolSearchOverride(turnInput.runtimePolicy.cwd, launchArgSettings),
+                ],
+                { concurrency: "unbounded" },
+              );
+          if (unattended) {
+            // Managed hooks can outrank flag settings. Refuse managed policy for the canary.
+            const managedMcp = yield* hasClaudeManagedMcpConfig().pipe(
+              Effect.provideService(FileSystem.FileSystem, fileSystem),
+            );
+            const remotePolicy = yield* fileSystem
+              .exists(path.join(homePath, "remote-settings.json"))
+              .pipe(Effect.orElseSucceed(() => true));
+            const managedSettings = yield* Effect.tryPromise({
+              try: () => resolveClaudeSettings({ settingSources: [] }),
+              catch: (cause) => queryRunnerError(cause, "resolveSettings"),
+            });
+            if (
+              managedMcp ||
+              remotePolicy ||
+              managedSettings.sources.some(({ source }) => source === "managed")
+            ) {
+              return yield* new ProviderAdapter.ProviderAdapterProtocolError({
+                driver: CLAUDE_PROVIDER,
+                detail:
+                  "Unattended launch cannot start under managed Claude settings or MCP policy.",
+              });
+            }
+          }
           const closedExistingNativeThreadId = existing !== null ? existing.nativeThreadId : null;
           clearedNativeSessions.delete(nativeThreadId);
           if (existing !== null) {
@@ -13702,6 +13764,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             nativeThreadId,
             title: turnInput.appThread.title,
             resume: shouldResume,
+            ...(unattended ? { unattended: true } : {}),
             ...(resumeSessionAt === undefined ? {} : { resumeSessionAt }),
             cwd: turnInput.runtimePolicy.cwd,
             ...(turnInput.runtimePolicy.workspace === undefined
@@ -13711,7 +13774,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             settings: adapterOptions.settings,
             // Delegated threads have no one typing, so they never ask for suggestions.
             promptSuggestions:
-              !isDelegatedAppThread(turnInput.appThread) && (yield* promptSuggestionsEnabled),
+              !unattended &&
+              !isDelegatedAppThread(turnInput.appThread) &&
+              (yield* promptSuggestionsEnabled),
             ...(launchArgSettings === undefined
               ? {}
               : { sdkSettings: claudeSdkLaunchArgSettings(launchArgSettings) }),
@@ -14034,7 +14099,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             }
             const [skills, queryPolicy] = yield* Effect.all(
               [
-                promptUuid === null
+                promptUuid === null || turnInput.appThread.unattended
                   ? Effect.undefined
                   : userInvocableSkills(turnInput.runtimePolicy.cwd),
                 queryPolicyForTurn(turnInput),
@@ -14049,7 +14114,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               turnInput.message.text,
               compileClaudeModelSelection(turnInput.modelSelection, modelCatalog).promptEffort,
             );
-            const appContext = turnInput.appContext ?? [];
+            const appContext = turnInput.appThread.unattended ? [] : (turnInput.appContext ?? []);
             const delivered = deliveredAppContext.get(nativeThreadId);
             let appContextSent = false;
             const userMessage =

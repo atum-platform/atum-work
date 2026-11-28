@@ -149,6 +149,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
       }),
     ),
     generateTitle: Schema.optional(Schema.Boolean),
+    unattended: Schema.optional(Schema.Literal(true)),
     modelSelection: Schema.optional(ModelSelection),
     runtimeMode: Schema.optional(RuntimeMode),
     interactionMode: Schema.optional(ProviderInteractionMode),
