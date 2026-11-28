@@ -27,8 +27,8 @@ function useWorkFormats() {
       chip: gt("Analyze numbers"),
       Icon: FileSpreadsheetIcon,
     },
-    pptx: { format: "pptx", label: gt("Slides"), chip: gt("Design"), Icon: PresentationIcon },
-    svg: { format: "svg", label: gt("Design"), Icon: PaletteIcon },
+    pptx: { format: "pptx", label: gt("Slides"), Icon: PresentationIcon },
+    svg: { format: "svg", label: gt("Design"), chip: gt("Design"), Icon: PaletteIcon },
   } as const;
 }
 
@@ -58,10 +58,10 @@ export function WorkCreateMenu({ disabled, onChoose }: WorkStartProps) {
 }
 
 export function WorkSessionChips({ disabled, onChoose }: WorkStartProps) {
-  const { docx, pptx, xlsx } = useWorkFormats();
+  const { docx, svg, xlsx } = useWorkFormats();
   return (
     <div className="flex flex-wrap justify-center gap-2 pt-3" data-atum-work-session-chips="">
-      {[docx, pptx, xlsx].map(({ format, chip, Icon }) => (
+      {[docx, svg, xlsx].map(({ format, chip, Icon }) => (
         <Button
           key={format}
           type="button"

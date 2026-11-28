@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Read the host-staged skill from both launch and run preparation.
+import * as NodeFSP from "node:fs/promises";
+import * as NodePath from "node:path";
 import type { WorkDocumentFormat, WorkStarterFile } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -32,7 +35,7 @@ const starterFormats = {
     skill: "work-design",
     description: "Create and revise editable SVG designs.",
     instructions:
-      "Use editable SVG elements and keep the design self-contained. Exclude scripts, external resources and embedded HTML. Render a PNG proof with the local authoring runtime.",
+      "Use editable HTML or SVG and keep the design self-contained. Exclude scripts, external resources and embedded documents. Work generates the PNG preview when it saves the design.",
   },
 } satisfies Record<
   WorkDocumentFormat,
@@ -41,6 +44,16 @@ const starterFormats = {
 
 const blankDesign =
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540"/>\n';
+
+export const workDesignSkill = Effect.fn("Work.readDesignSkill")(function* () {
+  const staged = process.env.ATUM_WORK_DESIGN_SKILL;
+  if (!staged || !NodePath.isAbsolute(staged)) return undefined;
+  const skill = yield* Effect.tryPromise({
+    try: () => NodeFSP.readFile(staged, "utf8"),
+    catch: () => undefined,
+  }).pipe(Effect.orElseSucceed(() => undefined));
+  return skill?.trim() ? skill : undefined;
+});
 
 export const workStarterFile = (format: WorkDocumentFormat): WorkStarterFile => ({
   format,
@@ -59,19 +72,27 @@ export const prepareWorkStarter = Effect.fn("Work.prepareStarter")(function* (
     "Use the host-provided local authoring runtime when available. If the required tool is unavailable, report that and preserve the starting file.",
     starter.instructions,
   ].join("\n\n");
-  const skill = [
-    "---",
-    `name: ${starter.skill}`,
-    `description: ${starter.description}`,
-    "---",
-    "",
-    body,
-    "",
-  ].join("\n");
+  const stagedSkill = format === "svg" ? yield* workDesignSkill() : undefined;
+  const skill =
+    stagedSkill ??
+    [
+      "---",
+      `name: ${starter.skill}`,
+      `description: ${starter.description}`,
+      "---",
+      "",
+      body,
+      "",
+    ].join("\n");
   const skillDirectory = path.join(folder, ".claude", "skills", starter.skill);
   const exclusive = { flag: "wx" } as const;
   yield* fs.makeDirectory(skillDirectory, { recursive: true });
   yield* fs.writeFileString(path.join(skillDirectory, "SKILL.md"), skill, exclusive);
+  if (stagedSkill !== undefined) {
+    const agentsSkillDirectory = path.join(folder, ".agents", "skills", starter.skill);
+    yield* fs.makeDirectory(agentsSkillDirectory, { recursive: true });
+    yield* fs.writeFileString(path.join(agentsSkillDirectory, "SKILL.md"), skill, exclusive);
+  }
   yield* fs.writeFileString(
     path.join(folder, "CLAUDE.md"),
     `Invoke the ${starter.skill} skill when working on the document in this session.\n\n${body}\n`,

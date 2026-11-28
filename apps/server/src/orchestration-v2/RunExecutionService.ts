@@ -43,7 +43,7 @@ import * as Stream from "effect/Stream";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
 import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
-import { hasValidWorkDeliverable, prepareWorkDeliverable } from "../project/workDeliverable.ts";
+import { prepareWorkDeliverable, selectWorkDeliverable } from "../project/workDeliverable.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EventSink from "./EventSink.ts";
@@ -749,7 +749,9 @@ export const layer: Layer.Layer<
         readonly lostToolCalls?: ReadonlyArray<OrchestrationV2TurnItem>;
         readonly restoredHandoffs?: ReadonlyArray<OrchestrationV2ContextHandoff>;
         readonly terminal: ProviderTerminalEvent;
-        readonly workDeliverableId?: string;
+        readonly workDeliverable?: Required<
+          Pick<OrchestrationV2Run, "workDeliverableId" | "workDeliverableFormat">
+        >;
         readonly completedAt?: DateTime.Utc;
         readonly failureItemPersisted: boolean;
         readonly refreshAfterTurn: Effect.Effect<void>;
@@ -856,9 +858,7 @@ export const layer: Layer.Layer<
           input.run;
         const finalizedRun: OrchestrationV2Run = {
           ...runWithoutDelegatedCompletion,
-          ...(input.workDeliverableId === undefined
-            ? {}
-            : { workDeliverableId: input.workDeliverableId }),
+          ...input.workDeliverable,
           status: persistedStatus,
           completedAt: input.terminal.status === "completed" ? null : completedAt,
         };
@@ -1224,7 +1224,6 @@ export const layer: Layer.Layer<
           return;
         }
         const workOutput =
-          input.session.driver === "claudeAgent" &&
           input.runtimePolicy.interactionMode === "default" &&
           input.message.createdBy === "user" &&
           !isDelegatedAppThread(input.appThread) &&
@@ -1237,6 +1236,7 @@ export const layer: Layer.Layer<
                 runId: input.run.id,
                 workspace: input.checkpointScope.cwd,
                 scratchRoot: input.workScratchRoot,
+                allowMemo: input.session.driver === "claudeAgent",
               })
             : undefined;
         const terminalEvent = yield* Ref.make<ProviderTerminalEvent | null>(null);
@@ -1337,12 +1337,11 @@ export const layer: Layer.Layer<
           }
           const providerThread = yield* Ref.get(latestProviderThread);
           const openSubagents = yield* Ref.get(openRunOwnedSubagents);
-          const workDeliverableId =
+          const workDeliverableFormat =
             workOutput !== undefined &&
             terminal.status === "completed" &&
-            terminal.promptDropped !== true &&
-            (yield* hasValidWorkDeliverable(input.checkpointScope.cwd, workOutput.artifactId))
-              ? workOutput.artifactId
+            terminal.promptDropped !== true
+              ? yield* selectWorkDeliverable(input.checkpointScope.cwd, workOutput)
               : undefined;
           const writeTerminal = Effect.fnUntraced(
             function* (settledTerminal: ProviderTerminalEvent) {
@@ -1382,7 +1381,14 @@ export const layer: Layer.Layer<
                 ...(abandonedProviderTurn === undefined ? {} : { abandonedProviderTurn }),
                 ...(restoredHandoffs === undefined ? {} : { restoredHandoffs }),
                 terminal: settledTerminal,
-                ...(workDeliverableId === undefined ? {} : { workDeliverableId }),
+                ...(workDeliverableFormat === undefined || workOutput === undefined
+                  ? {}
+                  : {
+                      workDeliverable: {
+                        workDeliverableId: workOutput.artifactId,
+                        workDeliverableFormat,
+                      },
+                    }),
                 failureItemPersisted: settledTerminal.status === "failed",
                 refreshAfterTurn,
               });

@@ -818,6 +818,9 @@ export const OrchestrationV2RunOutput = Schema.Struct({
 });
 export type OrchestrationV2RunOutput = typeof OrchestrationV2RunOutput.Type;
 
+export const WorkDeliverableFormat = Schema.Literals(["docx", "html", "svg"]);
+export type WorkDeliverableFormat = typeof WorkDeliverableFormat.Type;
+
 export const OrchestrationV2Run = Schema.Struct({
   id: RunId,
   threadId: ThreadId,
@@ -865,6 +868,8 @@ export const OrchestrationV2Run = Schema.Struct({
   workDeliverableId: Schema.optionalKey(
     Schema.String.check(Schema.isPattern(/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/u)),
   ),
+  /** Absent for Word receipts written before design settlements. */
+  workDeliverableFormat: Schema.optionalKey(WorkDeliverableFormat),
 });
 export type OrchestrationV2Run = typeof OrchestrationV2Run.Type;
 
