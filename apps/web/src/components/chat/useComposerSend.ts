@@ -21,6 +21,7 @@ import {
 } from "../ChatView.logic";
 import { isUsageLimitsCommand } from "@t3tools/shared/usageLimits";
 import {
+  CommandId,
   AuthOrchestrationOperateScope,
   DEFAULT_MODEL,
   type EnvironmentId,
@@ -29,7 +30,7 @@ import {
   type ResponseContextRecord,
   type ScopedThreadRef,
   type ThreadContextRecord,
-  type ThreadId,
+  ThreadId,
   ProviderInteractionMode,
   RuntimeMode,
 } from "@t3tools/contracts";
@@ -123,6 +124,7 @@ import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { countPreparingComposerImages, holdComposerSend } from "./preparingComposerImages";
 import { fileAttachmentCapabilityBlockReason } from "./composerAttachmentFiles";
 import { useLinkedEnvironments } from "../../state/peerLinks";
+import { waitForThreadShell } from "../../state/entities";
 import { readEnvironmentScope } from "../../state/session";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import {
@@ -136,7 +138,7 @@ import {
   prepareTurnAttachments,
   restoreComposerDraft,
 } from "./chatViewSend";
-import { checkWorkSubmitAccess } from "./workSubmitAccess";
+import { checkWorkSubmitAccess, submitWorkLearning } from "./workSubmitAccess";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -210,6 +212,8 @@ interface ComposerSendInput {
   readonly activeThreadBranch: string | null;
   readonly activeProject: EnvironmentProject | null;
   readonly activeProjectIsScratch: boolean;
+  readonly work: boolean;
+  readonly assistantWorkRunning: boolean;
   readonly activeProjectDefaultModelSelection: ModelSelection | null;
   readonly activeMessageCount: number;
   readonly isServerThread: boolean;
@@ -313,6 +317,8 @@ export function useComposerSend(input: ComposerSendInput) {
     activeThreadBranch,
     activeProject,
     activeProjectIsScratch,
+    work,
+    assistantWorkRunning = false,
     activeProjectDefaultModelSelection,
     activeMessageCount,
     isServerThread,
@@ -1122,6 +1128,71 @@ export function useComposerSend(input: ComposerSendInput) {
         return;
       }
     }
+    const learning = submitWorkLearning(
+      {
+        threadId: threadIdForSend,
+        requestId: messageIdForSend,
+        text: outgoingMessageText,
+        modelSelection: ctxSelectedModelSelection,
+      },
+      {
+        work: work && activeProjectIsScratch && submissionIntent === "foreground",
+        draft: isLocalDraftThread,
+        running: assistantWorkRunning,
+        textOnly:
+          composerHoldsOnlyText &&
+          multipleModelSelections === null &&
+          approvalFeedbackTarget === undefined &&
+          pendingApprovals.length === 0 &&
+          freshArm === undefined,
+      },
+    );
+    if (learning) {
+      const result = await learning;
+      if (result.status === "running") {
+        sendInFlightRef.current = false;
+        return;
+      }
+      if (result.status === "unavailable") {
+        sendInFlightRef.current = false;
+        if (isCurrentRouteThread())
+          setThreadError(threadIdForSend, m(msg("Assistant connection unavailable. Try again.")));
+        return;
+      }
+      if (result.status === "started") {
+        try {
+          const draftChanged = draftChangedDuringPreparation();
+          if (!draftChanged) {
+            clearComposerDraftContent(composerDraftTarget);
+            if (isCurrentRouteThread()) {
+              promptRef.current = "";
+              composerRef.current?.resetCursorState();
+            }
+          }
+          setThreadError(threadIdForSend, null);
+          if (result.threadId !== threadIdForSend && isCurrentRouteThread()) {
+            const thread = scopeThreadRef(environmentId, ThreadId.make(result.threadId));
+            await waitForThreadShell(thread);
+            if (isCurrentRouteThread()) {
+              if (draftId && !draftChanged) {
+                useComposerDraftStore.getState().markDraftThreadPromoting(draftId, thread);
+                finalizePromotedDraftThreadByRef(thread);
+              }
+              await navigate({
+                to: "/$environmentId/$threadId",
+                params: buildThreadRouteParams(thread),
+                replace: isLocalDraftThread,
+              });
+            }
+          }
+        } finally {
+          sendInFlightRef.current = false;
+        }
+        return;
+      }
+    }
+    const standaloneLearning =
+      learning !== undefined && threadIdForSend.startsWith("work-learning-");
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();
     if (attachmentCapabilitiesBeforeUpload.fileBlockReason !== null) {
       sendInFlightRef.current = false;
@@ -1562,6 +1633,13 @@ export function useComposerSend(input: ComposerSendInput) {
         environmentId,
         input: {
           threadId: threadIdForSend,
+          ...(standaloneLearning
+            ? {
+                commandId: CommandId.make(
+                  threadIdForSend + ":work-learning-send-v1:" + messageIdForSend,
+                ),
+              }
+            : {}),
           message: {
             messageId: messageIdForSend,
             role: "user",
@@ -1611,6 +1689,9 @@ export function useComposerSend(input: ComposerSendInput) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        if (standaloneLearning && isCurrentRouteThread()) {
+          toastManager.add({ type: "info", title: m(msg("Standalone Work session")) });
+        }
         if (checkoutPullRequestUrl) {
           linkCheckoutPullRequest(
             scopeThreadRef(environmentId, threadIdForSend),

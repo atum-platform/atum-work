@@ -130,6 +130,7 @@ import * as McpSignIn from "./mcpApps/McpSignIn.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
+import { ThreadMcpServers } from "./mcp/ThreadMcpServers.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as Workflows from "./workflows/Workflows.ts";
@@ -1452,6 +1453,7 @@ export const layerWsRpc = (
   Layer.effectContext(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
+      const threadMcp = yield* Effect.serviceOption(ThreadMcpServers);
       const sql = yield* SqlClient.SqlClient;
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
@@ -2041,20 +2043,42 @@ export const layerWsRpc = (
             Effect.andThen(
               startup
                 .enqueueCommand(
-                  (command.type === "prepared-run.retry"
-                    ? threadLaunch.retryPreparation(command)
-                    : ThreadMessageIntake.dispatchCommand(
-                        ThreadManagementService.withCreationProvenance(command, {
-                          createdBy: "user",
-                          creationSource:
-                            "creationSource" in command ? command.creationSource : "web",
-                        }),
-                        {
-                          managesProviders:
-                            currentSession.scopes.includes(AuthProvidersManageScope),
-                        },
-                      )
-                  ).pipe(Effect.provide(intakeContext)),
+                  Effect.suspend(() => {
+                    const dispatch = (
+                      command.type === "prepared-run.retry"
+                        ? threadLaunch.retryPreparation(command)
+                        : ThreadMessageIntake.dispatchCommand(
+                            ThreadManagementService.withCreationProvenance(command, {
+                              createdBy: "user",
+                              creationSource:
+                                "creationSource" in command ? command.creationSource : "web",
+                            }),
+                            {
+                              managesProviders:
+                                currentSession.scopes.includes(AuthProvidersManageScope),
+                            },
+                          )
+                    ).pipe(Effect.provide(intakeContext));
+                    if (command.type !== "message.dispatch" || Option.isNone(threadMcp))
+                      return dispatch;
+                    return threadMcp.value.aroundStandalone(
+                      command.threadId,
+                      dispatch,
+                      threadManagement.getThreadShell(command.threadId).pipe(
+                        Effect.flatMap((shell) =>
+                          shell?.activeRunId
+                            ? Effect.fail(
+                                new OrchestrationV2DispatchCommandError({
+                                  commandId: command.commandId,
+                                  commandType: command.type,
+                                  message: "Wait for the active Work run to finish.",
+                                }),
+                              )
+                            : Effect.void,
+                        ),
+                      ),
+                    );
+                  }),
                 )
                 .pipe(
                   Effect.tap((result) =>
@@ -2062,7 +2086,11 @@ export const layerWsRpc = (
                   ),
                   Effect.map((result) => ({ sequence: result.sequence })),
                   Effect.mapError((cause) => {
-                    if (cause._tag === "EnvironmentAuthorizationError") return cause;
+                    if (
+                      cause._tag === "EnvironmentAuthorizationError" ||
+                      cause._tag === "OrchestrationV2DispatchCommandError"
+                    )
+                      return cause;
                     const detail = userFacingDispatchErrorMessage(cause);
                     return new OrchestrationV2DispatchCommandError({
                       commandId: command.commandId,

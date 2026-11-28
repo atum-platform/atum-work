@@ -3151,6 +3151,14 @@ export default function ChatView(props: ChatViewProps) {
     scrollToEnd,
     setThreadError,
   });
+  const driveRun = atumWork
+    ? serverProjection?.runs.findLast(
+        (run) => run.status === "completed" && run.workDeliverableId !== undefined,
+      )
+    : undefined;
+  const assistantWorkRunning =
+    activeThreadId?.startsWith("work-learning-") === true &&
+    (phase === "running" || phase === "connecting");
   const { onSend, captureDetachedSend } = useComposerSend({
     environmentId,
     routeThreadKey,
@@ -3162,6 +3170,8 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadBranch,
     activeProject,
     activeProjectIsScratch,
+    work: atumWork && environmentId === primaryEnvironment?.environmentId,
+    assistantWorkRunning,
     activeProjectDefaultModelSelection,
     activeMessageCount,
     isServerThread,
@@ -3395,11 +3405,6 @@ export default function ChatView(props: ChatViewProps) {
       .join(" · ") || null;
   // The end of the timeline holds the thread's present and next turns: what it is doing now,
   // its lifecycle status, guest messages awaiting you, then your queued messages.
-  const driveRun = atumWork
-    ? serverProjection?.runs.findLast(
-        (run) => run.status === "completed" && run.workDeliverableId !== undefined,
-      )
-    : undefined;
   const timelineFooter =
     pendingHandoff === null &&
     driveRun === undefined &&
@@ -3960,6 +3965,7 @@ export default function ChatView(props: ChatViewProps) {
                                 canSteer={canSteer}
                                 canInterrupt={canInterruptRunningThread}
                                 isSendBusy={
+                                  assistantWorkRunning ||
                                   (isSendBusy && !sendQueuesBehindSetup) ||
                                   (setupQueueSendThreadKey !== null &&
                                     setupQueueSendThreadKey === activeThreadKey) ||

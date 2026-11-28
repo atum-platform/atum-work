@@ -1,6 +1,63 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { checkWorkSubmitAccess, readWorkProtonsAction } from "./workSubmitAccess";
+import { createModelSelection } from "@t3tools/shared/model";
+import { ProviderInstanceId } from "@t3tools/contracts";
+import {
+  checkWorkSubmitAccess,
+  readWorkProtonsAction,
+  submitWorkLearning,
+} from "./workSubmitAccess";
+
+describe("Work composer handoff", () => {
+  const input = {
+    threadId: "draft",
+    requestId: "send",
+    text: "Remember this format.",
+    modelSelection: createModelSelection(ProviderInstanceId.make("codex"), "fixture"),
+  };
+  const context = { work: true, draft: true, textOnly: true };
+  const readModelAccess = async () => "allowed" as const;
+
+  it("relays a new draft with the selected provider", async () => {
+    const submitLearning = vi.fn(async () => ({
+      status: "started" as const,
+      threadId: "work-learning-session",
+    }));
+    await expect(
+      submitWorkLearning(input, context, { readModelAccess, submitLearning }),
+    ).resolves.toEqual({ status: "started", threadId: "work-learning-session" });
+    expect(submitLearning).toHaveBeenCalledExactlyOnceWith(input);
+  });
+
+  it("keeps existing local and offline assistant threads usable", async () => {
+    const submitLearning = vi.fn(async () => ({ status: "standalone" as const }));
+    const bridge = { readModelAccess, submitLearning };
+    await expect(submitWorkLearning(input, context, bridge)).resolves.toEqual({
+      status: "standalone",
+    });
+    await expect(
+      submitWorkLearning({ ...input, threadId: "work-learning-session" }, context, bridge),
+    ).resolves.toEqual({ status: "standalone" });
+    // A completed document supplies no reason to route the existing thread.
+    const localDocumentThread = { ...input, document: { artifactId: "completed-docx" } };
+    expect(
+      submitWorkLearning(localDocumentThread, { ...context, draft: false }, bridge),
+    ).toBeUndefined();
+    expect(submitLearning).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds the composer while an assistant-backed run is active", async () => {
+    const submitLearning = vi.fn();
+    await expect(
+      submitWorkLearning(
+        { ...input, threadId: "work-learning-session" },
+        { ...context, draft: false, running: true },
+        { readModelAccess, submitLearning },
+      ),
+    ).resolves.toEqual({ status: "running" });
+    expect(submitLearning).not.toHaveBeenCalled();
+  });
+});
 
 describe("Work submit access", () => {
   it("does not read access for another provider", () => {
