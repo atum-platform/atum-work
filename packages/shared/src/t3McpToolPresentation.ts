@@ -1,3 +1,5 @@
+import { canonicalWorkToolName, workToolName } from "./workToolNames.ts";
+
 export type T3McpToolLogo = "t3-code";
 
 export interface T3McpToolPresentation {
@@ -113,6 +115,10 @@ const T3_MCP_SERVER_ALIASES = new Set([
   "t3code",
   "t3-code-direct",
   "t3_code_direct",
+  "atum-work",
+  "atum_work",
+  "atum-work-direct",
+  "atum_work_direct",
 ]);
 
 const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
@@ -474,28 +480,35 @@ function parseT3McpToolName(value: string): string | null {
     return server !== undefined &&
       tool !== undefined &&
       T3_MCP_SERVER_ALIASES.has(server.toLowerCase())
-      ? tool
+      ? canonicalWorkToolName(tool)
       : null;
   }
 
   const namespaceMatch =
-    /^(?<server>t3[-_]code[-_]direct|t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
+    /^@?(?<server>t3[-_]code(?:[-_]direct)?|t3code|atum[-_]work(?:[-_]direct)?)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
       label,
     );
   if (namespaceMatch?.groups) {
-    return namespaceMatch.groups.tool ?? null;
+    const name = namespaceMatch.groups.tool;
+    return name === undefined ? null : canonicalWorkToolName(name);
   }
 
   const prefixed = /^(?:mcp[-_]{1,2})?t3[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(label);
-  const candidate = prefixed?.groups?.tool ?? label;
+  const candidate = canonicalWorkToolName(prefixed?.groups?.tool ?? label);
   if (Object.hasOwn(T3_MCP_TOOLS, candidate)) return candidate;
   // OpenCode 2 thread prefixes can contain underscores; choose the longest known tool-name suffix.
-  if (!/^t3-code-/i.test(label)) return null;
-  let longest: string | null = null;
+  if (!/^(?:t3-code|atum-work)-/i.test(label)) return null;
+  let winner: string | null = null;
+  let length = 0;
   for (const tool of Object.keys(T3_MCP_TOOLS)) {
-    if (label.endsWith(`_${tool}`) && tool.length > (longest?.length ?? 0)) longest = tool;
+    for (const name of [tool, workToolName(tool)]) {
+      if (name.length > length && label.endsWith(`_${name}`)) {
+        winner = tool;
+        length = name.length;
+      }
+    }
   }
-  return longest;
+  return winner;
 }
 
 export function resolveT3McpToolId(toolName: string | null | undefined): string | null {

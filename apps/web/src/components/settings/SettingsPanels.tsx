@@ -2563,11 +2563,15 @@ export function AboutSettingsPanel() {
             />
           </>
         )}
-        <MobileAppSettingsRow />
+        {import.meta.env.VITE_ATUM_WORK_BUILD === "1" ? null : <MobileAppSettingsRow />}
         {primaryEnvironmentId === null ? null : (
           <SettingsRow
             {...setting("welcome-page")}
-            description={gt("See your agents, import projects, and set up your phone.")}
+            description={
+              import.meta.env.VITE_ATUM_WORK_BUILD === "1"
+                ? gt("See your agents and import projects.")
+                : gt("See your agents, import projects, and set up your phone.")
+            }
             control={
               <Button size="sm" variant="outline" render={<Link to="/welcome" />}>
                 <T context="verb, opens a page">Open</T>

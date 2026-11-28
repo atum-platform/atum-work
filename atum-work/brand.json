@@ -92,6 +92,12 @@
       "count": 1
     },
     {
+      "file": "src/branding.ts",
+      "from": "https://t3.codes/download",
+      "to": "https://atumplatform.com/download",
+      "count": 1
+    },
+    {
       "file": "src/cloud/cloudLinkState.ts",
       "from": " T3 Connect",
       "to": " Connect",
@@ -198,6 +204,12 @@
       "from": " T3 Code",
       "to": " Atum",
       "count": 1
+    },
+    {
+      "file": "src/components/ServerUpdateAction.tsx",
+      "from": "Reconnected on t3@{version}.",
+      "to": "Reconnected on version {version}.",
+      "count": 2
     },
     {
       "file": "src/components/ServerUpdateAction.tsx",
@@ -555,6 +567,18 @@
     },
     {
       "file": "src/components/mcp/mcpApps.ts",
+      "from": "openclaw mcp add t3code",
+      "to": "openclaw mcp add atum-work",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
+      "from": "openclaw mcp login t3code",
+      "to": "openclaw mcp login atum-work",
+      "count": 1
+    },
+    {
+      "file": "src/components/mcp/mcpApps.ts",
       "from": " T3 Code",
       "to": " Atum",
       "count": 3
@@ -849,6 +873,12 @@
     },
     {
       "file": "src/components/settings/LinkedEnvironmentsSettings.tsx",
+      "from": "From Sharing & access there, or t3 pair",
+      "to": "From Sharing & access on that computer",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/LinkedEnvironmentsSettings.tsx",
       "from": " T3 Code",
       "to": " Atum",
       "count": 1
@@ -921,15 +951,21 @@
     },
     {
       "file": "src/components/settings/SavedEnvironmentRows.tsx",
-      "from": " T3 Code",
-      "to": " Atum",
+      "from": "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.",
+      "to": "This environment was unlinked. Open Sharing & access on the host to connect it again.",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SavedEnvironmentRows.tsx",
+      "from": "Run `t3 connect link` on the host, then restart T3 Code there.",
+      "to": "Open Sharing & access on the host to configure the connection.",
       "count": 1
     },
     {
       "file": "src/components/settings/SavedEnvironmentRows.tsx",
       "from": " T3 Connect",
       "to": " Connect",
-      "count": 16
+      "count": 15
     },
     {
       "file": "src/components/settings/SavedEnvironmentRows.tsx",
@@ -953,6 +989,12 @@
       "file": "src/components/settings/SecretsSettings.tsx",
       "from": " T3 Code",
       "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "src/components/settings/SettingsFontPreviews.tsx",
+      "from": "t3code\\x1b",
+      "to": "workspace\\x1b",
       "count": 1
     },
     {
@@ -1026,6 +1068,12 @@
       "from": " T3 Code",
       "to": " Atum",
       "count": 1
+    },
+    {
+      "file": "src/components/settings/settingsSearch.ts",
+      "from": "t3 connect",
+      "to": "connect",
+      "count": 4
     },
     {
       "file": "src/components/settings/settingsSearch.ts",
@@ -1154,6 +1202,18 @@
       "count": 1
     },
     {
+      "file": "src/legalLinks.ts",
+      "from": "https://t3.codes/privacy-policy",
+      "to": "https://atumplatform.com/privacy",
+      "count": 1
+    },
+    {
+      "file": "src/lib/bootError.ts",
+      "from": "https://t3.codes/download",
+      "to": "https://atumplatform.com/download",
+      "count": 1
+    },
+    {
       "file": "src/lib/bootError.ts",
       "from": " T3 Code",
       "to": " Atum",
@@ -1247,6 +1307,12 @@
       "file": "../../packages/client-runtime/src/connection/compatibility.ts",
       "from": " T3 Code",
       "to": " Atum",
+      "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/connection/diagnosis.ts",
+      "from": "On {host}, check Settings > Sharing & access or run `t3 connect status`.",
+      "to": "On {host}, check Settings > Sharing & access.",
       "count": 1
     },
     {
@@ -1440,6 +1506,12 @@
       "from": " T3 Code",
       "to": " Atum",
       "count": 1
+    },
+    {
+      "file": "../../packages/client-runtime/src/state/server.ts",
+      "from": "The t3@{version} update",
+      "to": "The update to {version}",
+      "count": 4
     },
     {
       "file": "../../packages/client-runtime/src/state/threadRequests.ts",

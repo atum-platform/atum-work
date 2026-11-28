@@ -322,7 +322,8 @@ export function showBootError(error: unknown) {
       },
     ),
   );
-  void resolveTriageCommand(bridge).then((value) => (command.textContent = value));
+  const workBuild = import.meta.env.VITE_ATUM_WORK_BUILD === "1";
+  if (!workBuild) void resolveTriageCommand(bridge).then((value) => (command.textContent = value));
 
   let report = "(no error message)";
   try {
@@ -362,20 +363,24 @@ export function showBootError(error: unknown) {
     ...(bridge
       ? [
           link(
-            nightly ? `${DOWNLOAD_URL}?channel=nightly` : DOWNLOAD_URL,
-            nightly
+            nightly && !workBuild ? `${DOWNLOAD_URL}?channel=nightly` : DOWNLOAD_URL,
+            nightly && !workBuild
               ? "Download and reinstall the latest nightly build"
               : "Download and reinstall T3 Code",
           ),
         ]
       : []),
-    element("div", {}, [
-      element("p", {
-        textContent:
-          "Run this on the computer that runs T3 Code. Your agent can check the local logs and help you file a bug report.",
-      }),
-      element("div", { id: "boot-error-command" }, [command, copyCommand]),
-    ]),
+    ...(!workBuild
+      ? [
+          element("div", {}, [
+            element("p", {
+              textContent:
+                "Run this on the computer that runs T3 Code. Your agent can check the local logs and help you file a bug report.",
+            }),
+            element("div", { id: "boot-error-command" }, [command, copyCommand]),
+          ]),
+        ]
+      : []),
     element("div", {}, [
       details,
       element("p", {
@@ -383,7 +388,9 @@ export function showBootError(error: unknown) {
       }),
       element("div", { id: "boot-error-report" }, [
         copyDetails,
-        link(issue.href, "File a bug report on GitHub"),
+        workBuild
+          ? link("mailto:support@atumplatform.com", "Contact Atum support")
+          : link(issue.href, "File a bug report on GitHub"),
       ]),
     ]),
   ]);

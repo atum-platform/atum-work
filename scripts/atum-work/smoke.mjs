@@ -1,4 +1,6 @@
 import * as NodeAssert from "node:assert/strict";
+import { assertWorkBrandText } from "../../packages/shared/src/workBrandCheck.ts";
+import { readBrandMap } from "./brand.mjs";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
@@ -27,6 +29,25 @@ try {
   NodeAssert.ok(name && rest.length === 0, "Expected one runtime root");
   const root = NodePath.join(temp, name);
   const json = (file) => JSON.parse(NodeFS.readFileSync(NodePath.join(root, file), "utf8"));
+  const source = (file) => NodeFS.readFileSync(new URL("../../" + file, import.meta.url));
+  for (const notice of ["LICENSE", "NOTICE"]) {
+    NodeAssert.deepEqual(NodeFS.readFileSync(NodePath.join(root, notice)), source(notice));
+  }
+  const members = NodeFS.readdirSync(root, { recursive: true });
+  NodeAssert.ok(!members.some((member) => /\.(?:app|ipa|apk|aab)(?:\/|$)/iu.test(member)));
+  const { data: brand } = readBrandMap(
+    new URL("../../atum-work/brand.json", import.meta.url).pathname,
+  );
+  for (const [file, asset] of Object.entries(brand.icons)) {
+    NodeAssert.deepEqual(
+      NodeFS.readFileSync(NodePath.join(root, "client", file)),
+      source("atum-work/" + asset),
+    );
+  }
+  const manifest = json("client/manifest.webmanifest");
+  NodeAssert.equal(manifest.name, expectedName);
+  assertWorkBrandText("packaged web manifest", JSON.stringify(manifest));
+
   NodeAssert.match(
     NodeFS.readFileSync(NodePath.join(root, "LICENSE"), "utf8"),
     /Copyright \(c\) 2026 T3 Tools Inc\./,
@@ -65,6 +86,18 @@ try {
     encoding: "utf8",
   });
   NodeAssert.match(version, /\bv\d+\.\d+\.\d+\b/);
+  const workCli = NodePath.join(root, "atum");
+  const help = NodeChildProcess.execFileSync(workCli, ["work", "--help"], {
+    cwd,
+    env,
+    encoding: "utf8",
+  });
+  assertWorkBrandText("packaged Work CLI help", help);
+  NodeAssert.equal(
+    NodeChildProcess.execFileSync(workCli, ["work", "--version"], { cwd, env, encoding: "utf8" }),
+    version,
+  );
+
   child = NodeChildProcess.spawn(
     executable,
     ["--mode", "web", "--no-browser", "--host", "127.0.0.1"],
@@ -196,6 +229,38 @@ try {
   const phases = await page.evaluate(() => window.__atumSmokeStartupPhases);
   NodeAssert.equal(new Set(phases).size, phases.length, "Startup phases repeated");
   console.log(`Packaged startup reports: ${phases.join(", ")}.`);
+  const readScreen = async (id) => {
+    const visible = await page.evaluate(() => ({
+      title: document.title,
+      text: document.body.innerText,
+      attributes: Array.from(document.querySelectorAll("[aria-label], [alt], [title], a[href]"))
+        .filter((element) => element.getClientRects().length > 0)
+        .flatMap((element) =>
+          ["aria-label", "alt", "title", "href"].map((name) => element.getAttribute(name)),
+        )
+        .filter(Boolean),
+    }));
+    assertWorkBrandText(id + " title", visible.title);
+    assertWorkBrandText(id + " text", visible.text);
+    for (const [index, attribute] of visible.attributes.entries()) {
+      assertWorkBrandText(id + " attribute " + index, attribute);
+    }
+  };
+  await readScreen("Work home");
+  for (const section of [
+    "about",
+    "general",
+    "connections",
+    "providers",
+    "integrations",
+    "source-control",
+    "appearance",
+  ]) {
+    await page.goto(new URL("/settings/" + section, origin).href);
+    await page.locator("[data-settings-page-scroll]").waitFor({ timeout: 15_000 });
+    await readScreen("Work settings / " + section);
+  }
+
   const connectHelp = NodeChildProcess.execFileSync(executable, ["connect", "--help"], {
     cwd,
     env,

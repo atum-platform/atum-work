@@ -4,7 +4,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeTest from "node:test";
 import { assertWorkBrandText } from "../../packages/shared/src/workBrandCheck.ts";
-import { applyBrand, assertProviderIdentity, planBrand } from "./brand.mjs";
+import { applyBrand, assertProviderIdentity, assertWorkMark, planBrand } from "./brand.mjs";
 
 NodeTest.test("the presentation gate rejects hidden and encoded legacy text", () => {
   assertWorkBrandText("model", "Use the Work browser panel.");
@@ -21,6 +21,15 @@ NodeTest.test("the presentation gate rejects hidden and encoded legacy text", ()
   NodeAssert.throws(() => assertWorkBrandText("missing", ""), /Missing Work brand fixture/);
   assertWorkBrandText("ACP", "Read T3_ACP_MCP_NODE", ["T3_ACP_MCP_NODE"]);
   NodeAssert.throws(() => assertWorkBrandText("UI", "Read T3_ACP_MCP_NODE"), /Legacy product text/);
+});
+
+NodeTest.test("the Work tool mark gate catches a replaced eclipse shape", () => {
+  const asset = NodeFS.readFileSync(
+    new URL("../../atum-work/assets/T3Wordmark.tsx", import.meta.url),
+    "utf8",
+  );
+  assertWorkMark(asset);
+  NodeAssert.throws(() => assertWorkMark(asset.replace('r="28.5"', 'r="30"')));
 });
 
 NodeTest.test(

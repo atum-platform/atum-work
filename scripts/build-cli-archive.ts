@@ -649,7 +649,14 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   if (Option.isSome(input.noticeDir)) {
     const target = path.join(contentDir, "licenses");
     yield* fs.copy(input.noticeDir.value, target);
-    yield* fs.copyFile(path.join(repoRoot, "LICENSE"), path.join(contentDir, "LICENSE"));
+    for (const notice of ["LICENSE", "NOTICE"]) {
+      yield* fs.copyFile(path.join(repoRoot, notice), path.join(contentDir, notice));
+    }
+    if (input.platform === "mac") {
+      const workCli = path.join(contentDir, "atum");
+      yield* fs.copyFile(path.join(repoRoot, "scripts/atum-work/atum"), workCli);
+      yield* fs.chmod(workCli, 0o755);
+    }
     yield* Effect.promise(() => writeRuntimeNotices(contentDir, repoRoot));
   }
 

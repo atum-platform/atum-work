@@ -16,6 +16,7 @@ export async function suggestAppAccessForRemote(
   environmentId: EnvironmentId,
   remoteUrl: string,
 ): Promise<void> {
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return;
   const target = appSignInTargetForRemote(remoteUrl);
   if (target === null) return;
   const result = await runAtomCommand(

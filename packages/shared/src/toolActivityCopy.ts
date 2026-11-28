@@ -1,6 +1,7 @@
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
+import { resolveT3McpToolId } from "./t3McpToolPresentation.ts";
 import { describeDynamicToolTitle, searchToolLabelParts } from "./toolActivity.ts";
 
 /** @public */
@@ -10,6 +11,12 @@ export function dynamicToolTitle(
   retainedTitle?: string | null,
   resolve: MFunctionType = mFallback,
 ): string | undefined {
+  if (
+    toolName &&
+    /^(?:mcp__|@)?(?:t3[-_]?code|atum[-_]work)(?:[-_]|[.:/])/i.test(toolName) &&
+    resolveT3McpToolId(toolName) === null
+  )
+    return resolve(msg("Work tool"));
   const title = describeDynamicToolTitle(toolName, input, retainedTitle);
   switch (title?.kind) {
     case undefined:

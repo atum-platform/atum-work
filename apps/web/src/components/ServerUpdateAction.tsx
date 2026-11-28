@@ -204,6 +204,7 @@ export function ServerUpdatesAction({
   const eligible = targets.filter(
     (target) =>
       target.selfUpdate !== null &&
+      (import.meta.env.VITE_ATUM_WORK_BUILD !== "1" || target.selfUpdate === "desktop-managed") &&
       (target.selfUpdate !== "desktop-managed" || target.desktopAppUpdate) &&
       managedUpdatesDenial(serverConfigs.get(target.environmentId)?.managedPolicy, messages) ===
         undefined &&
@@ -398,6 +399,14 @@ export function ServerUpdateAction({
     return <CrossTrackNote />;
   }
 
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1" && selfUpdate !== "desktop-managed") {
+    return appearance === "icon" ? null : (
+      <span className="text-muted-foreground text-xs">
+        <T>Update the Work installation on the host.</T>
+      </span>
+    );
+  }
+
   const manualCommand =
     selfUpdate === null ? manualServerUpdateCommand(targetVersion, installation) : null;
   const actionLabel =
@@ -486,6 +495,7 @@ export function OutdatedServerUpdateAction({
       description: m(msg("Reconnected on t3@{version}.", { version: result.value.targetVersion })),
     });
   };
+  if (import.meta.env.VITE_ATUM_WORK_BUILD === "1") return null;
   if (fromVersion !== undefined && crossesReleaseTrack(fromVersion, targetVersion)) {
     return <CrossTrackNote />;
   }

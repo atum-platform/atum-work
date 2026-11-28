@@ -98,6 +98,8 @@ export function SourceControlAppSignInSettings({
   readonly onChanged: () => void;
 }) {
   const gt = useGT();
+  const workBuild = import.meta.env.VITE_ATUM_WORK_BUILD === "1";
+  const appName = workBuild ? gt("GitHub app account") : appSignIn.appName;
   const host = appSignIn.hosts[0] ?? "";
   const { signIns, tokens } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
@@ -113,7 +115,7 @@ export function SourceControlAppSignInSettings({
   const wait = useAtomCommand(sourceControlEnvironment.waitForSignIn, { reportFailure: false });
   const cancel = useAtomCommand(sourceControlEnvironment.cancelSignIn, { reportFailure: false });
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `sign out of ${appSignIn.appName}`,
+    label: `sign out of ${appName}`,
   });
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     timeout: 1500,
@@ -124,6 +126,7 @@ export function SourceControlAppSignInSettings({
     },
   });
   const [state, setState] = useState<SignInState>({ status: "idle" });
+  if (workBuild && !signedIn) return null;
 
   const signIn = async () => {
     setState({ status: "starting" });
@@ -224,9 +227,9 @@ export function SourceControlAppSignInSettings({
       )}
     >
       <div className="flex items-center gap-3 p-3">
-        <AppMark signedIn={signedIn} />
+        {workBuild ? null : <AppMark signedIn={signedIn} />}
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-sm font-medium text-foreground">{appSignIn.appName}</p>
+          <p className="text-sm font-medium text-foreground">{appName}</p>
           <div className="text-xs text-muted-foreground">{subtitle}</div>
         </div>
         <div className="shrink-0">{action}</div>
@@ -266,7 +269,7 @@ export function SourceControlAppSignInSettings({
         </div>
       ) : null}
 
-      {signedIn ? (
+      {signedIn && !workBuild ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 flex-1">
             <T>Reaches repositories in accounts and organizations that installed the app.</T>
