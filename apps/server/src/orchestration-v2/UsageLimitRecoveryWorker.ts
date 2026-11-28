@@ -109,6 +109,7 @@ const makeSweep = Effect.gen(function* () {
       now,
       autoResume: preferences.autoResumeLimitedThreads,
       snooze: preferences.snoozeLimitedThreads,
+      fallbackSettings: preferences,
     });
     let acted = false;
     for (const thread of candidates) {

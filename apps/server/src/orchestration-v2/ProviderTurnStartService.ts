@@ -670,14 +670,27 @@ export const layer: Layer.Layer<
       }
       const manualResume =
         run.manualContinuationOfRunId !== undefined && attempt.reason !== "steering_restart";
-      const resumeSource = manualResume
-        ? unsentManualContinuationSource(run, projection)
-        : undefined;
+      const portableResume =
+        manualResume &&
+        run.contextHandoffId !== null &&
+        projection.runs.some(
+          (source) =>
+            source.id === run.manualContinuationOfRunId &&
+            source.providerInstanceId !== run.providerInstanceId,
+        );
+      const resumeSource =
+        manualResume && !portableResume
+          ? unsentManualContinuationSource(run, projection)
+          : undefined;
       const unsentResumeMessage =
         resumeSource !== undefined
           ? projection.messages.find((source) => source.id === resumeSource.userMessageId)
           : undefined;
-      const providerMessage = unsentResumeMessage ?? message;
+      // The handoff carries the interrupted task. Sending its original prompt again
+      // can repeat side effects, including when the old provider lost its delivery receipt.
+      const providerMessage = portableResume
+        ? { ...message, text: RESUME_PROMPT }
+        : (unsentResumeMessage ?? message);
       const settleStartFailure = Effect.fn("ProviderTurnStartService.settleStartFailure")(
         function* (failed: {
           readonly signal: string;
@@ -1914,6 +1927,7 @@ export const layer: Layer.Layer<
       // Pending context turns the resume into a prompted turn, which needs no native resume.
       if (
         manualResume &&
+        !portableResume &&
         unsentResumeMessage === undefined &&
         session.resumeTurn === undefined &&
         !carriesPendingContext
@@ -2268,7 +2282,7 @@ export const layer: Layer.Layer<
               .filter((turn) => turn.providerThreadId === providerThread.id)
               .map((turn) => turn.ordinal),
           ) + 1,
-        resume: manualResume && unsentResumeMessage === undefined,
+        resume: manualResume && !portableResume && unsentResumeMessage === undefined,
         nativeThreadHasTurns:
           nativeInputRunIds.size > 0 ||
           (legacyInputRunIds.size > 0 &&

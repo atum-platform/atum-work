@@ -46,6 +46,9 @@ export interface ProviderAdapterRegistryV2Shape {
     instanceId: ProviderInstanceId,
   ) => Effect.Effect<ProviderAdapter.ProviderAdapterV2["Service"], ProviderAdapterRegistryV2Error>;
   readonly list: () => Effect.Effect<ReadonlyArray<ProviderInstanceId>>;
+  readonly getSnapshot?: (
+    instanceId: ProviderInstanceId,
+  ) => Effect.Effect<ServerProvider | undefined>;
   readonly getMetadata?: (instanceId: ProviderInstanceId) => Effect.Effect<
     {
       readonly driver: ProviderAdapter.ProviderAdapterV2["Service"]["driver"];
@@ -154,6 +157,10 @@ export const layerFromProviderInstanceRegistry: Layer.Layer<
         return instances.listInstances.pipe(
           Effect.map((available) => available.map((instance) => instance.instanceId)),
         );
+      }),
+      getSnapshot: Effect.fn("ProviderAdapterRegistryV2.getSnapshot")(function* (instanceId) {
+        const instance = yield* instances.getInstance(instanceId);
+        return instance === undefined ? undefined : yield* instance.snapshot.getSnapshot;
       }),
       getMetadata: Effect.fn("ProviderAdapterRegistry.getMetadata")(function* (instanceId) {
         const instance = yield* instances.getInstance(instanceId);

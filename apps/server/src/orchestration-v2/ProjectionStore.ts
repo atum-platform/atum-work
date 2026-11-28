@@ -1,3 +1,9 @@
+import {
+  CONTINUABLE_WORK_ITEM_TYPES,
+  providerFallbackShellFields,
+  workFallbackOrder,
+  type ProviderQuotaFailure,
+} from "./ProviderFallback.ts";
 import type { ProjectThreadAwarenessV2Input } from "@t3tools/shared/agentAwareness";
 import { applyOrchestrationV2ThreadVisit, pendingGuestMessageCount } from "@t3tools/contracts";
 import { applyThreadPullRequestLinkUpdate } from "../sourceControl/threadPullRequests.ts";
@@ -7,6 +13,7 @@ import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { makeThreadFind } from "./ThreadFind.ts";
 import { unsentManualContinuationSource } from "@t3tools/shared/orchestrationV2ManualContinuation";
 import type {
+  ModelSelection,
   OrchestrationV2ThreadLinkMetadata,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -672,10 +679,15 @@ export interface ProjectionStoreV2Shape {
   readonly findThread: (
     threadId: ThreadId,
   ) => Effect.Effect<OrchestrationV2AppThread | null, ProjectionStoreV2Error>;
+  readonly getProviderQuotaFailure: (
+    selection: ModelSelection,
+    shareGoQuota: boolean,
+  ) => Effect.Effect<ProviderQuotaFailure | undefined, ProjectionStoreV2Error>;
   readonly getLimitRecoveryCandidates: (options: {
     readonly now: DateTime.Utc;
     readonly autoResume: boolean;
     readonly snooze: boolean;
+    readonly fallbackSettings?: import("@t3tools/contracts").ServerSettings;
   }) => Effect.Effect<ReadonlyArray<ProjectionLimitRecoveryCandidate>, ProjectionStoreV2Error>;
   /** Epoch ms of the next armed reset or snooze end after `now`, when a waiting thread becomes a candidate. */
   readonly getLimitRecoveryWakeAt: (
@@ -1267,6 +1279,7 @@ type ShellThreadRow = {
   readonly latest_run_started_at: string | null;
   readonly latest_run_completed_at: string | null;
   readonly latest_run_stop_requested: number;
+  readonly failed_run_performed_work: number;
   readonly latest_run_background_wake: number;
   readonly active_run_id: string | null;
   readonly active_run_status: string | null;
@@ -1926,6 +1939,10 @@ export function threadShellFromProjection(
     runs,
     pullRequests: projection.thread.pullRequests,
   });
+  const errorSummary = threadErrorSummary(
+    latestRootProviderFailure(latestRun, projection.turnItems),
+    providerSession?.lastError ?? null,
+  );
   return {
     createdBy: projection.thread.createdBy,
     creationSource: projection.thread.creationSource,
@@ -1982,9 +1999,22 @@ export function threadShellFromProjection(
     activityRunStartedAt:
       activityRun === null ? null : orchestrationV2RunWorkStartedAt(activityRun),
     status: latestRun?.status ?? "idle",
-    ...threadErrorSummary(
-      latestRootProviderFailure(latestRun, projection.turnItems),
-      providerSession?.lastError ?? null,
+    ...errorSummary,
+    ...providerFallbackShellFields(
+      projection.thread,
+      {
+        ...errorSummary,
+        status: latestRun?.status ?? "idle",
+        pendingRuntimeRequest,
+        activeRunId: activeRun?.id ?? null,
+      },
+      latestRun !== null &&
+        latestRun?.status === "failed" &&
+        projection.turnItems.some(
+          (item) =>
+            item.runId === latestRun.id &&
+            CONTINUABLE_WORK_ITEM_TYPES.some((type) => type === item.type),
+        ),
     ),
     pendingRuntimeRequest,
     pendingGuestMessageCount: pendingGuestMessageCount(projection.thread.guestShare),
@@ -2118,6 +2148,7 @@ type ShellThreadState = {
   readonly blockedOnThreadWait: boolean;
   readonly activityRunStatus: ShellActivityRunStatus | null;
   readonly activityRunStartedAt: DateTime.Utc | null;
+  readonly failedRunPerformedWork: boolean;
   readonly lastError: string | null;
   readonly lastErrorClass: OrchestrationV2ThreadShell["lastErrorClass"];
   readonly lastErrorCode: OrchestrationV2ThreadShell["lastErrorCode"];
@@ -2326,6 +2357,11 @@ function shellFromState(input: {
     opens: input.state.thread.opens ?? null,
     titleRegeneration: input.state.thread.titleRegeneration ?? null,
     lastTitleRegeneration: input.state.thread.lastTitleRegeneration ?? null,
+    ...providerFallbackShellFields(
+      input.state.thread,
+      { ...input.state, status: input.state.latestRunStatus },
+      input.state.failedRunPerformedWork,
+    ),
     limitRecovery: input.state.thread.limitRecovery ?? null,
     deletedAt: input.state.thread.deletedAt,
   };
@@ -4976,6 +5012,53 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         ),
     );
 
+    const getProviderQuotaFailure = Effect.fn("ProjectionStore.getProviderQuotaFailure")(
+      function* (selection: ModelSelection, shareGoQuota: boolean) {
+        const modelMatches = (alias: "run" | "recovered") => {
+          const path = sql.literal(`${alias}.payload_json`);
+          return shareGoQuota
+            ? sql`json_extract(${path}, '$.modelSelection.model') GLOB 'opencode-go/*'`
+            : sql`json_extract(${path}, '$.modelSelection.model') = ${selection.model}`;
+        };
+        const rows = yield* sql<{ readonly reset_at: string | null; readonly observed_at: string }>`
+          SELECT json_extract(failure.payload_json, '$.failure.resetAt') AS reset_at,
+            failure.updated_at AS observed_at
+          FROM orchestration_v2_projection_turn_items failure
+          CROSS JOIN orchestration_v2_projection_runs run ON run.run_id = failure.run_id
+          WHERE failure.type = 'error' AND failure.status = 'failed'
+            AND CASE WHEN json_valid(failure.payload_json) THEN
+              json_extract(failure.payload_json, '$.failure.class') = 'usage_limit'
+              ELSE 0 END
+            AND run.provider_instance_id = ${selection.instanceId}
+            AND run.status = 'failed'
+            AND failure.node_id IS json_extract(run.payload_json, '$.rootNodeId')
+            AND ${modelMatches("run")}
+            AND failure.turn_item_id = (
+              SELECT terminal.turn_item_id FROM orchestration_v2_projection_turn_items terminal
+              WHERE terminal.thread_id = run.thread_id AND terminal.run_id = run.run_id
+                AND terminal.node_id IS failure.node_id
+                AND terminal.type = 'error' AND terminal.status = 'failed'
+              ORDER BY terminal.updated_at DESC, terminal.ordinal DESC, terminal.turn_item_id DESC
+              LIMIT 1
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM orchestration_v2_projection_runs recovered
+              WHERE recovered.provider_instance_id = run.provider_instance_id
+                AND recovered.status = 'completed'
+                AND json_extract(recovered.payload_json, '$.startedAt') > failure.updated_at
+                AND ${modelMatches("recovered")}
+            )
+          ORDER BY failure.updated_at DESC, failure.turn_item_id DESC
+          LIMIT 1
+        `;
+        const row = rows[0];
+        return row === undefined
+          ? undefined
+          : { resetAt: row.reset_at, observedAt: row.observed_at };
+      },
+      Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
+    );
+
     const getLimitRecoveryCandidates = Effect.fn("ProjectionStore.getLimitRecoveryCandidates")(
       function* (options: Parameters<ProjectionStoreV2Shape["getLimitRecoveryCandidates"]>[0]) {
         const rows = yield* sql<{
@@ -5080,6 +5163,11 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         const candidates: Array<ProjectionLimitRecoveryCandidate> = [];
         for (const row of rows) {
           const thread = yield* decodeThreadPayload(row.payload_json);
+          if (
+            options.fallbackSettings !== undefined &&
+            workFallbackOrder(options.fallbackSettings, thread).length > 0
+          )
+            continue;
           const item = yield* decodeTurnItemPayload(row.failure_payload_json);
           const summary = threadErrorSummary(
             item.type === "error" ? item.failure : null,
@@ -8437,6 +8525,11 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 WHERE stop_request.thread_id = t.thread_id AND stop_request.run_id = presented.run_id
                   AND stop_request.type = 'run_interrupt_request'
               ) AS latest_run_stop_requested,
+              EXISTS (
+                SELECT 1 FROM orchestration_v2_projection_turn_items work
+                WHERE work.thread_id = t.thread_id AND work.run_id = blocked.run_id
+                  AND work.type IN ${sql.in(CONTINUABLE_WORK_ITEM_TYPES)}
+              ) AS failed_run_performed_work,
               ${isBackgroundWakeShellRun("presented")} AS latest_run_background_wake,
               active.run_id AS active_run_id,
               active.status AS active_run_status,
@@ -9232,6 +9325,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             row.last_error,
           ),
           pendingRuntimeRequest,
+          failedRunPerformedWork:
+            latestRunId === row.blocking_run_id && row.failed_run_performed_work === 1,
           latestUserMessageAt:
             row.latest_user_message_at === null
               ? null
@@ -9944,6 +10039,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getRuntimeRequest: readOnReader(getRuntimeRequest),
       getPlan: readOnReader(getPlan),
       getProviderControlContext: readOnReader(getProviderControlContext),
+      getProviderQuotaFailure: readOnReader(getProviderQuotaFailure),
       getLimitRecoveryCandidates: readOnReader(getLimitRecoveryCandidates),
       getLimitRecoveryWakeAt: readOnReader(getLimitRecoveryWakeAt),
       getRecoveryThreadIds: readOnReader(getRecoveryThreadIds),

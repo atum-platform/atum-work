@@ -600,6 +600,9 @@ export function applyServerSettingsPatch(
           ),
         }
       : {}),
+    ...(patch.providerFallbackOrder === undefined
+      ? {}
+      : { providerFallbackOrder: patch.providerFallbackOrder }),
     ...(patch.defaultModelSelection !== undefined
       ? { defaultModelSelection: patch.defaultModelSelection }
       : {}),
