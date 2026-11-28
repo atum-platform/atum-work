@@ -601,9 +601,7 @@ it("advertises the native retry key without exposing relay-only arguments", () =
   const schema = advertisedJsonSchema(ProjectToolkit.tools.t3_thread_launch);
   expect(schema.properties).not.toHaveProperty("assistantLearning");
   expect(schema.properties).not.toHaveProperty("assistantSessionId");
-  expect(schema.properties?.clientRequestId).toMatchObject({
-    description: expect.stringContaining("work-learning-v1"),
-  });
+  expect(ProjectToolkit.tools.t3_thread_launch.description).toContain("work-learning-v1");
 });
 
 it.live("replays a visible learning launch only with its original native owner key", () =>

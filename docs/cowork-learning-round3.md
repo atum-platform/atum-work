@@ -16,3 +16,5 @@ Local tests cover composer eligibility and busy state, a rejected local
 dispatch during an active run, detachment, and reattachment with refreshed
 native consent. The enrolled Desktop-to-relay path needs signed integration
 verification.
+
+The advertised launch description carries the relay compatibility marker.
