@@ -1,17 +1,22 @@
 # Atum Work standalone runtime
 
-The fork carries a linear queue over an upstream stable tag. Q1 is the generated brand
+The stable fork patch queue is linear over an upstream stable tag. Q1 is the generated brand
 overlay, Q3 is the defaults, and Q6 is the composer access check. Q4 (Work/Code)
 and Q5 (Vietnamese) are reserved for a later slice. The five-seam cap includes those
 reserved entries. The tooling and workflow carry no additional product seams.
 
-## Replay the queue
+## Replay the queue before an upstream bump
 
 ```sh
-scripts/atum-work/replay.sh v0.1.10 v0.1.11 v0.1.11 HEAD
+git fetch --no-tags https://github.com/pingdotgg/t3code refs/tags/v0.1.10:refs/tags/v0.1.10 refs/tags/v0.1.11:refs/tags/v0.1.11
+scripts/atum-work/replay.sh v0.1.10 v0.1.11 v0.1.11 "$queue_head"
 ```
 
-The arguments are previous pin, next pin, base of the carried queue, and queue head.
+Set `queue_head` to the ref of the linear patch queue being maintained. The arguments are
+previous pin, next pin, base of the carried queue, and queue head. Integration and feature
+branches can contain upstream commits and merges. Run replay on the patch queue during
+fork maintenance. Feature PR verification checks branding, typecheck, lint, scoped tests,
+and the standalone archive on eligible PRs.
 Supply an optional fifth argument with an absolute brand map path to validate it on both pins.
 The script uses a disposable worktree, checks the two Codex identity anchors on
 both pins, and compares the resulting tree with the source when replaying back
