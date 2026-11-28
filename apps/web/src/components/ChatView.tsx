@@ -76,6 +76,7 @@ import { atumOpenThreadFrom, offerAtumOpenThread } from "../atum/openThread";
 import { atumDraftOverlayStyle } from "../atum/bannerAnchor";
 import { WorkCreateMenu, WorkSessionChips } from "../atum/WorkSessionChips";
 import { useWorkStarter } from "../atum/useWorkStarter";
+import { syncWorkDraftDefault } from "../atum/workDraftDefault";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
 import { ChatBannerLane } from "./chat/ChatBannerLane";
 import * as Schema from "effect/Schema";
@@ -1059,6 +1060,14 @@ export default function ChatView(props: ChatViewProps) {
     (isServerThread ? activeThread?.runtimeMode : undefined) ??
     defaultRuntimeMode;
   const isLocalDraftThread = !isServerThread && localDraftThread !== undefined;
+  const workDraftDefault = draftFallback ? draftFallback.selection : draftDefaultModelSelection;
+  const useHostDefault = isAtumWorkBuild && Boolean(globalThis.window?.atumWork);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- updates an inherited draft seed when the desktop's provider probe changes the default
+  useLayoutEffect(() => {
+    if (useHostDefault && isLocalDraftThread && draftId !== null && workDraftDefault) {
+      syncWorkDraftDefault(draftId, workDraftDefault);
+    }
+  }, [useHostDefault, isLocalDraftThread, draftId, workDraftDefault]);
   const canCheckoutPullRequestIntoThread = canWriteSourceControl && isLocalDraftThread;
   const activeThreadId = activeThread?.id ?? null;
   // Turn items can lag projection hydration; keep the environment locked through that gap.
