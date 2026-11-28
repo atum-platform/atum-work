@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 
 import { loadOrCreateProofKey } from "./dpop";
 import { managedRelayAccessTokenStore } from "./managedRelayTokenStore";
+import { isAtumTransportProof } from "./publicConfig";
 
 const layerRelayDpopSigner = DpopProof.layerSigner({
   keyStore: "expo-secure-store",
@@ -14,5 +15,5 @@ export const layer = (relayUrl: string) =>
   ManagedRelay.layer({
     relayUrl,
     clientId: RelayMobileClientId,
-    accessTokenStore: managedRelayAccessTokenStore,
+    ...(!isAtumTransportProof() && { accessTokenStore: managedRelayAccessTokenStore }),
   }).pipe(Layer.provideMerge(layerRelayDpopSigner));

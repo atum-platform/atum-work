@@ -1,5 +1,6 @@
 import type { getClerkInstance } from "@clerk/expo";
 import {
+  createAtumConnectIdentity,
   createCloudAccountService,
   ManagedRelay,
   setManagedRelaySession,
@@ -36,12 +37,18 @@ export function deactivateCloudRelayAccount(): void {
 
 export function activateCloudRelayAccount(
   accountId: string,
-  tokenProvider: () => Promise<string | null>,
+  identity: (() => Promise<string | null>) | { readonly getAssertion: () => Promise<string> },
 ): void {
-  setAgentAwarenessRelayTokenProvider(tokenProvider, accountId);
+  if (typeof identity === "function") {
+    setAgentAwarenessRelayTokenProvider(identity, accountId);
+    setManagedRelaySession(appAtomRegistry, { accountId, readClerkToken: identity });
+    return;
+  }
+  const { getAssertion } = createAtumConnectIdentity(identity);
   setManagedRelaySession(appAtomRegistry, {
     accountId,
-    readClerkToken: tokenProvider,
+    cacheToken: false,
+    readClerkToken: getAssertion,
   });
 }
 

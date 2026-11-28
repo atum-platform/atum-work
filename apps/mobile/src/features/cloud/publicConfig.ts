@@ -73,6 +73,15 @@ export function resolveCloudPublicConfig(extra: ExpoExtra = Constants.expoConfig
   } satisfies CloudPublicConfig;
 }
 
+export function isAtumTransportProof(): boolean {
+  return Constants.expoConfig?.extra?.atumTransportProof === true;
+}
+
+export function hasCloudDiscoveryPublicConfig(): boolean {
+  return isAtumTransportProof() ? resolveCloudPublicConfig().relay.url !== null : hasCloudPublicConfig();
+}
+
+// The other cloud screens still use Clerk hooks.
 export function hasCloudPublicConfig(): boolean {
   const config = resolveCloudPublicConfig();
   return Boolean(config.clerk.publishableKey && config.clerk.jwtTemplate && config.relay.url);

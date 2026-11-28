@@ -4,8 +4,10 @@ import { Observe } from "expo-observe";
 // Importing expo-observe installs its global JS error handler; reports leave only through the relay.
 const relayUrl: unknown = Constants.expoConfig?.extra?.relay?.url;
 const appVariant: unknown = Constants.expoConfig?.extra?.appVariant;
+const transportProof = Constants.expoConfig?.extra?.atumTransportProof === true;
 
-export const crashReportingAvailable = typeof relayUrl === "string" && relayUrl.trim() !== "";
+export const crashReportingAvailable =
+  !transportProof && typeof relayUrl === "string" && relayUrl.trim() !== "";
 
 interface PromiseRejectionTracker {
   readonly enablePromiseRejectionTracker?: (options: {
@@ -15,7 +17,7 @@ interface PromiseRejectionTracker {
 }
 
 // React Native tracks unhandled rejections only in development, for LogBox; Observe has no hook.
-if (!__DEV__) {
+if (!__DEV__ && !transportProof) {
   const hermes: PromiseRejectionTracker | undefined = Reflect.get(globalThis, "HermesInternal");
   hermes?.enablePromiseRejectionTracker?.({
     allRejections: true,

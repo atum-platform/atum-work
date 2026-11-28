@@ -14,7 +14,7 @@ import {
 } from "@react-navigation/native";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,7 +27,7 @@ import { FrostedCutout } from "../../components/ui/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/ui/AppSymbol";
-import { hasCloudPublicConfig } from "../cloud/publicConfig";
+import { hasCloudDiscoveryPublicConfig, isAtumTransportProof } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
 import { autoConnectReport, devAutoConnectAttemptAtom } from "./devAutoConnect";
 import { linkedEnvironmentPrefillAtom } from "./linkedEnvironmentPrefill";
@@ -286,7 +286,7 @@ function PairingForm({
             </Text>
           </View>
 
-          {hasCloudPublicConfig() ? <T3ConnectSection /> : null}
+          {hasCloudDiscoveryPublicConfig() ? <T3ConnectSection /> : null}
         </View>
       </ScrollView>
     </SettingsScreen>
@@ -389,9 +389,30 @@ function PairingScanCard(props: {
 }
 
 function T3ConnectSection() {
+  return isAtumTransportProof() ? <T3ConnectRows /> : <ClerkT3ConnectSection />;
+}
+
+function ClerkT3ConnectSection() {
   const gt = useGT();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const navigation = useNavigation();
+  return (
+    <T3ConnectRows
+      {...(!isSignedIn && {
+        signIn: (
+          <ListRow
+            label={gt("Sign in to {product}", { product: "T3 Connect" })}
+            description={gt("Reach your machines from anywhere, no network setup.")}
+            disabled={!isLoaded}
+            onPress={() => navigation.navigate("SettingsAuth")}
+          />
+        ),
+      })}
+    />
+  );
+}
+
+function T3ConnectRows({ signIn }: { readonly signIn?: ReactNode }) {
   const { connectedEnvironments, onSetEnvironmentEnabled, onRemoveEnvironmentPress } =
     useRemoteConnections();
   const { connectedCloudEnvironments } = splitEnvironmentSections({
@@ -404,19 +425,12 @@ function T3ConnectSection() {
       <Text className="px-4 text-sm font-t3-medium text-foreground-muted">
         <T>Or use the managed relay</T>
       </Text>
-      {isSignedIn ? (
+      {signIn ?? (
         <CloudEnvironmentRows
           connectedCloudEnvironments={connectedCloudEnvironments}
           onSetEnvironmentEnabled={onSetEnvironmentEnabled}
           onRemoveEnvironment={onRemoveEnvironmentPress}
           showHeader={false}
-        />
-      ) : (
-        <ListRow
-          label={gt("Sign in to {product}", { product: "T3 Connect" })}
-          description={gt("Reach your machines from anywhere, no network setup.")}
-          disabled={!isLoaded}
-          onPress={() => navigation.navigate("SettingsAuth")}
         />
       )}
     </View>

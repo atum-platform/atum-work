@@ -21,6 +21,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { isAtumTransportProof } from "../features/cloud/publicConfig";
 import * as CatalogStore from "./catalog-store";
 
 function targetPersistenceError(
@@ -158,12 +159,32 @@ export const layer = Layer.effectContext(
           ),
         })),
     });
-    return Context.make(Persistence.ConnectionTargetStore, targetStore).pipe(
+    const storage = Context.make(Persistence.ConnectionTargetStore, targetStore).pipe(
       Context.add(PullRequestRoutingPermissions, githubRoutingPermissions),
       Context.add(Persistence.ConnectionRegistrationStore, registrationStore),
       Context.add(ProfileStore.ConnectionProfileStore, profileStore),
       Context.add(CredentialStore.ConnectionCredentialStore, credentialStore),
       Context.add(TokenStore.RemoteDpopAccessTokenStore, remoteTokenStore),
+    );
+    if (!isAtumTransportProof()) return storage;
+
+    // Keep connection targets and the proof key across launches, but reissue session credentials.
+    const credentials = yield* Effect.provide(
+      CredentialStore.ConnectionCredentialStore,
+      CredentialStore.layerMemory(),
+    );
+    const sessions = new Map<string, TokenStore.RemoteDpopAccessToken>();
+    return storage.pipe(
+      Context.add(CredentialStore.ConnectionCredentialStore, credentials),
+      Context.add(
+        TokenStore.RemoteDpopAccessTokenStore,
+        TokenStore.make({
+          get: (environmentId) =>
+            Effect.sync(() => Option.fromUndefinedOr(sessions.get(environmentId))),
+          put: (token) => Effect.sync(() => void sessions.set(token.environmentId, token)),
+          remove: (environmentId) => Effect.sync(() => void sessions.delete(environmentId)),
+        }),
+      ),
     );
   }),
 );

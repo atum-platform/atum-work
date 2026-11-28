@@ -11,18 +11,25 @@ Object.assign(process.env, repoEnv);
 process.env.EXPO_NO_TYPESCRIPT_SETUP = "1";
 
 const APP_VARIANT = resolveAppVariant(repoEnv.APP_VARIANT);
-const isIosPersonalTeamBuild = repoEnv.T3CODE_IOS_PERSONAL_TEAM === "1";
+const atumTransportProof = repoEnv.ATUM_MOBILE_TRANSPORT_PROOF === "1";
+if (atumTransportProof && APP_VARIANT !== "development") {
+  throw new Error("ATUM_MOBILE_TRANSPORT_PROOF requires APP_VARIANT=development.");
+}
+const isIosPersonalTeamBuild = atumTransportProof || repoEnv.T3CODE_IOS_PERSONAL_TEAM === "1";
+const relayUrl = atumTransportProof ? "https://relay.atumplatform.com" : repoEnv.T3CODE_RELAY_URL;
 const runtimeVersionPolicy =
   process.env.MOBILE_VERSION_POLICY ??
   (APP_VARIANT === "development" ? "appVersion" : "fingerprint");
 
-const personalTeamBundleIdentifier = repoEnv.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?.trim();
+const personalTeamBundleIdentifier = atumTransportProof
+  ? "com.atum.work-transport-proof"
+  : repoEnv.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?.trim();
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 
 // Compiled into the native project. Without a relay, Observe's native side could dispatch to
 // Expo's own ingest before observe.ts turns it off; `.invalid` never resolves (RFC 6761).
-const observeEndpointUrl = repoEnv.T3CODE_RELAY_URL?.trim()
-  ? new URL("/v1/mobile/observe", repoEnv.T3CODE_RELAY_URL.trim()).toString()
+const observeEndpointUrl = !atumTransportProof && relayUrl?.trim()
+  ? new URL("/v1/mobile/observe", relayUrl.trim()).toString()
   : "https://observe.invalid";
 
 const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
@@ -232,11 +239,16 @@ const sharingPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
 
 // Match iOS PostScript names on Android so RN and the native composer share fonts before runtime loading.
 
+const clerkPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
+  "@clerk/expo",
+  { theme: "./clerk-theme.json", appleSignIn: !isIosPersonalTeamBuild },
+];
+
 const config: ExpoConfig = {
-  name: variant.appName,
+  name: atumTransportProof ? "Atum Work Transport" : variant.appName,
   slug: "t3-code",
-  platforms: ["ios", "android"],
-  scheme: variant.scheme,
+  platforms: atumTransportProof ? ["ios"] : ["ios", "android"],
+  scheme: atumTransportProof ? "atum-work-transport-proof" : variant.scheme,
   version: repoEnv.T3CODE_MOBILE_VERSION ?? "2.3.0",
   runtimeVersion: {
     // Skip costly fingerprinting on dev launches; preview and production OTAs require matching native projects.
@@ -246,9 +258,13 @@ const config: ExpoConfig = {
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
   updates: {
-    enabled: repoEnv.T3CODE_MOBILE_UPDATES_ENABLED !== "0",
-    url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
-    checkAutomatically: "ON_LOAD",
+    enabled: !atumTransportProof && repoEnv.T3CODE_MOBILE_UPDATES_ENABLED !== "0",
+    ...(atumTransportProof
+      ? { checkAutomatically: "NEVER" }
+      : {
+          url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+          checkAutomatically: "ON_LOAD",
+        }),
     fallbackToCacheTimeout: 0,
   },
   ios: {
@@ -257,15 +273,19 @@ const config: ExpoConfig = {
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
     // Avoid Personal Team fallback: it cannot sign App Groups, Apple sign-in or push entitlements.
-    appleTeamId: "ARK85ZXQ4Z",
-    associatedDomains: [
-      `applinks:${variant.relyingParty}`,
-      `webcredentials:${variant.relyingParty}`,
-      `applinks:${HOSTED_APP_HOST}`,
-    ],
-    entitlements: {
-      "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],
-    },
+    ...(atumTransportProof
+      ? (repoEnv.ATUM_MOBILE_IOS_TEAM ? { appleTeamId: repoEnv.ATUM_MOBILE_IOS_TEAM } : {})
+      : { appleTeamId: "ARK85ZXQ4Z" }),
+    ...(!atumTransportProof && {
+      associatedDomains: [
+        `applinks:${variant.relyingParty}`,
+        `webcredentials:${variant.relyingParty}`,
+        `applinks:${HOSTED_APP_HOST}`,
+      ],
+      entitlements: {
+        "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],
+      },
+    }),
     infoPlist: {
       UISupportedInterfaceOrientations: [
         "UIInterfaceOrientationPortrait",
@@ -371,7 +391,7 @@ const config: ExpoConfig = {
       },
     ],
     // Gate Clerk here: withoutIosPersonalTeamCapabilities runs too early to strip its entitlement.
-    ["@clerk/expo", { theme: "./clerk-theme.json", appleSignIn: !isIosPersonalTeamBuild }],
+    ...(atumTransportProof ? [] : [clerkPlugin]),
     "expo-web-browser",
     [
       "expo-quick-actions",
@@ -470,30 +490,35 @@ const config: ExpoConfig = {
     ...(isIosPersonalTeamBuild ? ["./plugins/withoutIosPersonalTeamCapabilities.cjs"] : []),
   ],
   extra: {
+    atumTransportProof,
     appVariant: APP_VARIANT,
     secretsFeatureEnabled: ["1", "true"].includes(
       process.env.T3CODE_FEATURE_SECRETS?.trim().toLowerCase() ?? "",
     ),
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
     relay: {
-      url: repoEnv.T3CODE_RELAY_URL ?? null,
+      url: relayUrl ?? null,
     },
-    clerk: {
-      publishableKey: repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? null,
-      jwtTemplate: repoEnv.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? null,
-    },
-    // Clerk reads these exact names at prebuild. Omit unset values: manifest null becomes truthy {}.
-    EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID,
-    EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID,
-    EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID,
-    EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME,
-    observability: {
-      tracesUrl: repoEnv.EXPO_PUBLIC_OTLP_TRACES_URL ?? "https://api.axiom.co/v1/traces",
-      tracesDataset: repoEnv.EXPO_PUBLIC_OTLP_TRACES_DATASET ?? null,
-      tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
-    },
+    ...(!atumTransportProof && {
+      clerk: {
+        publishableKey: repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? null,
+        jwtTemplate: repoEnv.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? null,
+      },
+    }),
+    ...(!atumTransportProof && {
+      // Clerk reads these exact names at prebuild. Omit unset values: manifest null becomes truthy {}.
+      EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID,
+      EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID,
+      EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID,
+      EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME,
+      observability: {
+        tracesUrl: repoEnv.EXPO_PUBLIC_OTLP_TRACES_URL ?? "https://api.axiom.co/v1/traces",
+        tracesDataset: repoEnv.EXPO_PUBLIC_OTLP_TRACES_DATASET ?? null,
+        tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
+      },
+    }),
     eas: {
-      projectId: "d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+      ...(!atumTransportProof && { projectId: "d763fcb8-d37c-41ea-a773-b54a0ab4a454" }),
       observe: { endpointUrl: observeEndpointUrl },
     },
   },

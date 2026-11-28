@@ -57,7 +57,7 @@ import { environmentThreadShells, threadEnvironment } from "./state/threads";
 import { environmentShell, shellCachesReadAtom } from "./state/shell";
 import { OverlayPortalHost } from "./components/ui/OverlayPortal";
 import { shouldHandleAppLink, restoreDraftLinkState } from "./lib/appLinking";
-import { hasCloudPublicConfig } from "./features/cloud/publicConfig";
+import { hasCloudPublicConfig, isAtumTransportProof } from "./features/cloud/publicConfig";
 import { takeScheduledTaskNewLink } from "./features/settings/scheduled-task-editor-state";
 import {
   pairingFormLinkAction,
@@ -198,6 +198,7 @@ function handleNavigationReady(): void {
 
 declare const module: { readonly hot?: FoundationHotModule } | undefined;
 
+const atumTransportProof = isAtumTransportProof();
 const appServiceDisposers = [
   installUiRuntimeMemoryWarningGc(),
   subscribeComposerDraftModelReconciliation({
@@ -208,18 +209,18 @@ const appServiceDisposers = [
     pendingThreadIdsAtom: threadEnvironment.pendingThreadIdsAtom,
   }),
   installAppearanceRuntime(),
-  installSubscriptionUsageRefresh(),
+  atumTransportProof ? null : installSubscriptionUsageRefresh(),
   installPermissionUpdateNotice(),
   installThreadOutboxDelivery(),
   installComposerAttachmentUploads(),
   startIncomingShareInbox(),
-  installAgentNotificationNavigation(linkToAppPath),
+  atumTransportProof ? null : installAgentNotificationNavigation(linkToAppPath),
   installAppShortcuts(linkToAppPath),
-  installAppUpdateChecks(),
+  atumTransportProof ? null : installAppUpdateChecks(),
   installShowcaseCapture(rootPathnameFromState),
 ];
 disposeOnFoundationReplace(typeof module === "undefined" ? undefined : module.hot, () => {
-  for (const dispose of appServiceDisposers) dispose();
+  for (const dispose of appServiceDisposers) dispose?.();
 });
 
 // Cached shells are local reads that end in a fraction of this time; the limit keeps a failed
@@ -301,7 +302,7 @@ function AppContent() {
     <>
       <SplashScreenCoordinator />
       <QuickActionsLanguage />
-      <SubscriptionUsageCoordinator />
+      {atumTransportProof ? null : <SubscriptionUsageCoordinator />}
       <ConnectDeviceApprovalCoordinator />
       <GestureHandlerRootView className="flex-1">
         <KeyboardProvider statusBarTranslucent>

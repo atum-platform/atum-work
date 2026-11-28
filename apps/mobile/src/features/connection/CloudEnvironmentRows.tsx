@@ -14,6 +14,7 @@ import {
   type ExecutionEnvironmentDescriptor,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
+import { managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
 import { useAtomValue } from "@effect/atom-react";
 import { useState } from "react";
 import { Pressable, type TextLayoutEvent, View } from "react-native";
@@ -28,7 +29,7 @@ import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-typ
 import { serverEnvironment } from "../../state/server";
 import { environmentPresentations } from "../../state/presentation";
 import { availableCloudEnvironmentPresentation } from "../cloud/cloudEnvironmentPresentation";
-import { hasCloudPublicConfig } from "../cloud/publicConfig";
+import { hasCloudDiscoveryPublicConfig, isAtumTransportProof } from "../cloud/publicConfig";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
 import { useConnectionDiagnosis } from "./ConnectionDiagnosisDetails";
 import { environmentStatusText } from "./environmentStatusText";
@@ -49,11 +50,23 @@ export function CloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
   if (props.showcaseSignedIn !== undefined) {
     return props.showcaseSignedIn ? <CloudEnvironmentRowsContent {...props} /> : null;
   }
-  // No cloud config means no `ClerkProvider` either, so `useAuth` would throw.
-  if (!hasCloudPublicConfig()) {
+  if (!hasCloudDiscoveryPublicConfig()) {
     return <ConnectedOnlyCloudEnvironmentRows {...props} />;
   }
-  return <SignedInCloudEnvironmentRows {...props} />;
+  return isAtumTransportProof() ? (
+    <AtumCloudEnvironmentRows {...props} />
+  ) : (
+    <SignedInCloudEnvironmentRows {...props} />
+  );
+}
+
+function AtumCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
+  const session = useAtomValue(managedRelaySessionAtom);
+  return session ? (
+    <CloudEnvironmentRowsContent {...props} />
+  ) : (
+    <ConnectedOnlyCloudEnvironmentRows {...props} />
+  );
 }
 
 function SignedInCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {

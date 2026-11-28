@@ -6,7 +6,12 @@ import assetLinks from "../web/public/.well-known/assetlinks.json";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
-  loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
+  loadRepoEnv: () => ({
+    APP_VARIANT: process.env.APP_VARIANT,
+    ATUM_MOBILE_TRANSPORT_PROOF: process.env.ATUM_MOBILE_TRANSPORT_PROOF,
+    EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "unused-test-key",
+    EXPO_PUBLIC_OTLP_TRACES_TOKEN: "unused-test-token",
+  }),
 }));
 
 afterEach(() => {
@@ -44,4 +49,22 @@ it.each([
     { scheme: "https", host, pathPrefix: "/threads/" },
   ]);
   expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
+});
+
+it("isolates W0 from Clerk, OTA updates, and upstream telemetry", async () => {
+  vi.stubEnv("ATUM_MOBILE_TRANSPORT_PROOF", "1");
+  await expect(loadConfig("production")).rejects.toThrow("requires APP_VARIANT=development");
+  const config = await loadConfig("development");
+  expect(config.ios?.bundleIdentifier).toBe("com.atum.work-transport-proof");
+  expect(config.ios?.associatedDomains).toBeUndefined();
+  expect(config.updates).toMatchObject({ enabled: false, checkAutomatically: "NEVER" });
+  expect(config.updates?.url).toBeUndefined();
+  expect(config.extra).toMatchObject({
+    atumTransportProof: true,
+    relay: { url: "https://relay.atumplatform.com" },
+    eas: { observe: { endpointUrl: "https://observe.invalid" } },
+  });
+  expect(config.extra?.clerk).toBeUndefined();
+  expect(config.extra?.observability).toBeUndefined();
+  expect(config.extra?.eas.projectId).toBeUndefined();
 });

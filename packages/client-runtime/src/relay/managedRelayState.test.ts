@@ -164,6 +164,20 @@ describe("createManagedRelayQueryManager", () => {
     }),
   );
 
+  it.effect("reads a fresh host assertion for every Atum operation", () =>
+    Effect.gen(function* () {
+      const readClerkToken = vi.fn(async () => clerkToken(4_102_444_800));
+      const session = createManagedRelaySession({
+        accountId: "owner",
+        cacheToken: false,
+        readClerkToken,
+      });
+      yield* session.readClerkToken();
+      yield* session.readClerkToken();
+      expect(readClerkToken).toHaveBeenCalledTimes(2);
+    }),
+  );
+
   it.effect("deduplicates concurrent Clerk token reads and reuses the token until JWT expiry", () =>
     Effect.gen(function* () {
       const token = clerkToken(4_102_444_800);
