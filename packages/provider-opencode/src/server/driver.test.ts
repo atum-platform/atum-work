@@ -2,6 +2,7 @@
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
+import * as NodeSqlite from "node:sqlite";
 
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -31,6 +32,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as UrlParams from "effect/http/UrlParams";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
+import { ProviderHost } from "@t3tools/provider-core/server/ProviderHost";
 import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
@@ -98,6 +100,58 @@ const create = (config: Partial<OpenCodeSettings>, http: HttpClient.HttpClient, 
   }).pipe(Effect.provideService(HttpClient.HttpClient, http));
 
 const noHttp = HttpClient.make(() => Effect.die("A local binary must not be probed over HTTP"));
+
+it.layer(layer, { excludeTestServices: true })("OpenRouter Free", (it) => {
+  it.effect("accepts a 2.3 patch but leaves the server off before the first connection", () =>
+    Effect.gen(function* () {
+      const { paths } = yield* ProviderHost;
+      const fs = yield* FileSystem.FileSystem;
+      const directory = NodePath.join(paths.baseDir, "openrouter-free", "data", "opencode");
+      yield* fs.makeDirectory(directory, { recursive: true });
+      yield* Effect.sync(() => {
+        const database = new NodeSqlite.DatabaseSync(NodePath.join(directory, "opencode.db"));
+        try {
+          database.exec("CREATE TABLE credential (integration_id TEXT, active INTEGER)");
+          database.exec("INSERT INTO credential VALUES ('openrouter', 0)");
+        } finally {
+          database.close();
+        }
+      });
+      let starts = 0;
+      const runtime = {
+        ...openCode2Runtime,
+        runOpenCodeCommand: () =>
+          Effect.succeed({ stdout: "opencode v2.3.99\n", stderr: "", code: 0 }),
+        startOpenCodeServerProcess: () => {
+          starts++;
+          return reachedServer("start");
+        },
+      };
+      const provider = yield* OpenCodeDriver.create({
+        instanceId: ProviderInstanceId.make("openrouter-free"),
+        displayName: undefined,
+        environment: [],
+        enabled: true,
+        config: OpenCodeDriver.defaultConfig(),
+      }).pipe(
+        Effect.provideService(OpenCodeRuntime.OpenCodeRuntime, runtime),
+        Effect.provideService(HttpClient.HttpClient, noHttp),
+      );
+      const checked = yield* provider.snapshot.streamChanges.pipe(
+        Stream.filter((snapshot) => snapshot.version === "2.3.99"),
+        Stream.runHead,
+        Effect.forkScoped({ startImmediately: true }),
+      );
+      yield* provider.snapshot.refresh;
+      assert.deepInclude(Option.getOrThrow(yield* Fiber.join(checked)), {
+        installed: true,
+        auth: { status: "unauthenticated", canLogout: false },
+        models: [],
+      });
+      assert.equal(starts, 0);
+    }),
+  );
+});
 
 const openCode2Project = "/work/project-with-config";
 const openCode2Model = (providerID: string, id: string, name: string) => ({

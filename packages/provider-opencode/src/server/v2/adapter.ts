@@ -65,6 +65,7 @@ import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import * as OpenCode2Client from "./OpenCode2Client.ts";
 import * as OpenCode2Server from "./OpenCode2Server.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
+import { isOpenRouterFreeDailyLimit, openRouterFreeError } from "../openRouterFreePolicy.ts";
 import { readableProviderErrorMessage } from "../providerErrorMessage.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
@@ -1601,12 +1602,39 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       });
     });
 
+    const openRouterDailyLimitFailure = Effect.fnUntraced(function* () {
+      const now = yield* DateTime.now;
+      const reset = DateTime.startOf(DateTime.add(now, { days: 1 }), "day");
+      const time = new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(DateTime.toDateUtc(reset));
+      return makeProviderFailure({
+        message: `You've used today's free OpenRouter requests. They reset at ${time}.`,
+        code: "openrouter_free_daily_limit",
+        class: "usage_limit",
+        retryable: false,
+        resetAt: DateTime.formatIso(reset),
+      });
+    });
+
     const updateRetry = Effect.fnUntraced(function* (
       state: ThreadState,
       turn: ActiveTurn,
       { attempt, error }: Pick<EventOf<"session.retry.scheduled">["data"], "attempt" | "error">,
       delayMs: number,
     ) {
+      if (isOpenRouterFreeDailyLimit(instanceId, error)) {
+        markUnsettled(state);
+        yield* client.session
+          .interrupt({ sessionID: Session.ID.make(state.sessionId) })
+          .pipe(Effect.timeout("2 seconds"), Effect.ignore({ log: true }));
+        yield* finishTurn(state, {
+          status: "failed",
+          failure: yield* openRouterDailyLimitFailure(),
+        });
+        return;
+      }
       turn.retry = {
         retry: {
           // OpenCode counts the first request as attempt 1, so its first retry is attempt 2.
@@ -3002,11 +3030,21 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         case "session.execution.interrupted":
           return yield* endExecution(state, turn, { status: "interrupted" });
         case "session.execution.failed": {
+          if (isOpenRouterFreeDailyLimit(instanceId, event.data.error)) {
+            return yield* endExecution(state, turn, {
+              status: "failed",
+              failure: yield* openRouterDailyLimitFailure(),
+            });
+          }
           const { type, message, status, response } = event.data.error;
           return yield* endExecution(state, turn, {
             status: "failed",
             failure: makeProviderFailure({
-              message: readableProviderErrorMessage(message, status, response?.body),
+              message: openRouterFreeError(
+                instanceId,
+                readableProviderErrorMessage(message, status, response?.body),
+                response?.body,
+              ),
               code: type,
               class: isUsageLimit(event.data.error) ? "usage_limit" : "provider_error",
               resetAt: claudeUsageLimit(message)?.resetAt ?? null,
@@ -3629,6 +3667,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
               DateTime.toEpochMillis(assistant.retry.at) -
                 DateTime.toEpochMillis(yield* DateTime.now),
             );
+            if (state.active !== turn) return undefined;
           } else if (
             turn.retry !== undefined &&
             assistant !== undefined &&

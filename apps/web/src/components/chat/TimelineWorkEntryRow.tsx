@@ -383,7 +383,23 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       >
         {!warning ? (
           <p className="ms-7 whitespace-pre-wrap break-words py-1 text-sm leading-relaxed text-foreground/80">
-            {failureItem.failure.message}
+            {failureItem.failure.message?.endsWith("https://openrouter.ai/settings/privacy") ? (
+              <>
+                {failureItem.failure.message
+                  .replace(/\s+https:\/\/openrouter\.ai\/settings\/privacy$/u, "")
+                  .trimEnd()}{" "}
+                <a
+                  className="underline"
+                  href="https://openrouter.ai/settings/privacy"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {gt("Open settings")}
+                </a>
+              </>
+            ) : (
+              failureItem.failure.message
+            )}
           </p>
         ) : null}
         {retryRunId !== null && onRetryWorkspacePreparation ? (

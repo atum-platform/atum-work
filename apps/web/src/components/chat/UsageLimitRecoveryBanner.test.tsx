@@ -6,10 +6,14 @@ import { usageLimitRecoveryBannerItem } from "./UsageLimitRecoveryBanner";
 
 const stoppedAt = new Date(2026, 9, 20, 12, 0);
 
-function bannerItem(resetAt: Date, timestampFormat: TimestampFormat = "24-hour") {
+function bannerItem(
+  resetAt: Date,
+  timestampFormat: TimestampFormat = "24-hour",
+  errorCode: string | null = null,
+) {
   return usageLimitRecoveryBannerItem({
     runId: RunId.make("run-1"),
-    errorCode: null,
+    errorCode,
     resetAt: resetAt.toISOString(),
     stoppedAt: stoppedAt.toISOString(),
     settled: false,
@@ -22,6 +26,17 @@ function bannerItem(resetAt: Date, timestampFormat: TimestampFormat = "24-hour")
 }
 
 describe("usageLimitRecoveryBannerItem", () => {
+  it("shows the OpenRouter daily reset in the viewer's local time", () => {
+    const resetAt = new Date("2026-10-21T00:00:00Z");
+    const localTime = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(resetAt);
+    expect(bannerItem(resetAt, "12-hour", "openrouter_free_daily_limit").title).toBe(
+      `You've used today's free OpenRouter requests. They reset at ${localTime}.`,
+    );
+  });
+
   it.each([
     ["12-hour", "Resets 5:30 PM"],
     ["24-hour", "Resets 17:30"],

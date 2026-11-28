@@ -533,6 +533,7 @@ export class AcpRegistryCatalog extends Context.Service<
       settings: AcpRegistrySettings,
       cwd: string,
       environment?: NodeJS.ProcessEnv,
+      distributionPin?: AcpRegistryAgent,
     ) => Effect.Effect<ResolvedAcpRegistryAgent, AcpRegistryError, Scope.Scope>;
     readonly uninstallManagedBinary: (
       input: AcpRegistryManagedBinaryUninstallInput,
@@ -2029,7 +2030,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
 
   // A cached index can pin a version whose archive was since removed upstream.
   const resolve: AcpRegistryCatalog["Service"]["resolve"] = Effect.fn("AcpRegistryCatalog.resolve")(
-    function* (settings, cwd, environment) {
+    function* (settings, cwd, environment, distributionPin) {
       if (settings.source === "local") {
         const executable = settings.commandPath.trim();
         if (!executable) {
@@ -2051,6 +2052,12 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
           distribution: "local",
           spawn: { command, args: settings.commandArgs, cwd, env, shell: false },
         } satisfies ResolvedAcpRegistryAgent;
+      }
+      if (distributionPin) {
+        return yield* resolveWithRegistry(settings, cwd, environment, {
+          version: distributionPin.version,
+          agents: [distributionPin],
+        });
       }
       const registry = yield* loadRegistry();
       return yield* resolveWithRegistry(settings, cwd, environment, registry).pipe(

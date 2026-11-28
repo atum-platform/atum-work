@@ -9,6 +9,7 @@ import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as HttpClientError from "effect/http/HttpClientError";
 
+import { supportsOpenRouterFreeVersion } from "../openRouterFreePolicy.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
 import * as OpenCodeServerOwner from "../OpenCodeServerOwner.ts";
 import * as OpenCode2Client from "./OpenCode2Client.ts";
@@ -119,6 +120,7 @@ export const make = Effect.fn("OpenCode2Server.make")(function* (input: {
   readonly serverUrl: string;
   readonly serverPassword: string;
   readonly directory: string;
+  readonly requiredPlugin?: string;
   readonly environment: NodeJS.ProcessEnv;
 }) {
   const opencode = yield* OpenCode2Client.OpenCode2Client;
@@ -129,6 +131,26 @@ export const make = Effect.fn("OpenCode2Server.make")(function* (input: {
   ) {
     const api = yield* opencode.connect({ baseUrl: url, password });
     const version = yield* verifyServer(api.client, input.environment);
+    if (input.requiredPlugin) {
+      const error = new OpenCodeRuntime.OpenCodeRuntimeError({
+        operation: "plugin.list",
+        detail: "OpenRouter Free could not verify its pricing policy.",
+      });
+      if (!supportsOpenRouterFreeVersion(version)) return yield* error;
+      const location = { directory: input.directory };
+      // OpenCode activates location plugins on the first model inventory read.
+      const plugins = yield* api.client.model.list({ location }).pipe(
+        Effect.andThen(api.client.plugin.list({ location })),
+        Effect.timeout("15 seconds"),
+        Effect.mapError(() => error),
+      );
+      if (
+        !plugins.data.some(
+          (plugin) => plugin.id === input.requiredPlugin && plugin.state.status === "active",
+        )
+      )
+        return yield* error;
+    }
     return { ...api, url, version, external } satisfies OpenCode2Connection;
   });
   let latest: OpenCode2Connection | undefined;

@@ -341,6 +341,7 @@ const resumed = (
     readonly resolveExtractedTextPath?: (path: string) => Effect.Effect<string | undefined>;
     readonly fileSystem?: FileSystem.FileSystem;
     readonly onPrompt?: (input: unknown) => void;
+    readonly instanceId?: string;
   },
 ) =>
   Effect.gen(function* () {
@@ -378,6 +379,7 @@ const resumed = (
         ...(options?.borrowers === undefined ? {} : { borrowers: options.borrowers }),
         ...(options?.fileSystem === undefined ? {} : { fileSystem: options.fileSystem }),
         ...(options?.onPrompt === undefined ? {} : { onPrompt: options.onPrompt }),
+        ...(options?.instanceId === undefined ? {} : { instanceId: options.instanceId }),
         ...(options?.external === undefined ? {} : { external: options.external }),
         ...(options?.processExit === undefined ? {} : { processExit: options.processExit }),
         ...(options?.beforeResponse === undefined
@@ -754,6 +756,58 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         message: error.message,
         retryable: null,
       });
+    }),
+  );
+
+  it.effect("interrupts the free OpenRouter session before it retries a daily-limit 429", () =>
+    Effect.gen(function* () {
+      const { runtime, thread } = yield* resumed(
+        [
+          out("session.prompt", { sessionID: SESSION, text: "<any>" }),
+          promptAccepted,
+          event("session.retry.scheduled", {
+            sessionID: SESSION,
+            assistantMessageID: "msg_0eb735d5b001oAFVeY5jz3WD4Z",
+            attempt: 2,
+            at: 2001,
+            error: {
+              type: "provider.rate-limit",
+              status: 429,
+              message: "Upstream rate limit exceeded.",
+              response: {
+                body: '{"error":{"message":"Rate limit exceeded: free-models-per-day."}}',
+              },
+            },
+          }),
+          out("session.interrupt", { sessionID: SESSION }),
+          reply("session.interrupt", { interrupted: true }),
+          event("session.execution.interrupted", { sessionID: SESSION }),
+        ],
+        { instanceId: "openrouter-free" },
+      );
+      const now = yield* DateTime.now;
+      const collected = yield* runtime.events.pipe(
+        Stream.takeUntil((event) => event.type === "turn.terminal"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* runtime.startTurn(
+        turnInput(thread, { ...bigPickle, instanceId: ProviderInstanceId.make("openrouter-free") }),
+      );
+      const seen = yield* Fiber.join(collected);
+      assert.isFalse(errorRows(seen).some((row) => row.status === "running"));
+      const ended = seen.find((event) => event.type === "turn.terminal");
+      assert.equal(ended?.status, "failed");
+      assert.equal(ended?.failure?.class, "usage_limit");
+      assert.equal(ended?.failure?.retryable, false);
+      assert.equal(
+        ended?.failure?.resetAt,
+        DateTime.formatIso(DateTime.startOf(DateTime.add(now, { days: 1 }), "day")),
+      );
+      assert.match(
+        ended?.failure?.message ?? "",
+        /^You've used today's free OpenRouter requests\. They reset at .+\.$/,
+      );
     }),
   );
 

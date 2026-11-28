@@ -4,6 +4,26 @@ import {
   settingsSecretLiteral,
   type ServerProviderModel,
 } from "@t3tools/contracts";
+import {
+  make as makeProviderAuthFlow,
+  runBrowserLoginCommand,
+} from "@t3tools/provider-core/server/providerAuthFlow";
+import {
+  authorizeOpenRouter,
+  hasOpenRouterCredential,
+  openRouterSetupError,
+  readOpenRouterQuota,
+  removeOpenRouterKeys,
+  saveOpenRouterKey,
+} from "./openRouterFreeAuth.ts";
+import {
+  OPENROUTER_FREE_INSTANCE,
+  OPENROUTER_FREE_POLICY,
+  supportsOpenRouterFreeVersion,
+  openRouterFreeConfig,
+  openRouterFreePlugin,
+} from "./openRouterFreePolicy.ts";
+import { installOpenRouterFreeOpenCode } from "./openRouterFreeInstall.ts";
 import { OpenCodeSettings } from "../settings.ts";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -277,6 +297,45 @@ export const OpenCodeDriver: ProviderDriver<
     const digest = yield* Digest.Digest;
     const host = yield* ProviderHost.ProviderHost;
     const processEnv = yield* mergeProviderInstanceEnvironment(environment);
+    const openRouterFree = instanceId === OPENROUTER_FREE_INSTANCE;
+    const isolatedRoot = pathService.join(host.paths.baseDir, OPENROUTER_FREE_INSTANCE);
+    const openRouterConnected = hasOpenRouterCredential(
+      pathService.join(isolatedRoot, "data", "opencode", "opencode.db"),
+    );
+    const platform = yield* HostProcess.Platform;
+    const architecture = yield* HostProcess.Architecture;
+    if (openRouterFree) {
+      const root = isolatedRoot;
+      const plugin = pathService.join(root, "policy");
+      yield* fileSystem.makeDirectory(plugin, { recursive: true, mode: 0o700 }).pipe(
+        Effect.andThen(
+          fileSystem.writeFileString(pathService.join(plugin, "index.ts"), openRouterFreePlugin),
+        ),
+        Effect.mapError(
+          () =>
+            new ProviderDriverError({
+              driver: DRIVER_KIND,
+              instanceId,
+              detail: "Could not prepare OpenRouter Free on this Mac.",
+            }),
+        ),
+      );
+      for (const key of Object.keys(processEnv)) {
+        if (key.startsWith("OPENCODE_") || key.startsWith("OPENROUTER_")) delete processEnv[key];
+      }
+      Object.assign(processEnv, {
+        PATH: [pathService.join(root, "bin"), processEnv.PATH ?? "/usr/bin:/bin"].join(
+          platform === "win32" ? ";" : ":",
+        ),
+        XDG_DATA_HOME: pathService.join(root, "data"),
+        XDG_CONFIG_HOME: pathService.join(root, "config"),
+        XDG_STATE_HOME: pathService.join(root, "state"),
+        XDG_CACHE_HOME: pathService.join(root, "cache"),
+        OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+        OPENCODE_DISABLE_CLAUDE_CODE: "1",
+        OPENCODE_CONFIG_CONTENT: openRouterFreeConfig(plugin),
+      });
+    }
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: DRIVER_KIND,
       instanceId,
@@ -290,13 +349,26 @@ export const OpenCodeDriver: ProviderDriver<
     });
     const effectiveConfig = {
       ...config,
+      ...(openRouterFree ? { serverUrl: "", customModels: [] } : {}),
       enabled,
-      binaryPath: expandHomePath(config.binaryPath, yield* HostProcess.HomeDirectory),
+      binaryPath: openRouterFree
+        ? "opencode"
+        : expandHomePath(config.binaryPath, yield* HostProcess.HomeDirectory),
       // The instance registry has already read a referenced password from its secret provider.
       serverPassword: settingsSecretLiteral(config.serverPassword),
     } satisfies OpenCodeSettings;
     const probeRuntime = (probeEnv: NodeJS.ProcessEnv) =>
       probeOpenCodeRuntime(effectiveConfig, probeEnv).pipe(
+        Effect.filterOrFail(
+          (runtime) =>
+            !openRouterFree ||
+            (runtime.generation === "v2" && supportsOpenRouterFreeVersion(runtime.version)),
+          () =>
+            new OpenCodeRuntime.OpenCodeRuntimeError({
+              operation: "version",
+              detail: "OpenRouter Free requires OpenCode 2.3.x.",
+            }),
+        ),
         Effect.provideService(HttpClient.HttpClient, httpClient),
         Effect.provideService(OpenCodeRuntime.OpenCodeRuntime, openCodeRuntime),
       );
@@ -382,6 +454,7 @@ export const OpenCodeDriver: ProviderDriver<
       serverPassword: effectiveConfig.serverPassword,
       directory: host.paths.cwd,
       environment: processEnv,
+      ...(openRouterFree ? { requiredPlugin: OPENROUTER_FREE_POLICY } : {}),
     }).pipe(
       Effect.provideService(OpenCodeRuntime.OpenCodeRuntime, openCodeRuntime),
       Effect.provideService(
@@ -397,13 +470,18 @@ export const OpenCodeDriver: ProviderDriver<
         Effect.provideService(OpenCode2Server.OpenCode2Server, openCode2Server),
       ),
     });
-    const loadOpenCode2Models = yield* makeOpenCode2ModelLoader(
+    const connectedOpenCode2Models = yield* makeOpenCode2ModelLoader(
       // An external server may not have the host's cwd; without a location it uses its own default.
       openCode2Server.withConnection(({ client, external }) =>
         loadOpenCode2Catalog(client, external ? undefined : host.paths.cwd),
       ),
       processEnv,
     );
+    const loadOpenCode2Models = openRouterFree
+      ? openRouterConnected.pipe(
+          Effect.flatMap((exists) => (exists ? connectedOpenCode2Models : Effect.succeed([]))),
+        )
+      : connectedOpenCode2Models;
     const listOpenCode2Workspace = (cwd: string) =>
       openCode2Server.withConnection(({ client, events }) =>
         Effect.gen(function* () {
@@ -503,6 +581,21 @@ export const OpenCodeDriver: ProviderDriver<
         })),
       ),
     );
+    const openRouterAccount =
+      openRouterFree && enabled
+        ? openRouterConnected.pipe(
+            Effect.flatMap((exists) =>
+              exists
+                ? runtimeProbe.get.pipe(
+                    Effect.andThen(
+                      openCode2Server.withConnection(({ client }) => readOpenRouterQuota(client)),
+                    ),
+                    Effect.orElseSucceed(() => undefined),
+                  )
+                : Effect.succeed({ authenticated: false, limits: undefined }),
+            ),
+          )
+        : Effect.undefined;
     const checkProvider = Effect.all(
       {
         // A configured loopback server reports its running version. Probe the local
@@ -529,13 +622,34 @@ export const OpenCodeDriver: ProviderDriver<
           Effect.annotateLogs({ providerInstanceId: instanceId }),
           Effect.annotateSpans({ providerInstanceId: instanceId }),
         ),
-        usageLimits: checkUsageLimits,
+        usageLimits: openRouterFree ? Effect.undefined : checkUsageLimits,
+        openRouterAccount,
       },
       { concurrency: "unbounded" },
     ).pipe(
-      Effect.map(({ provider, usageLimits, installedVersion }) => ({
+      Effect.map(({ provider, usageLimits, installedVersion, openRouterAccount }) => ({
         ...provider,
-        usageLimits,
+        ...(openRouterFree
+          ? {
+              auth: {
+                ...provider.auth,
+                status: openRouterAccount?.authenticated
+                  ? provider.auth.status
+                  : openRouterAccount
+                    ? ("unauthenticated" as const)
+                    : ("unknown" as const),
+                canLogout: openRouterAccount?.authenticated ?? false,
+              },
+              installed: provider.installed && provider.version !== null,
+              models: openRouterAccount?.authenticated ? provider.models : [],
+              setup: {
+                ...provider.setup,
+                canInstall: false,
+                canAuthenticate: provider.installed || platform === "darwin",
+              },
+            }
+          : {}),
+        usageLimits: openRouterFree ? openRouterAccount?.limits : usageLimits,
         ...(installedVersion === undefined ? {} : { installedVersion }),
       })),
       Effect.map(stampIdentity),
@@ -684,6 +798,80 @@ export const OpenCodeDriver: ProviderDriver<
       ),
     );
 
+    const openRouterAuth = openRouterFree
+      ? yield* makeProviderAuthFlow({
+          instanceId,
+          credentialBinding: {
+            owner: "provider",
+            key: `opencode:${host.paths.baseDir}:${instanceId}`,
+          },
+          methods: Effect.succeed([
+            { id: "browser", name: "Connect OpenRouter", description: null, type: "agent" },
+          ]),
+          authenticate: Effect.fn("OpenRouterFree.connect")(function* (_method, flow) {
+            const error = openRouterSetupError(
+              instanceId,
+              "start",
+              "Could not connect OpenRouter. Try again.",
+            );
+            if (Option.isNone(yield* runtimeProbe.refresh.pipe(Effect.option))) {
+              yield* installOpenRouterFreeOpenCode({
+                instanceId,
+                directory: isolatedRoot,
+                platform,
+                architecture,
+              }).pipe(
+                Effect.provideService(FileSystem.FileSystem, fileSystem),
+                Effect.provideService(Path.Path, pathService),
+                Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+              );
+              yield* runtimeProbe.refresh.pipe(Effect.mapError(() => error));
+            }
+            yield* openCode2Server
+              .withConnection(() => Effect.void)
+              .pipe(
+                Effect.mapError(() =>
+                  openRouterSetupError(
+                    instanceId,
+                    "start",
+                    "Could not verify OpenRouter Free’s pricing rules. Try again.",
+                  ),
+                ),
+              );
+            const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
+            const key = yield* Effect.tryPromise({
+              try: (signal) =>
+                authorizeOpenRouter(
+                  (url) =>
+                    runPromise(
+                      runBrowserLoginCommand(spawner, "/usr/bin/open", [url], {
+                        cwd: host.paths.cwd,
+                        env: processEnv,
+                        error,
+                      }),
+                      { signal },
+                    ),
+                  signal,
+                ),
+              catch: () => error,
+            });
+            yield* flow.verifying;
+            yield* openCode2Server
+              .withConnection(({ client }) => saveOpenRouterKey(client, key))
+              .pipe(Effect.mapError(() => error));
+            yield* snapshot.refresh;
+          }),
+          logout: openCode2Server
+            .withConnection(({ client }) => removeOpenRouterKeys(client))
+            .pipe(
+              Effect.mapError(() =>
+                openRouterSetupError(instanceId, "logout", "Could not disconnect OpenRouter."),
+              ),
+              Effect.andThen(snapshot.refresh),
+              Effect.asVoid,
+            ),
+        })
+      : undefined;
     return {
       instanceId,
       driverKind: DRIVER_KIND,
@@ -784,6 +972,7 @@ export const OpenCodeDriver: ProviderDriver<
                 }),
               ),
             ),
+      ...(openRouterAuth ? { auth: openRouterAuth } : {}),
       invalidateCaches: openCode2Server.forget,
       afterUpdate,
       orchestrationAdapter,

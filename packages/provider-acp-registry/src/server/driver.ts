@@ -1,6 +1,7 @@
 import {
   officialAcpRegistryIconUrlForAgentId,
   ProviderDriverKind,
+  ProviderSetupError,
   resolveOfficialAcpRegistryIconUrl,
   TextGenerationError,
   type AcpRegistryOperationError,
@@ -10,6 +11,13 @@ import {
   type ServerProviderModel,
 } from "@t3tools/contracts";
 import { AcpRegistrySettings } from "../settings.ts";
+// Effect FileSystem has no API for filesystem capacity.
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodeFSP from "node:fs/promises";
+import {
+  make as makeProviderAuthFlow,
+  runBrowserLoginCommand,
+} from "@t3tools/provider-core/server/providerAuthFlow";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { createModelCapabilities } from "@t3tools/shared/model";
 import { atumProviderName, projectAtumModels } from "@t3tools/shared/atumModels";
@@ -271,6 +279,16 @@ function acpRegistrySnapshotReadiness(
   }
 }
 
+function usesCopilotBrowserLogin(instanceId: string, settings: AcpRegistrySettings): boolean {
+  return (
+    instanceId === "copilot" &&
+    settings.source === "local" &&
+    settings.commandPath === "copilot" &&
+    settings.commandArgs.length === 1 &&
+    settings.commandArgs[0] === "--acp"
+  );
+}
+
 interface SnapshotIdentity {
   readonly instanceId: ProviderInstance["instanceId"];
   readonly displayName: string | undefined;
@@ -297,6 +315,7 @@ function baseSnapshot(
       ? null
       : (resolveOfficialAcpRegistryIconUrl(input.probe?.probe.icon) ??
         officialAcpRegistryIconUrlForAgentId(input.settings.agentId));
+  const nativeCopilot = usesCopilotBrowserLogin(input.instanceId, input.settings);
   const managedName = atumProviderName(input.instanceId, DRIVER_KIND);
   const displayName = managedName ?? input.displayName;
   const models = modelsFromDiscovery(input.probe?.probe, input.settings.customModels);
@@ -312,18 +331,24 @@ function baseSnapshot(
     installed: input.installed,
     version: input.version,
     status: input.settings.enabled ? input.status : "disabled",
-    auth: { ...input.auth, canLogout: input.auth.canLogout ?? false },
+    auth: {
+      ...input.auth,
+      canLogout: nativeCopilot
+        ? input.auth.status === "authenticated"
+        : (input.auth.canLogout ?? false),
+    },
     checkedAt: input.checkedAt,
     setup: {
       canInstall: false,
       ...(input.documentationUrl ? { documentationUrl: input.documentationUrl } : {}),
       canAuthenticate:
-        input.installed &&
-        (input.probe
-          ? input.probe.probe.authMethods.length > 0
-          : input.settings.source === "local"
-            ? (input.probeError?.authMethods?.length ?? 0) > 0
-            : input.settings.agentId.length > 0),
+        nativeCopilot ||
+        (input.installed &&
+          (input.probe
+            ? input.probe.probe.authMethods.length > 0
+            : input.settings.source === "local"
+              ? (input.probeError?.authMethods?.length ?? 0) > 0
+              : input.settings.agentId.length > 0)),
     },
     ...(input.message ? { message: input.message } : {}),
     models: managedName ? projectAtumModels(models) : models,
@@ -721,7 +746,15 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         input.installed &&
         input.auth.status === "unknown" &&
         (yield* confirmedAuthentication.get)
-          ? { ...input, auth: { ...input.auth, status: "authenticated" as const } }
+          ? {
+              ...input,
+              auth: {
+                ...input.auth,
+                status: "authenticated" as const,
+                canLogout:
+                  usesCopilotBrowserLogin(instanceId, effectiveConfig) || input.auth.canLogout,
+              },
+            }
           : input;
       return yield* Option.isNone(runtimeCoordinator)
         ? Effect.succeed(provider)
@@ -969,25 +1002,130 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             .pipe(Effect.andThen(runtimeCoordinator.value.clearAvailableCommands(instanceId)))
         : Effect.void
     ).pipe(Effect.andThen(clearLearnedModels));
-    const controller = yield* AcpRegistryAuth.makeAcpRegistryAuth({
-      instanceId,
-      settings: effectiveConfig,
-      cwd: host.paths.cwd,
-      environment: processEnvironment,
-      onChanged: (authenticated) =>
-        confirmedAuthentication
-          .set(authenticated)
-          .pipe(
-            Effect.andThen(authenticated ? Effect.void : clearLiveState),
-            Effect.andThen(liveSnapshotSemaphore.withPermit(invalidateEnrichmentCache)),
-            Effect.andThen(snapshot.refresh),
-            Effect.asVoid,
+    const onChanged = (authenticated: boolean) =>
+      confirmedAuthentication
+        .set(authenticated)
+        .pipe(
+          Effect.andThen(authenticated ? Effect.void : clearLiveState),
+          Effect.andThen(liveSnapshotSemaphore.withPermit(invalidateEnrichmentCache)),
+          Effect.andThen(snapshot.refresh),
+          Effect.asVoid,
+        );
+    const userHome = yield* HostProcess.HomeDirectory;
+    const copilotAuthEnvironment = () => {
+      const cwd = host.paths.cwd;
+      const home = processEnvironment.HOME ?? userHome;
+      const env: NodeJS.ProcessEnv = { ...processEnvironment, HOME: home };
+      // Use the account selected in the official browser flow.
+      for (const name of Object.keys(env)) {
+        if (
+          name === "GH_TOKEN" ||
+          name === "GITHUB_TOKEN" ||
+          name.startsWith("COPILOT_PROVIDER_") ||
+          name === "COPILOT_GITHUB_TOKEN"
+        ) {
+          delete env[name];
+        }
+      }
+      return { cwd, home, env };
+    };
+    const controller = usesCopilotBrowserLogin(instanceId, effectiveConfig)
+      ? yield* makeProviderAuthFlow({
+          instanceId,
+          credentialBinding: { owner: "provider", key: "copilot-cli" },
+          methods: Effect.succeed([
+            {
+              id: "browser",
+              name: "Sign in with GitHub",
+              description: null,
+              type: "agent",
+            },
+          ]),
+          authenticate: Effect.fn("Copilot.browserLogin")(function* () {
+            const failure = (detail: string) =>
+              new ProviderSetupError({
+                instanceId,
+                operation: "start",
+                detail,
+              });
+            const { cwd, home, env } = copilotAuthEnvironment();
+            const resolved = yield* catalog.resolve(effectiveConfig, cwd, env).pipe(Effect.option);
+            let command: string;
+            if (Option.isSome(resolved)) {
+              command = resolved.value.spawn.command;
+            } else {
+              const disk = yield* Effect.tryPromise({
+                try: () => NodeFSP.statfs(home),
+                catch: () => failure("Could not check available space for Copilot."),
+              });
+              if (disk.bavail * disk.bsize < 1.5 * 1024 ** 3) {
+                return yield* failure("Free up 1.5 GB of disk space to install Copilot.");
+              }
+              const error = failure("Could not install GitHub Copilot. Try again.");
+              const directory = yield* fileSystem
+                .makeTempDirectoryScoped({ prefix: "atum-copilot-" })
+                .pipe(Effect.mapError(() => error));
+              const script = path.join(directory, "install.sh");
+              yield* runBrowserLoginCommand(
+                spawner,
+                "/usr/bin/curl",
+                [
+                  "--fail",
+                  "--silent",
+                  "--show-error",
+                  "--location",
+                  "--output",
+                  script,
+                  "https://raw.githubusercontent.com/github/copilot-cli/main/install.sh",
+                ],
+                { cwd: directory, env, error },
+              );
+              const prefix = path.join(home, ".local");
+              yield* runBrowserLoginCommand(spawner, "/bin/bash", [script], {
+                cwd: directory,
+                env: { ...env, PREFIX: prefix },
+                error,
+              });
+              command = path.join(prefix, "bin", "copilot");
+            }
+            yield* runBrowserLoginCommand(spawner, command, ["login", "--web-flow"], {
+              cwd,
+              env,
+              error: failure("Could not finish GitHub sign-in. Try again."),
+            });
+            yield* onChanged(true);
+          }),
+          logout: Effect.scoped(
+            Effect.gen(function* () {
+              const error = new ProviderSetupError({
+                instanceId,
+                operation: "logout",
+                detail: "Could not sign out of GitHub Copilot. Try again.",
+              });
+              const { cwd, env } = copilotAuthEnvironment();
+              const { spawn } = yield* catalog
+                .resolve(effectiveConfig, cwd, env)
+                .pipe(Effect.mapError(() => error));
+              yield* runBrowserLoginCommand(spawner, spawn.command, ["auth", "logout"], {
+                cwd,
+                env,
+                error,
+              });
+              yield* onChanged(false);
+            }),
           ),
-    }).pipe(
-      Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
-      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-      Effect.provideService(SecureRandom.SecureRandom, random),
-    );
+        })
+      : yield* AcpRegistryAuth.makeAcpRegistryAuth({
+          instanceId,
+          settings: effectiveConfig,
+          cwd: host.paths.cwd,
+          environment: processEnvironment,
+          onChanged,
+        }).pipe(
+          Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          Effect.provideService(SecureRandom.SecureRandom, random),
+        );
     const auth = {
       ...controller,
       invalidate: (controller.invalidate ?? Effect.void).pipe(
