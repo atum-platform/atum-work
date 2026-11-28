@@ -37,8 +37,12 @@ export interface WorkSubmitAccessBridge {
   readonly getDeliverable?: (identity: WorkDeliverableIdentity) => Promise<{
     readonly state: string;
     readonly name?: string;
+    readonly previewName?: string;
+    readonly previewDataUrl?: string;
   } | null>;
-  readonly openDeliverable?: (identity: WorkDeliverableIdentity) => Promise<boolean>;
+  readonly openDeliverable?: (
+    identity: WorkDeliverableIdentity & { readonly asset?: "preview" },
+  ) => Promise<boolean>;
   readonly prepareCodexSignIn?: () => Promise<boolean>;
   readonly openProviderSignIn?: (provider: WorkPlanProvider, url: string) => Promise<boolean>;
 }

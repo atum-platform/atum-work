@@ -102,6 +102,7 @@ const make = Effect.gen(function* () {
         yield* settleWorkDeliverable(
           { threadId: input.threadId, runId: input.runId, artifactId: run.workDeliverableId },
           cwd,
+          run.workDeliverableFormat,
         );
       }
     }
