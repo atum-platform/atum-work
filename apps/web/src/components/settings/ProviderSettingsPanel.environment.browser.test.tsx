@@ -161,6 +161,10 @@ vi.mock(import("./settingsLayout"), async (original) => ({
     </div>
   )) as never,
 }));
+vi.mock(import("~/atum/surfaceMode"), async (original) => ({
+  ...(await original()),
+  useAtumSurfaceMode: (() => "work") as never,
+}));
 vi.mock(import("./UsageProviderSettings"), async (original) => ({
   ...(await original()),
   UsageProviderSettings: (() => null) as never,
@@ -171,6 +175,7 @@ vi.mock(import("../ProviderUpdatesAction"), async (original) => ({
 }));
 
 import { appAtomRegistry } from "~/rpc/atomRegistry";
+import { providerAutoswitchAvailable } from "~/atum/providerAutoswitch";
 import { EnvironmentProviderSettings } from "./ProviderSettingsPanel";
 
 const environmentId = EnvironmentId.make("remote-device");
@@ -647,5 +652,34 @@ describe("EnvironmentProviderSettings health check interval", () => {
 
     await expect.element(input).toHaveValue("300");
     expect(state.updateSettings).not.toHaveBeenCalled();
+  });
+});
+
+// Runs once the provider autoswitch engine's contract (ServerSettings.providerFallbackOrder) is present.
+describe.skipIf(!providerAutoswitchAvailable)("When a plan runs out", () => {
+  it("saves the connected plans as the account order and turns it off with []", async () => {
+    await setup();
+    const claude: ServerProvider = {
+      ...provider(),
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      driver: ProviderDriverKind.make("claudeAgent"),
+    };
+    await setProviders([provider(), claude]);
+    await using _screen = await render(panel());
+    const toggle = page.getByRole("switch", { name: "Switch plans when one runs out" });
+    await expect.element(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    const [patch] = state.updateSettings.mock.calls.at(-1) ?? [];
+    expect(patch).toEqual({
+      providerFallbackOrder: expect.arrayContaining([codexId, claude.instanceId]),
+    });
+    expect((patch as { providerFallbackOrder: unknown[] }).providerFallbackOrder).toHaveLength(2);
+
+    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, ...(patch as object) };
+    await using _again = await render(panel());
+    await userEvent.click(
+      page.getByRole("switch", { name: "Switch plans when one runs out" }).last(),
+    );
+    expect(state.updateSettings).toHaveBeenLastCalledWith({ providerFallbackOrder: [] });
   });
 });

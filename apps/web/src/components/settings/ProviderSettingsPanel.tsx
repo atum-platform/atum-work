@@ -1,5 +1,14 @@
 import { atumProviderName } from "@t3tools/shared/atumModels";
 import { isProviderSettingsVisible } from "./providerSettingsVisibility";
+import {
+  accountFallbackOrder,
+  accountFallbackOrderPatch,
+  autoswitchProviders,
+  providerAutoswitchAvailable,
+} from "../../atum/providerAutoswitch";
+import { useAtumSurfaceMode } from "../../atum/surfaceMode";
+import { providerInstanceEntriesFor } from "../../providerInstances";
+import { ProviderFallbackSettings } from "./ProviderFallbackSettings";
 import { SettingsGroup } from "./SettingsGroup";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import {
@@ -592,6 +601,8 @@ export function EnvironmentProviderSettings({
   const canWriteSettings = useEnvironmentScope(environmentId, AuthSettingsWriteScope);
   const canRefreshProviders = useEnvironmentScope(environmentId, AuthOrchestrationReadScope);
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
+  // The engine switches plans only for Work threads.
+  const workSurface = useAtumSurfaceMode(null, environmentId) === "work";
   const updateModelPreferences = useUpdateEnvironmentModelPreferences(environmentId);
   const toggleModelFavorite = useToggleEnvironmentModelFavorite(environmentId);
   const persistProviderInstance = usePersistEnvironmentProviderInstanceMutation(environmentId);
@@ -1153,6 +1164,20 @@ export function EnvironmentProviderSettings({
           </div>
         </SettingsGroup>
       </SettingsSection>
+
+      {providerAutoswitchAvailable && workSurface ? (
+        <ProviderFallbackSettings
+          order={accountFallbackOrder(settings)}
+          providers={autoswitchProviders(
+            providerInstanceEntriesFor(serverProviders, settings, null).filter(
+              isProviderSettingsVisible,
+            ),
+          )}
+          disabled={readOnly || !canWriteSettings}
+          onChange={(order) => updateSettings(accountFallbackOrderPatch(order))}
+          onSignIn={setSelectedInstanceId}
+        />
+      ) : null}
 
       <UsageProviderSettings
         key={environmentId}

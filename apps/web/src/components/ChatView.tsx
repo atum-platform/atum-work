@@ -366,6 +366,7 @@ import { useIncrementalTimelineEntries } from "../hooks/useIncrementalTimelineEn
 import { useRightPanelSurfaceClose } from "../hooks/useRightPanelSurfaceClose";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./chat/ComposerBannerStack";
 import { modelFallbackBannerItem } from "./chat/ComposerUsageLimits";
+import { useAutoswitchCoversLimit } from "./chat/ComposerAutoswitch";
 import { ComposerSurface } from "./chat/ComposerSurface";
 import { resolveThreadSyncPhase } from "../threadSync";
 import { hasAvailableCompactionProvider } from "./chat/compaction.logic";
@@ -2745,8 +2746,15 @@ export default function ChatView(props: ChatViewProps) {
     );
     return item ? [item] : [];
   });
+  // A plan switch on the next message replaces "wait for the reset".
+  const autoswitchCoversLimit = useAutoswitchCoversLimit({
+    environmentId,
+    threadRef: isServerThread ? routeThreadRef : null,
+    instanceEntries: providerInstanceEntries,
+    canResume,
+  });
   const limitRecoveryBanner = useUsageLimitRecoveryBannerItem(
-    limitRecoveryRun !== null && activeThreadShell !== null
+    limitRecoveryRun !== null && activeThreadShell !== null && !autoswitchCoversLimit
       ? {
           runId: limitRecoveryRun.runId,
           errorCode: serverRuntime?.lastErrorCode ?? null,
