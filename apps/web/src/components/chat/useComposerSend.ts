@@ -29,7 +29,7 @@ import {
   type ResponseContextRecord,
   type ScopedThreadRef,
   type ThreadContextRecord,
-  type ThreadId,
+  ThreadId,
   ProviderInteractionMode,
   RuntimeMode,
 } from "@t3tools/contracts";
@@ -123,6 +123,7 @@ import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { countPreparingComposerImages, holdComposerSend } from "./preparingComposerImages";
 import { fileAttachmentCapabilityBlockReason } from "./composerAttachmentFiles";
 import { useLinkedEnvironments } from "../../state/peerLinks";
+import { waitForThreadShell } from "../../state/entities";
 import { readEnvironmentScope } from "../../state/session";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import {
@@ -136,7 +137,11 @@ import {
   prepareTurnAttachments,
   restoreComposerDraft,
 } from "./chatViewSend";
-import { checkWorkSubmitAccess } from "./workSubmitAccess";
+import {
+  checkWorkSubmitAccess,
+  submitWorkLearning,
+  type WorkDeliverableIdentity,
+} from "./workSubmitAccess";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -210,6 +215,8 @@ interface ComposerSendInput {
   readonly activeThreadBranch: string | null;
   readonly activeProject: EnvironmentProject | null;
   readonly activeProjectIsScratch: boolean;
+  readonly work: boolean;
+  readonly workDocument?: WorkDeliverableIdentity;
   readonly activeProjectDefaultModelSelection: ModelSelection | null;
   readonly activeMessageCount: number;
   readonly isServerThread: boolean;
@@ -313,6 +320,8 @@ export function useComposerSend(input: ComposerSendInput) {
     activeThreadBranch,
     activeProject,
     activeProjectIsScratch,
+    work,
+    workDocument,
     activeProjectDefaultModelSelection,
     activeMessageCount,
     isServerThread,
@@ -1120,6 +1129,68 @@ export function useComposerSend(input: ComposerSendInput) {
         sendInFlightRef.current = false;
         if (refusal !== null && !routeChanged) setThreadError(threadIdForSend, refusal);
         return;
+      }
+    }
+    const learning = submitWorkLearning(
+      {
+        threadId: threadIdForSend,
+        requestId: messageIdForSend,
+        text: outgoingMessageText,
+        modelSelection: ctxSelectedModelSelection,
+        ...(workDocument === undefined ? {} : { document: workDocument }),
+      },
+      {
+        work: work && activeProjectIsScratch && submissionIntent === "foreground",
+        draft: isLocalDraftThread,
+        textOnly:
+          composerHoldsOnlyText &&
+          multipleModelSelections === null &&
+          approvalFeedbackTarget === undefined &&
+          pendingApprovals.length === 0 &&
+          freshArm === undefined,
+      },
+    );
+    if (learning) {
+      const result = await learning;
+      if (result.status === "unavailable") {
+        sendInFlightRef.current = false;
+        if (isCurrentRouteThread())
+          setThreadError(threadIdForSend, m(msg("Assistant connection unavailable. Try again.")));
+        return;
+      }
+      if (result.status === "started") {
+        try {
+          const draftChanged = draftChangedDuringPreparation();
+          if (!draftChanged) {
+            clearComposerDraftContent(composerDraftTarget);
+            if (isCurrentRouteThread()) {
+              promptRef.current = "";
+              composerRef.current?.resetCursorState();
+            }
+          }
+          setThreadError(threadIdForSend, null);
+          if (result.threadId !== threadIdForSend && isCurrentRouteThread()) {
+            const thread = scopeThreadRef(environmentId, ThreadId.make(result.threadId));
+            await waitForThreadShell(thread);
+            if (isCurrentRouteThread()) {
+              if (draftId && !draftChanged) {
+                useComposerDraftStore.getState().markDraftThreadPromoting(draftId, thread);
+                finalizePromotedDraftThreadByRef(thread);
+              }
+              await navigate({
+                to: "/$environmentId/$threadId",
+                params: buildThreadRouteParams(thread),
+                replace: isLocalDraftThread,
+              });
+            }
+          }
+        } finally {
+          sendInFlightRef.current = false;
+        }
+        return;
+      }
+      if (isCurrentRouteThread()) {
+        toastManager.add({ type: "info", title: m(msg("Standalone Work session")) });
       }
     }
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();

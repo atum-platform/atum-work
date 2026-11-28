@@ -198,7 +198,11 @@ export const layer = (origins: ReadonlySet<string>) =>
         ),
         requiresAssistantRelay: Effect.fn("ThreadMcpServers.requiresAssistantRelay")(
           (threadId: ThreadId) =>
-            Effect.sync(() => threads.get(threadId)?.assistantConsent !== undefined),
+            Effect.sync(
+              () =>
+                threadId.startsWith("work-learning-") ||
+                threads.get(threadId)?.assistantConsent !== undefined,
+            ),
         ),
         around: Effect.fn("ThreadMcpServers.around")(
           <A, E, R>(
@@ -210,7 +214,9 @@ export const layer = (origins: ReadonlySet<string>) =>
             const consent = client?.nativeConsent;
             const previousLearning = threads.get(input.threadId)?.assistantConsent;
             if (
-              (input.assistantLearning || previousLearning) &&
+              (input.assistantLearning ||
+                previousLearning ||
+                input.threadId.startsWith("work-learning-")) &&
               (consent?.audience !== "owner_dm" || !input.servers?.length || thread !== undefined)
             )
               return Effect.fail(attachmentDenied());

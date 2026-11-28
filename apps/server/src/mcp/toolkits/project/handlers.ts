@@ -223,14 +223,19 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
     (input, { runtimeMode, interactionMode, linkOrigin }) =>
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
-        if (input.assistantLearning && scope.client?.nativeConsent?.audience !== "owner_dm")
+        const consent = scope.client?.nativeConsent;
+        if (
+          (input.assistantLearning || input.assistantSessionId) &&
+          consent?.audience !== "owner_dm"
+        )
           return yield* new OrchestratorMcpFailure({
             code: "thread_mcp_attachment_denied",
             message: "Assistant learning requires the selected assistant's native owner consent.",
           });
         if (
-          input.assistantLearning &&
-          (!input.scratch || input.hidden || !input.clientRequestId || !input.mcpServers)
+          (input.assistantSessionId && !input.assistantLearning) ||
+          (input.assistantLearning &&
+            (!input.scratch || input.hidden || !input.clientRequestId || !input.mcpServers))
         )
           return yield* new OrchestratorMcpFailure({
             code: "invalid_request",
@@ -245,7 +250,11 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           input.clientRequestId === undefined
             ? yield* newCommandId()
             : yield* launchCommandId(scope.requestNamespace, input.clientRequestId);
-        const threadId = ThreadId.make(commandId);
+        const threadId = ThreadId.make(
+          input.assistantSessionId && consent
+            ? `work-learning-${consent.binding.agent}-${input.assistantSessionId}`
+            : commandId,
+        );
         const messageId = MessageId.make(commandId);
         const attachments = input.attachments ?? [];
         if (input.generateTitle === true && !input.message?.trim() && attachments.length === 0)

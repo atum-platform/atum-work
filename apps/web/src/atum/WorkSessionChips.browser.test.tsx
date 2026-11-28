@@ -16,6 +16,7 @@ import { officeStarters } from "@t3tools/shared/workOfficeStarters";
 import { AppRoot } from "~/AppRoot";
 import "~/components/ChatView";
 import { DraftId, useComposerDraftStore } from "~/composerDraftStore";
+import type { WorkLearningSubmission } from "~/components/chat/workSubmitAccess";
 import { __setClientSettingsForTests } from "~/hooks/useSettings";
 import { setAppearanceMode } from "~/hooks/useTheme";
 import stylesheet from "~/index.css?inline";
@@ -168,5 +169,75 @@ it.each(["light", "dark"] as const)(
     });
     expect(launches[0]?.initialMessage).toBeUndefined();
     if (evidence) await page.screenshot({ path: `${evidence}/document-${theme}.png` });
+  },
+);
+
+it.each(["started", "standalone"] as const)(
+  "sends a Work composer draft through the owner handoff (%s)",
+  async (status) => {
+    using _environment = installFakeEnvironment([], { workStarters: true });
+    const draftId = DraftId.make(`work-composer-${status}`);
+    const threadId = ThreadId.make(`draft-${status}`);
+    const attachedId = ThreadId.make("work-learning-receipt");
+    const launches: OrchestrationV2ThreadLaunchInput[] = [];
+    using _launch = answerRpc(
+      ORCHESTRATION_V2_WS_METHODS.launchThread,
+      (input: OrchestrationV2ThreadLaunchInput) => {
+        launches.push(input);
+        return publishFakeThread({
+          id: threadId,
+          title: input.title,
+          modelSelection: input.modelSelection,
+          runs: [],
+          items: [],
+        }).pipe(Effect.map((projection) => ({ threadId, projection, resumed: false })));
+      },
+    );
+    const submitLearning = vi.fn(async (input: WorkLearningSubmission) => {
+      if (status === "standalone") return { status };
+      await Effect.runPromise(
+        publishFakeThread({
+          id: attachedId,
+          title: "Assistant work",
+          modelSelection: input.modelSelection,
+          runs: [],
+          items: [],
+        }),
+      );
+      return { status, threadId: attachedId };
+    });
+    vi.stubGlobal("atumWork", { readModelAccess: async () => "allowed", submitLearning });
+    using _bridge = { [Symbol.dispose]: () => vi.unstubAllGlobals() };
+    __setClientSettingsForTests({
+      ...DEFAULT_CLIENT_SETTINGS,
+      onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const draft = useComposerDraftStore.getState();
+    draft.setProjectDraftThreadId(scopeProjectRef(ENVIRONMENT_ID, PROJECT_ID), draftId, {
+      threadId,
+    });
+    draft.setPrompt(draftId, "Remember the weekly update format.");
+    const router = getRouter(createMemoryHistory({ initialEntries: [`/draft/${draftId}`] }));
+    await router.load();
+    await using _app = await render(<AppRoot router={router} />, { router: false });
+    const editor = page.getByTestId("composer-editor");
+    await expect.element(editor).toHaveTextContent("Remember the weekly update format.");
+    await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
+    await editor.click();
+    await userEvent.keyboard("{Enter}");
+
+    await vi.waitFor(() =>
+      expect(submitLearning).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ threadId, text: "Remember the weekly update format." }),
+      ),
+    );
+    if (status === "started") {
+      await vi.waitFor(() => expect(router.state.location.pathname).toContain(attachedId));
+      expect(launches).toHaveLength(0);
+    } else {
+      await expect.element(page.getByText("Standalone Work session")).toBeVisible();
+      await vi.waitFor(() => expect(launches).toHaveLength(1));
+      expect(launches[0]?.threadId).toBe(threadId);
+    }
   },
 );

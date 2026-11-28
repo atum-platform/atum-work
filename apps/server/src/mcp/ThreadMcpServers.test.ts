@@ -72,6 +72,9 @@ it.effect("binds visible learning to the enrolled owner, assistant and OAuth ses
 
     const first = yield* relay.around(launch, relay.read(threadId));
     expect(yield* relay.requiresAssistantRelay(threadId)).toBe(true);
+    expect(yield* relay.requiresAssistantRelay(ThreadId.make("work-learning-cold-thread"))).toBe(
+      true,
+    );
     const send = { scope, threadId, commandId: CommandId.make("send"), servers: launch.servers };
     const withoutAttachment = yield* relay
       .around({ ...send, servers: undefined }, Effect.void)
