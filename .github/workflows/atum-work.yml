@@ -3,7 +3,7 @@ name: Atum Work verification
 on:
   workflow_dispatch:
   pull_request:
-    branches: [atum/main, atum/v0.1.11]
+    branches: [atum/main, atum/v0.1.11, feat/work-runtime-0.1.16]
     paths:
       - ".github/workflows/atum-work.yml"
       - "apps/server/**"
