@@ -55,3 +55,23 @@ it("shows the saved PNG thumbnail and opens the requested asset in Drive", async
     vi.unstubAllGlobals();
   }
 });
+
+it("shows a single status line when Desktop rejects a deliverable", async () => {
+  const identity = { threadId: "thread", runId: "design-run", artifactId: "design" };
+  const getDeliverable = vi.fn(async () => ({ state: "invalid" }));
+  vi.stubGlobal("atumWork", { getDeliverable, openDeliverable: vi.fn() });
+  using _clock = fakeTimers();
+  try {
+    await using screen = await render(<WorkDeliverableReceipt identity={identity} />, {
+      router: false,
+    });
+    const statuses = screen.container.querySelectorAll('[role="status"]');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.textContent).toBe("This file couldn’t be saved to Atum Drive.");
+    expect(screen.container.querySelector("button, img")).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(getDeliverable).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

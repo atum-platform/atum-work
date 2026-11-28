@@ -29,6 +29,7 @@ import {
   type FakeDriver,
 } from "../../test/fakeEnvironment";
 import { render } from "../../test/render";
+import { WorkSessionChips } from "./WorkSessionChips";
 
 vi.mock("../../../../packages/client-runtime/src/connection/driver.ts", async (importOriginal) => {
   const [actual, { fakeDriver }, Layer] = await Promise.all([
@@ -48,6 +49,17 @@ vi.mock(import("~/atum/surfaceMode"), async (original) => {
       mode: "work" as const,
     }),
   };
+});
+
+it("opens separate starters from the Slides and Design chips", async () => {
+  const onChoose = vi.fn(async () => {});
+  await using _chips = await render(<WorkSessionChips disabled={false} onChoose={onChoose} />, {
+    router: false,
+  });
+  await page.getByRole("button", { name: "Slides", exact: true }).click();
+  expect(onChoose).toHaveBeenLastCalledWith("pptx");
+  await page.getByRole("button", { name: "Design", exact: true }).click();
+  expect(onChoose).toHaveBeenLastCalledWith("svg");
 });
 
 it.each(["light", "dark"] as const)(
@@ -132,7 +144,7 @@ it.each(["light", "dark"] as const)(
 
     const editor = page.getByTestId("composer-editor");
     await expect.element(editor).toBeVisible();
-    for (const label of ["Write", "Design", "Analyze numbers"]) {
+    for (const label of ["Write", "Design", "Analyze numbers", "Slides"]) {
       await expect.element(page.getByRole("button", { name: label, exact: true })).toBeEnabled();
     }
     const write = page.getByRole("button", { name: "Write", exact: true });

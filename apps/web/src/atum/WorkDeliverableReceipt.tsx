@@ -36,6 +36,13 @@ export function WorkDeliverableReceipt({ identity }: { identity: WorkDeliverable
       clearTimeout(timer);
     };
   }, [bridge, threadId, runId, artifactId]);
+  if (receipt?.state === "invalid") {
+    return (
+      <div className="chat-content-lane py-2 text-sm" role="status">
+        {gt("This file couldn’t be saved to Atum Drive.")}
+      </div>
+    );
+  }
   if (receipt?.state !== "saved" && receipt?.state !== "syncing") return null;
   const open = async (asset?: "preview") => {
     const target = asset ? { ...identity, asset } : identity;

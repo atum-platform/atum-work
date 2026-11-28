@@ -5,10 +5,8 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import type { RunId, ThreadId, WorkDeliverableFormat } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
-import { SaxesParser } from "saxes";
-
 import { validateWorkDocx, WORK_DOCX_MAX_BYTES } from "./workDocx.ts";
-import { workDesignSkill } from "./workStarter.ts";
+import { workDesignSkillPath } from "./workStarter.ts";
 
 const filenames = { docx: "Memo.docx", html: "Design.html", svg: "Design.svg" } as const;
 const designFormats = ["html", "svg"] as const;
@@ -98,16 +96,23 @@ export const prepareWorkDeliverable = Effect.fn("Work.prepareDeliverable")(funct
         ).isFile(),
       catch: () => undefined,
     }).pipe(Effect.orElseSucceed(() => false));
-  const designSkill = (yield* hasStarterSkill("work-design"))
-    ? yield* workDesignSkill()
-    : undefined;
+  const stagedSkill = workDesignSkillPath();
+  const designEnabled =
+    stagedSkill !== undefined &&
+    (yield* hasStarterSkill("work-design")) &&
+    (yield* Effect.tryPromise({
+      try: async () => {
+        const stat = await NodeFSP.stat(stagedSkill);
+        return stat.isFile() && stat.size > 0;
+      },
+      catch: () => undefined,
+    }).pipe(Effect.orElseSucceed(() => false)));
   const memo = input.allowMemo ? memoRuntime() : undefined;
-  const runtime =
-    designSkill !== undefined
-      ? { kind: "design" as const, skill: designSkill }
-      : memo !== undefined && (yield* hasStarterSkill("work-document"))
-        ? { kind: "memo" as const, ...memo }
-        : undefined;
+  const runtime = designEnabled
+    ? { kind: "design" as const }
+    : memo !== undefined && (yield* hasStarterSkill("work-document"))
+      ? { kind: "memo" as const, ...memo }
+      : undefined;
   if (runtime === undefined) return undefined;
   const identity = {
     threadId: input.threadId,
@@ -130,11 +135,7 @@ export const prepareWorkDeliverable = Effect.fn("Work.prepareDeliverable")(funct
       formats: designFormats,
       context: {
         key: "work_design_output",
-        text: [
-          runtime.skill,
-          "This Design session has a private output slot for this turn. Use it when the user asks to create or revise a design.",
-          `Write exactly one editable file, either ${NodePath.join(outputRoot, filenames.html)} or ${NodePath.join(outputRoot, filenames.svg)}. Use the exact absolute path. Preserve earlier copies.`,
-        ].join("\n\n"),
+        text: `When asked to create or revise a design, write exactly one editable file to ${NodePath.join(outputRoot, filenames.html)} or ${NodePath.join(outputRoot, filenames.svg)}. Preserve earlier copies.`,
       },
     };
   }
@@ -195,35 +196,6 @@ async function readOutput(workspace: string, artifactId: string, format: WorkDel
   }
 }
 
-// Desktop validates the static markup allowlist on its pinned copy before rendering or placing it.
-function isDesignSource(bytes: Buffer, format: "html" | "svg"): boolean {
-  const parser = new SaxesParser({ xmlns: true });
-  let rootMatches = false;
-  let firstTag = true;
-  parser.on("opentag", (tag) => {
-    if (!firstTag) return;
-    firstTag = false;
-    rootMatches =
-      format === "svg"
-        ? tag.local === "svg" && tag.uri === "http://www.w3.org/2000/svg"
-        : tag.local === "html" && tag.uri === "";
-  });
-  parser.on("doctype", () => {
-    throw new Error("Unexpected design doctype");
-  });
-  try {
-    const source = new TextDecoder("utf-8", { fatal: true }).decode(bytes).trim();
-    const doctype = "<!doctype html>";
-    if (format === "html" && source.slice(0, doctype.length).toLowerCase() !== doctype) {
-      return false;
-    }
-    parser.write(format === "html" ? source.slice(doctype.length) : source).close();
-    return rootMatches;
-  } catch {
-    return false;
-  }
-}
-
 const hasValidWorkDeliverable = Effect.fn("Work.hasValidDeliverable")(function* (
   workspace: string,
   artifactId: string,
@@ -234,7 +206,8 @@ const hasValidWorkDeliverable = Effect.fn("Work.hasValidDeliverable")(function* 
     catch: () => undefined,
   }).pipe(Effect.orElseSucceed(() => undefined));
   if (bytes === undefined) return false;
-  return format === "docx" ? yield* validateWorkDocx(bytes) : isDesignSource(bytes, format);
+  // Desktop validates design markup on the same pinned snapshot it renders and places.
+  return format === "docx" ? yield* validateWorkDocx(bytes) : true;
 });
 
 export const selectWorkDeliverable = Effect.fn("Work.selectDeliverable")(function* (

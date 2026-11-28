@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off -- Read the host-staged skill from both launch and run preparation.
+// @effect-diagnostics nodeBuiltinImport:off -- Read the host-staged skill from the sidecar environment.
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import type { WorkDocumentFormat, WorkStarterFile } from "@t3tools/contracts";
@@ -46,11 +46,14 @@ const blankDesign =
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540"/>\n';
 
 // The Desktop sidecar supplies this internal runtime path alongside its IPC channel.
-const stagedDesignSkillPath = () => process.env.ATUM_WORK_DESIGN_SKILL;
+export function workDesignSkillPath() {
+  const staged = process.env.ATUM_WORK_DESIGN_SKILL;
+  return staged && NodePath.isAbsolute(staged) ? staged : undefined;
+}
 
-export const workDesignSkill = Effect.fn("Work.readDesignSkill")(function* () {
-  const staged = stagedDesignSkillPath();
-  if (!staged || !NodePath.isAbsolute(staged)) return undefined;
+const workDesignSkill = Effect.fn("Work.readDesignSkill")(function* () {
+  const staged = workDesignSkillPath();
+  if (!staged) return undefined;
   const skill = yield* Effect.tryPromise({
     try: () => NodeFSP.readFile(staged, "utf8"),
     catch: () => undefined,
@@ -91,17 +94,14 @@ export const prepareWorkStarter = Effect.fn("Work.prepareStarter")(function* (
   const exclusive = { flag: "wx" } as const;
   yield* fs.makeDirectory(skillDirectory, { recursive: true });
   yield* fs.writeFileString(path.join(skillDirectory, "SKILL.md"), skill, exclusive);
-  if (stagedSkill !== undefined) {
-    const agentsSkillDirectory = path.join(folder, ".agents", "skills", starter.skill);
-    yield* fs.makeDirectory(agentsSkillDirectory, { recursive: true });
-    yield* fs.writeFileString(path.join(agentsSkillDirectory, "SKILL.md"), skill, exclusive);
-  }
   yield* fs.writeFileString(
     path.join(folder, "CLAUDE.md"),
     `Invoke the ${starter.skill} skill when working on the document in this session.\n\n${body}\n`,
     exclusive,
   );
-  yield* fs.writeFileString(path.join(folder, "AGENTS.md"), body + "\n", exclusive);
+  const agentGuide =
+    format === "svg" ? `Read .claude/skills/${starter.skill}/SKILL.md before authoring.\n\n` : "";
+  yield* fs.writeFileString(path.join(folder, "AGENTS.md"), agentGuide + body + "\n", exclusive);
   const file = path.join(folder, starter.name);
   if (format === "svg") {
     yield* fs.writeFileString(file, blankDesign, exclusive);

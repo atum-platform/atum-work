@@ -4,9 +4,11 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeZlib from "node:zlib";
 import { it } from "@effect/vitest";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { RunId, ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import { expect, vi } from "vite-plus/test";
 import {
   prepareWorkDeliverable,
@@ -14,6 +16,7 @@ import {
   settleWorkDeliverable,
 } from "./workDeliverable.ts";
 import { validateWorkDocx, WORK_DOCX_MAX_BYTES } from "./workDocx.ts";
+import { prepareWorkStarter } from "./workStarter.ts";
 
 const wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const editableBody = "<w:p><w:r><w:t>Weekly pilot memo</w:t></w:r></w:p>";
@@ -158,9 +161,33 @@ it.effect(
 );
 
 const designs = {
-  html: '<!doctype html><html><head><meta charset="utf-8" /></head><body><h1>Draft flyer</h1></body></html>',
+  html: '<!doctype html><html><head><meta charset="utf-8" /></head><body><h1>Draft&nbsp;flyer &mdash; Saturday</h1></body></html>',
   svg: '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320"><text x="20" y="40">Draft diagram</text></svg>',
 };
+
+it.effect("installs the host design guidance once and points other providers to it", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "work-design-starter-" });
+    const staged = NodePath.join(root, "SKILL.md");
+    const workspace = NodePath.join(root, "design");
+    const skill = "Use editable markup and system fonts.";
+    yield* fs.writeFileString(staged, skill);
+    vi.stubEnv("ATUM_WORK_DESIGN_SKILL", staged);
+    try {
+      yield* prepareWorkStarter(workspace, "svg");
+      expect(
+        yield* fs.readFileString(NodePath.join(workspace, ".claude/skills/work-design/SKILL.md")),
+      ).toBe(skill);
+      expect(yield* fs.exists(NodePath.join(workspace, ".agents"))).toBe(false);
+      expect(yield* fs.readFileString(NodePath.join(workspace, "AGENTS.md"))).toContain(
+        ".claude/skills/work-design/SKILL.md",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
 
 it.effect.each(["html", "svg"] as const)(
   "settles one editable %s and preserves the first output on same-thread revision",
@@ -215,7 +242,8 @@ it.effect.each(["html", "svg"] as const)(
         );
         const output = yield* prepare(runId);
         if (!output) throw new Error("Expected a pinned design output");
-        expect(output.context.text).toContain("Use editable markup and system fonts.");
+        expect(output.context.text).not.toContain("Use editable markup and system fonts.");
+        expect(output.context.text.split("\n")).toHaveLength(1);
         const canonicalWorkspace = yield* Effect.promise(() => NodeFSP.realpath(workspace));
         const slot = (artifactId: string) =>
           NodePath.join(canonicalWorkspace, `.work-output-${artifactId}`);
@@ -242,11 +270,18 @@ it.effect.each(["html", "svg"] as const)(
           yield* settle();
           yield* Effect.promise(() => NodeFSP.unlink(source));
         }
-        yield* Effect.promise(() => NodeFSP.writeFile(source, designs[format].slice(0, -5)));
+        yield* Effect.promise(() => NodeFSP.writeFile(source, ""));
         yield* settle();
         yield* Effect.promise(() => NodeFSP.truncate(source, 512 * 1024 + 1));
         yield* settle();
         expect(send).toHaveBeenCalledTimes(1);
+        yield* Effect.promise(() => NodeFSP.writeFile(source, "Desktop validates these bytes."));
+        expect(yield* selectWorkDeliverable(workspace, output)).toBe(format);
+        yield* settle();
+        expect(send.mock.calls.at(-1)?.[0]).toMatchObject({
+          type: "work-deliverable-settled",
+          result: { path: filename, format },
+        });
         yield* Effect.promise(async () => {
           await NodeFSP.writeFile(source, designs[format]);
           await NodeFSP.writeFile(alternate, designs[otherFormat]);
