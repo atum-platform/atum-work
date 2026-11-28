@@ -1,8 +1,8 @@
 // The official installer accepts a local binary, so verify the pinned release before running it.
 // @effect-diagnostics-next-line nodeBuiltinImport:off
-import { createHash } from "node:crypto";
+import * as NodeCrypto from "node:crypto";
 // @effect-diagnostics-next-line nodeBuiltinImport:off
-import { statfs } from "node:fs/promises";
+import * as NodeFSP from "node:fs/promises";
 import { runBrowserLoginCommand } from "@t3tools/provider-core/server/providerAuthFlow";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -51,7 +51,7 @@ export const installOpenRouterFreeOpenCode = Effect.fn("installOpenRouterFreeOpe
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const error = failure("Could not install OpenCode. Try again.");
     const disk = yield* Effect.tryPromise({
-      try: () => statfs(input.directory),
+      try: () => NodeFSP.statfs(input.directory),
       catch: () => failure("Could not check available space for OpenCode."),
     });
     if (disk.bavail * disk.bsize < 1.5 * 1024 ** 3) {
@@ -87,7 +87,7 @@ export const installOpenRouterFreeOpenCode = Effect.fn("installOpenRouterFreeOpe
       encoding: "hex" | "base64",
       expected: string,
     ) {
-      const hash = createHash(algorithm);
+      const hash = NodeCrypto.createHash(algorithm);
       yield* fs.stream(file).pipe(
         Stream.runForEach((chunk) =>
           Effect.sync(() => {

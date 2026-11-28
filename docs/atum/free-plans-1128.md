@@ -81,5 +81,7 @@ The ordinary OpenCode instance keeps its own providers. The OpenRouter Free
 status check leaves the isolated server off until its database has an active OpenRouter credential.
 
 Local verification uses fake CLIs, replayed provider events and synthetic
-OpenRouter credentials. A live browser login and an installed-app check remain
-owner acceptance steps.
+OpenRouter credentials. The Kiro tests exercise both browser methods with
+closed stdin and 2 GiB available. The official OpenCode installer was verified
+in a temporary directory. A live browser login and an installed-app check
+remain owner acceptance steps.

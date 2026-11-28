@@ -1,3 +1,4 @@
+import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
@@ -18,8 +19,11 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
+import { vi } from "vite-plus/test";
 
 import { AtumKiroDriver } from "./AtumKiroDriver.ts";
+
+vi.mock("node:fs/promises", { spy: true });
 
 const hostLayer = TestProviderHost.layer({ runBackgroundWork: false }).pipe(
   Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -91,6 +95,16 @@ it.layer(hostLayer, { excludeTestServices: true })("Kiro Free setup", (it) => {
           }),
         );
         const auth = provider.auth!;
+        // Give the installer 2 GiB, above the new gate and below the previous 6 GiB.
+        vi.mocked(NodeFSP.statfs).mockResolvedValueOnce({
+          type: 0,
+          bsize: 4096,
+          blocks: 524_288,
+          bfree: 524_288,
+          bavail: 524_288,
+          files: 0,
+          ffree: 0,
+        });
         const started = yield* auth.start("owner", Effect.void, method);
         const result = yield* auth.subscribe("owner").pipe(
           Stream.filter(
