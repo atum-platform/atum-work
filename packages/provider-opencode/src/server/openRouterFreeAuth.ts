@@ -2,6 +2,7 @@
 // @effect-diagnostics nodeBuiltinImport:off globalFetch:off
 import * as NodeCrypto from "node:crypto";
 import * as NodeHttp from "node:http";
+import * as NodeSqlite from "node:sqlite";
 import type { OpenCodeClient } from "@opencode/client/effect";
 import { Integration } from "@opencode/schema/integration";
 import type { ProviderInstanceId } from "@t3tools/contracts";
@@ -91,6 +92,26 @@ export async function authorizeOpenRouter(
   if (!response.ok) throw new Error("OpenRouter did not return a key.");
   return decodeKey(await response.json()).key;
 }
+
+/** A cancelled setup can leave a database without an active OpenRouter key. */
+export const hasOpenRouterCredential = (databasePath: string) =>
+  Effect.sync(() => {
+    try {
+      const database = new NodeSqlite.DatabaseSync(databasePath, { readOnly: true });
+      try {
+        return (
+          database
+            .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active = 1 LIMIT 1")
+            .get(openRouter) !== undefined
+        );
+      } finally {
+        database.close();
+      }
+    } catch {
+      // A missing or unmigrated DB cannot contain an active OpenRouter credential.
+      return false;
+    }
+  });
 
 const storedKeys = (client: OpenCodeClient) =>
   client.credential

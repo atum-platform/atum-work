@@ -282,13 +282,14 @@ const makeReplayAdapter = (
     readonly onPrompt?: (input: unknown) => void;
     readonly replayGate?: ProviderReplayGate;
     readonly borrowers?: { current: number };
+    readonly instanceId?: string;
   },
 ) =>
   Effect.gen(function* () {
     const server = yield* replayServer(transcript, options);
-    return yield* OpenCode2Adapter.make(ProviderInstanceId.make("opencode")).pipe(
-      Effect.provideService(OpenCode2Server.OpenCode2Server, server),
-    );
+    return yield* OpenCode2Adapter.make(
+      ProviderInstanceId.make(options?.instanceId ?? "opencode"),
+    ).pipe(Effect.provideService(OpenCode2Server.OpenCode2Server, server));
   });
 
 const layerReplayHost = TestProviderHost.layer().pipe(
@@ -341,6 +342,7 @@ export const openCode2ReplayRuntime = (
     readonly attachmentsDir?: string;
     readonly resolveExtractedTextPath?: (path: string) => Effect.Effect<string | undefined>;
     readonly fileSystem?: FileSystem.FileSystem;
+    readonly instanceId?: string;
   },
 ) =>
   Effect.gen(function* () {
@@ -359,7 +361,7 @@ export const openCode2ReplayRuntime = (
       threadId: ThreadId.make("thread:opencode2-adapter"),
       providerSessionId: ProviderSessionId.make("provider-session:opencode2-adapter"),
       modelSelection: {
-        instanceId: ProviderInstanceId.make("opencode"),
+        instanceId: ProviderInstanceId.make(options?.instanceId ?? "opencode"),
         model: "opencode/big-pickle",
       },
       runtimePolicy: {

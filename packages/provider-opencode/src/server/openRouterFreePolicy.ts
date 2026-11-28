@@ -2,6 +2,25 @@ export const OPENROUTER_FREE_INSTANCE = "openrouter-free";
 export const OPENROUTER_FREE_POLICY = "atum.openrouter-free";
 export const OPENROUTER_FREE_VERSION = "2.3.2";
 
+export const supportsOpenRouterFreeVersion = (version: string) => /^2\.3\.\d+$/.test(version);
+
+export function isOpenRouterFreeDailyLimit(
+  instanceId: string,
+  error: {
+    status?: number | undefined;
+    message: string;
+    response?: { body?: string | undefined } | undefined;
+  },
+) {
+  return (
+    instanceId === OPENROUTER_FREE_INSTANCE &&
+    (error.status === undefined || error.status === 429) &&
+    [error.message, error.response?.body].some((text) =>
+      /\bfree-models-per-day\b/i.test(text ?? ""),
+    )
+  );
+}
+
 const titleModel = "openrouter/google/gemma-4-26b-a4b-it:free";
 
 export function openRouterFreeConfig(plugin: string) {

@@ -9,6 +9,7 @@ import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as HttpClientError from "effect/http/HttpClientError";
 
+import { supportsOpenRouterFreeVersion } from "../openRouterFreePolicy.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
 import * as OpenCodeServerOwner from "../OpenCodeServerOwner.ts";
 import * as OpenCode2Client from "./OpenCode2Client.ts";
@@ -120,7 +121,6 @@ export const make = Effect.fn("OpenCode2Server.make")(function* (input: {
   readonly serverPassword: string;
   readonly directory: string;
   readonly requiredPlugin?: string;
-  readonly requiredVersion?: string;
   readonly environment: NodeJS.ProcessEnv;
 }) {
   const opencode = yield* OpenCode2Client.OpenCode2Client;
@@ -136,7 +136,7 @@ export const make = Effect.fn("OpenCode2Server.make")(function* (input: {
         operation: "plugin.list",
         detail: "OpenRouter Free could not verify its pricing policy.",
       });
-      if (version !== input.requiredVersion) return yield* error;
+      if (!supportsOpenRouterFreeVersion(version)) return yield* error;
       const location = { directory: input.directory };
       // OpenCode activates location plugins on the first model inventory read.
       const plugins = yield* api.client.model.list({ location }).pipe(

@@ -111,6 +111,22 @@ export function usageLimitRecoveryBannerItem(
           ? resolve(msg("Reset {time}", { time: formattedTime }))
           : resolve(msg("Resets {time}", { time: formattedTime }))
       : resolve(msg("Reset time unavailable; retry manually"));
+  if (errorCode === "openrouter_free_daily_limit" && resetAt) {
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(resetAt));
+    return {
+      id: `usage-limit-recovery:${runId}`,
+      variant: "warning",
+      group: "environment",
+      icon: <GaugeIcon />,
+      title: resolve(
+        msg("You've used today's free OpenRouter requests. They reset at {time}.", { time }),
+      ),
+      actions: recoveryActions,
+    };
+  }
   if (!chatGptLimit) {
     return {
       id: `usage-limit-recovery:${runId}`,

@@ -1003,6 +1003,50 @@ const driverLayer = TestProviderHost.layer({ runBackgroundWork: false }).pipe(
 );
 
 it.layer(driverLayer, { excludeTestServices: true })("AcpRegistryDriver", (it) => {
+  it.effect("signs out through the Copilot CLI without passing ambient tokens", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "atum-copilot-logout-" });
+      const command = path.join(dir, "copilot");
+      const record = path.join(dir, "local-auth");
+      yield* fs.writeFileString(record, "signed in");
+      yield* fs.writeFileString(
+        command,
+        [
+          "#!/bin/sh",
+          '[ "$*" = "auth logout" ] && [ ! -t 0 ] && [ -z "$GH_TOKEN$GITHUB_TOKEN$COPILOT_GITHUB_TOKEN" ] || exit 1',
+          'printf "%s" "signed out" > "$COPILOT_TEST_RECORD"',
+        ].join("\n"),
+        { mode: 0o700 },
+      );
+      const instance = yield* AcpRegistryDriver.create({
+        instanceId: ProviderInstanceId.make("copilot"),
+        displayName: undefined,
+        enabled: true,
+        environment: [
+          { name: "GH_TOKEN", value: "fixture", sensitive: true },
+          { name: "GITHUB_TOKEN", value: "fixture", sensitive: true },
+          { name: "COPILOT_GITHUB_TOKEN", value: "fixture", sensitive: true },
+          { name: "COPILOT_TEST_RECORD", value: record, sensitive: false },
+        ],
+        config: decodeSettings({ source: "local", commandPath: "copilot", commandArgs: ["--acp"] }),
+      }).pipe(
+        Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, {
+          ...catalogWithInspection({
+            status: "missing_runner",
+            version: null,
+            distribution: "local",
+          }),
+          resolve: () =>
+            Effect.succeed({ distribution: "local" as const, spawn: { command, args: [] } }),
+        }),
+      );
+      yield* instance.auth!.logout(Effect.void);
+      expect(yield* fs.readFileString(record)).toBe("signed out");
+    }),
+  );
+
   it.effect("creates without inspecting the agent, which may fetch the registry", () =>
     Effect.gen(function* () {
       const instance = yield* AcpRegistryDriver.create({

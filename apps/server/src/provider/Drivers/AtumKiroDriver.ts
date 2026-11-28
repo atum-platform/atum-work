@@ -73,9 +73,10 @@ export const AtumKiroDriver = {
       instanceId,
       credentialBinding: { owner: "provider", key: "kiro-cli" },
       methods: Effect.succeed([
-        { id: "browser", name: "Sign in to Kiro", description: null, type: "agent" },
+        { id: "google", name: "Sign in with Google", description: null, type: "agent" },
+        { id: "github", name: "Sign in with GitHub", description: null, type: "agent" },
       ]),
-      authenticate: Effect.fn("Kiro.browserLogin")(function* () {
+      authenticate: Effect.fn("Kiro.browserLogin")(function* (method) {
         const resolved = yield* catalog.resolve(local, cwd, env).pipe(Effect.option);
         let command: string;
         if (Option.isSome(resolved)) {
@@ -85,8 +86,8 @@ export const AtumKiroDriver = {
             try: () => NodeFSP.statfs(baseDir),
             catch: () => failure("Could not check available space for Kiro."),
           });
-          if (disk.bavail * disk.bsize < 6 * 1024 ** 3) {
-            return yield* failure("Free up 6 GB of disk space to install Kiro.");
+          if (disk.bavail * disk.bsize < 1.5 * 1024 ** 3) {
+            return yield* failure("Free up 1.5 GB of disk space to install Kiro.");
           }
           const error = failure("Could not install Kiro. Try again.");
           const installed = yield* catalog
@@ -106,11 +107,15 @@ export const AtumKiroDriver = {
           yield* fs
             .makeDirectory(directory, { recursive: true })
             .pipe(Effect.mapError(() => error));
-          yield* fs
-            .symlink(command, path.join(directory, "kiro-cli"))
-            .pipe(Effect.mapError(() => error));
+          const link = path.join(directory, "kiro-cli");
+          // readLink also recognizes dangling links and leaves ordinary files alone.
+          const previous = yield* fs.readLink(link).pipe(Effect.option);
+          if (Option.isSome(previous)) {
+            yield* fs.remove(link, { force: true }).pipe(Effect.mapError(() => error));
+          }
+          yield* fs.symlink(command, link).pipe(Effect.mapError(() => error));
         }
-        yield* runBrowserLoginCommand(spawner, command, ["login"], {
+        yield* runBrowserLoginCommand(spawner, command, ["login", "--social", method], {
           cwd,
           env,
           error: failure("Could not finish Kiro sign-in. Try again."),

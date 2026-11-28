@@ -331,7 +331,12 @@ function baseSnapshot(
     installed: input.installed,
     version: input.version,
     status: input.settings.enabled ? input.status : "disabled",
-    auth: { ...input.auth, canLogout: input.auth.canLogout ?? false },
+    auth: {
+      ...input.auth,
+      canLogout: nativeCopilot
+        ? input.auth.status === "authenticated"
+        : (input.auth.canLogout ?? false),
+    },
     checkedAt: input.checkedAt,
     setup: {
       canInstall: false,
@@ -741,7 +746,15 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         input.installed &&
         input.auth.status === "unknown" &&
         (yield* confirmedAuthentication.get)
-          ? { ...input, auth: { ...input.auth, status: "authenticated" as const } }
+          ? {
+              ...input,
+              auth: {
+                ...input.auth,
+                status: "authenticated" as const,
+                canLogout:
+                  usesCopilotBrowserLogin(instanceId, effectiveConfig) || input.auth.canLogout,
+              },
+            }
           : input;
       return yield* Option.isNone(runtimeCoordinator)
         ? Effect.succeed(provider)
@@ -999,6 +1012,23 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
           Effect.asVoid,
         );
     const userHome = yield* HostProcess.HomeDirectory;
+    const copilotAuthEnvironment = () => {
+      const cwd = host.paths.cwd;
+      const home = processEnvironment.HOME ?? userHome;
+      const env: NodeJS.ProcessEnv = { ...processEnvironment, HOME: home };
+      // Use the account selected in the official browser flow.
+      for (const name of Object.keys(env)) {
+        if (
+          name === "GH_TOKEN" ||
+          name === "GITHUB_TOKEN" ||
+          name.startsWith("COPILOT_PROVIDER_") ||
+          name === "COPILOT_GITHUB_TOKEN"
+        ) {
+          delete env[name];
+        }
+      }
+      return { cwd, home, env };
+    };
     const controller = usesCopilotBrowserLogin(instanceId, effectiveConfig)
       ? yield* makeProviderAuthFlow({
           instanceId,
@@ -1018,20 +1048,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
                 operation: "start",
                 detail,
               });
-            const cwd = host.paths.cwd;
-            const home = processEnvironment.HOME ?? userHome;
-            const env: NodeJS.ProcessEnv = { ...processEnvironment, HOME: home };
-            // Use the account selected in the official browser flow.
-            for (const name of Object.keys(env)) {
-              if (
-                name === "GH_TOKEN" ||
-                name === "GITHUB_TOKEN" ||
-                name.startsWith("COPILOT_PROVIDER_") ||
-                name === "COPILOT_GITHUB_TOKEN"
-              ) {
-                delete env[name];
-              }
-            }
+            const { cwd, home, env } = copilotAuthEnvironment();
             const resolved = yield* catalog.resolve(effectiveConfig, cwd, env).pipe(Effect.option);
             let command: string;
             if (Option.isSome(resolved)) {
@@ -1041,8 +1058,8 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
                 try: () => NodeFSP.statfs(home),
                 catch: () => failure("Could not check available space for Copilot."),
               });
-              if (disk.bavail * disk.bsize < 6 * 1024 ** 3) {
-                return yield* failure("Free up 6 GB of disk space to install Copilot.");
+              if (disk.bavail * disk.bsize < 1.5 * 1024 ** 3) {
+                return yield* failure("Free up 1.5 GB of disk space to install Copilot.");
               }
               const error = failure("Could not install GitHub Copilot. Try again.");
               const directory = yield* fileSystem
@@ -1078,11 +1095,23 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             });
             yield* onChanged(true);
           }),
-          logout: Effect.fail(
-            new ProviderSetupError({
-              instanceId,
-              operation: "logout",
-              detail: "Sign out in GitHub Copilot CLI.",
+          logout: Effect.scoped(
+            Effect.gen(function* () {
+              const error = new ProviderSetupError({
+                instanceId,
+                operation: "logout",
+                detail: "Could not sign out of GitHub Copilot. Try again.",
+              });
+              const { cwd, env } = copilotAuthEnvironment();
+              const { spawn } = yield* catalog
+                .resolve(effectiveConfig, cwd, env)
+                .pipe(Effect.mapError(() => error));
+              yield* runBrowserLoginCommand(spawner, spawn.command, ["auth", "logout"], {
+                cwd,
+                env,
+                error,
+              });
+              yield* onChanged(false);
             }),
           ),
         })

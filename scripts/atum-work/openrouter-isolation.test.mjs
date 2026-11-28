@@ -6,7 +6,7 @@ import * as NodePath from "node:path";
 import * as NodeTest from "node:test";
 import * as NodeUtil from "node:util";
 import {
-  OPENROUTER_FREE_VERSION,
+  supportsOpenRouterFreeVersion,
   openRouterFreeConfig,
   openRouterFreePlugin,
 } from "../../packages/provider-opencode/src/server/openRouterFreePolicy.ts";
@@ -14,11 +14,13 @@ import {
 const free = "google/gemma-4-26b-a4b-it:free";
 function nativeReleaseAvailable() {
   try {
-    return (
+    return supportsOpenRouterFreeVersion(
       NodeChildProcess.execFileSync("opencode", ["--version"], {
         encoding: "utf8",
         timeout: 2_000,
-      }).trim() === `opencode v${OPENROUTER_FREE_VERSION}`
+      })
+        .trim()
+        .replace(/^opencode v/, ""),
     );
   } catch {
     return false;
@@ -27,7 +29,7 @@ function nativeReleaseAvailable() {
 
 NodeTest.test(
   "isolates the OpenRouter credential and model list from ordinary OpenCode",
-  { skip: nativeReleaseAvailable() ? false : "Requires OpenCode 2.3.2" },
+  { skip: nativeReleaseAvailable() ? false : "Requires OpenCode 2.3.x" },
   async () => {
     const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "atum-opencode-isolation-"));
     try {
@@ -61,10 +63,11 @@ NodeTest.test(
       const dedicated = await models(data, openRouterFreeConfig(plugin));
       const ordinary = await models(
         NodePath.join(root, "ordinary"),
-        JSON.stringify({ disabled_providers: ["openrouter"], autoupdate: false }),
+        JSON.stringify({ autoupdate: false }),
       );
       NodeAssert.ok(dedicated.includes(`openrouter/${free}`));
       NodeAssert.ok(dedicated.every((id) => id.startsWith("openrouter/") && id.endsWith(":free")));
+      NodeAssert.ok(ordinary.length > 0);
       NodeAssert.ok(ordinary.every((id) => !id.startsWith("openrouter/")));
     } finally {
       await NodeFSP.rm(root, { recursive: true, force: true });

@@ -10,6 +10,7 @@ import {
 } from "@t3tools/provider-core/server/providerAuthFlow";
 import {
   authorizeOpenRouter,
+  hasOpenRouterCredential,
   openRouterSetupError,
   readOpenRouterQuota,
   removeOpenRouterKeys,
@@ -18,10 +19,11 @@ import {
 import {
   OPENROUTER_FREE_INSTANCE,
   OPENROUTER_FREE_POLICY,
-  OPENROUTER_FREE_VERSION,
+  supportsOpenRouterFreeVersion,
   openRouterFreeConfig,
   openRouterFreePlugin,
 } from "./openRouterFreePolicy.ts";
+import { installOpenRouterFreeOpenCode } from "./openRouterFreeInstall.ts";
 import { OpenCodeSettings } from "../settings.ts";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -296,8 +298,14 @@ export const OpenCodeDriver: ProviderDriver<
     const host = yield* ProviderHost.ProviderHost;
     const processEnv = yield* mergeProviderInstanceEnvironment(environment);
     const openRouterFree = instanceId === OPENROUTER_FREE_INSTANCE;
+    const isolatedRoot = pathService.join(host.paths.baseDir, OPENROUTER_FREE_INSTANCE);
+    const openRouterConnected = hasOpenRouterCredential(
+      pathService.join(isolatedRoot, "data", "opencode", "opencode.db"),
+    );
+    const platform = yield* HostProcess.Platform;
+    const architecture = yield* HostProcess.Architecture;
     if (openRouterFree) {
-      const root = pathService.join(host.paths.baseDir, OPENROUTER_FREE_INSTANCE);
+      const root = isolatedRoot;
       const plugin = pathService.join(root, "policy");
       yield* fileSystem.makeDirectory(plugin, { recursive: true, mode: 0o700 }).pipe(
         Effect.andThen(
@@ -316,6 +324,9 @@ export const OpenCodeDriver: ProviderDriver<
         if (key.startsWith("OPENCODE_") || key.startsWith("OPENROUTER_")) delete processEnv[key];
       }
       Object.assign(processEnv, {
+        PATH: [pathService.join(root, "bin"), processEnv.PATH ?? "/usr/bin:/bin"].join(
+          platform === "win32" ? ";" : ":",
+        ),
         XDG_DATA_HOME: pathService.join(root, "data"),
         XDG_CONFIG_HOME: pathService.join(root, "config"),
         XDG_STATE_HOME: pathService.join(root, "state"),
@@ -340,7 +351,9 @@ export const OpenCodeDriver: ProviderDriver<
       ...config,
       ...(openRouterFree ? { serverUrl: "", customModels: [] } : {}),
       enabled,
-      binaryPath: expandHomePath(config.binaryPath, yield* HostProcess.HomeDirectory),
+      binaryPath: openRouterFree
+        ? "opencode"
+        : expandHomePath(config.binaryPath, yield* HostProcess.HomeDirectory),
       // The instance registry has already read a referenced password from its secret provider.
       serverPassword: settingsSecretLiteral(config.serverPassword),
     } satisfies OpenCodeSettings;
@@ -349,11 +362,11 @@ export const OpenCodeDriver: ProviderDriver<
         Effect.filterOrFail(
           (runtime) =>
             !openRouterFree ||
-            (runtime.generation === "v2" && runtime.version === OPENROUTER_FREE_VERSION),
+            (runtime.generation === "v2" && supportsOpenRouterFreeVersion(runtime.version)),
           () =>
             new OpenCodeRuntime.OpenCodeRuntimeError({
               operation: "version",
-              detail: `OpenRouter Free requires OpenCode ${OPENROUTER_FREE_VERSION}.`,
+              detail: "OpenRouter Free requires OpenCode 2.3.x.",
             }),
         ),
         Effect.provideService(HttpClient.HttpClient, httpClient),
@@ -441,9 +454,7 @@ export const OpenCodeDriver: ProviderDriver<
       serverPassword: effectiveConfig.serverPassword,
       directory: host.paths.cwd,
       environment: processEnv,
-      ...(openRouterFree
-        ? { requiredPlugin: OPENROUTER_FREE_POLICY, requiredVersion: OPENROUTER_FREE_VERSION }
-        : {}),
+      ...(openRouterFree ? { requiredPlugin: OPENROUTER_FREE_POLICY } : {}),
     }).pipe(
       Effect.provideService(OpenCodeRuntime.OpenCodeRuntime, openCodeRuntime),
       Effect.provideService(
@@ -459,13 +470,18 @@ export const OpenCodeDriver: ProviderDriver<
         Effect.provideService(OpenCode2Server.OpenCode2Server, openCode2Server),
       ),
     });
-    const loadOpenCode2Models = yield* makeOpenCode2ModelLoader(
+    const connectedOpenCode2Models = yield* makeOpenCode2ModelLoader(
       // An external server may not have the host's cwd; without a location it uses its own default.
       openCode2Server.withConnection(({ client, external }) =>
         loadOpenCode2Catalog(client, external ? undefined : host.paths.cwd),
       ),
       processEnv,
     );
+    const loadOpenCode2Models = openRouterFree
+      ? openRouterConnected.pipe(
+          Effect.flatMap((exists) => (exists ? connectedOpenCode2Models : Effect.succeed([]))),
+        )
+      : connectedOpenCode2Models;
     const listOpenCode2Workspace = (cwd: string) =>
       openCode2Server.withConnection(({ client, events }) =>
         Effect.gen(function* () {
@@ -565,16 +581,21 @@ export const OpenCodeDriver: ProviderDriver<
         })),
       ),
     );
-    const openRouterAccount = (
+    const openRouterAccount =
       openRouterFree && enabled
-        ? runtimeProbe.get.pipe(
-            Effect.andThen(
-              openCode2Server.withConnection(({ client }) => readOpenRouterQuota(client)),
+        ? openRouterConnected.pipe(
+            Effect.flatMap((exists) =>
+              exists
+                ? runtimeProbe.get.pipe(
+                    Effect.andThen(
+                      openCode2Server.withConnection(({ client }) => readOpenRouterQuota(client)),
+                    ),
+                    Effect.orElseSucceed(() => undefined),
+                  )
+                : Effect.succeed({ authenticated: false, limits: undefined }),
             ),
-            Effect.option,
           )
-        : Effect.succeedNone
-    ).pipe(Effect.map(Option.getOrUndefined));
+        : Effect.undefined;
     const checkProvider = Effect.all(
       {
         // A configured loopback server reports its running version. Probe the local
@@ -619,8 +640,13 @@ export const OpenCodeDriver: ProviderDriver<
                     : ("unknown" as const),
                 canLogout: openRouterAccount?.authenticated ?? false,
               },
+              installed: provider.installed && provider.version !== null,
               models: openRouterAccount?.authenticated ? provider.models : [],
-              setup: { ...provider.setup, canInstall: false, canAuthenticate: provider.installed },
+              setup: {
+                ...provider.setup,
+                canInstall: false,
+                canAuthenticate: provider.installed || platform === "darwin",
+              },
             }
           : {}),
         usageLimits: openRouterFree ? openRouterAccount?.limits : usageLimits,
@@ -788,10 +814,30 @@ export const OpenCodeDriver: ProviderDriver<
               "start",
               "Could not connect OpenRouter. Try again.",
             );
-            yield* runtimeProbe.get.pipe(
-              Effect.andThen(openCode2Server.withConnection(() => Effect.void)),
-              Effect.mapError(() => error),
-            );
+            if (Option.isNone(yield* runtimeProbe.refresh.pipe(Effect.option))) {
+              yield* installOpenRouterFreeOpenCode({
+                instanceId,
+                directory: isolatedRoot,
+                platform,
+                architecture,
+              }).pipe(
+                Effect.provideService(FileSystem.FileSystem, fileSystem),
+                Effect.provideService(Path.Path, pathService),
+                Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+              );
+              yield* runtimeProbe.refresh.pipe(Effect.mapError(() => error));
+            }
+            yield* openCode2Server
+              .withConnection(() => Effect.void)
+              .pipe(
+                Effect.mapError(() =>
+                  openRouterSetupError(
+                    instanceId,
+                    "start",
+                    "Could not verify OpenRouter Free’s pricing rules. Try again.",
+                  ),
+                ),
+              );
             const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
             const key = yield* Effect.tryPromise({
               try: (signal) =>
